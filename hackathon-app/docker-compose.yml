@@ -1,0 +1,15 @@
+# docker compose up --build   ->  http://localhost:8080
+# VITE_API_URL is empty here on purpose: the app calls /api/... on its own origin and nginx proxies to :8888.
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}
+        VITE_WS_URL: ${VITE_WS_URL:-}
+    # lets nginx reach the backend published on the VM (port 8888)
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '8080:80'
+    restart: unless-stopped

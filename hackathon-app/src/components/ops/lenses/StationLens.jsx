@@ -3,7 +3,7 @@ import { Box, Button, Chip, MenuItem, Paper, Stack, TextField, Typography } from
 import toast from 'react-hot-toast';
 import { useAddRecordMutation, useUpdateDiversionMutation } from '@/features/ops/opsApi';
 import { iso, ms, stampMs } from '@/features/ops/helpers';
-import { fmtZ } from '@/features/ops/time';
+import { flightDay, fmtZ } from '@/features/ops/time';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 import Countdown from '../Countdown';
 
@@ -144,7 +144,7 @@ export default function StationLens({ d }) {
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'baseline', flexWrap: 'wrap' }}>
               <Typography variant="h5">{f?.registration ?? 'aircraft'}</Typography>
               <Typography variant="body2">
-                {f?.flight_no} {f?.dep_iata} to {f?.planned_arr_iata}, diverted
+                {f?.flight_no} ({flightDay(f)}) {f?.dep_iata} to {f?.planned_arr_iata}, diverted
               </Typography>
               <Chip
                 size="small"

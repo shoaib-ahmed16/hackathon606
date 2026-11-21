@@ -13,7 +13,7 @@ import {
 import { useAppDispatch } from '@/app/hooks';
 import { selectFlight } from '@/features/ops/opsSlice';
 import { ms } from '@/features/ops/helpers';
-import { fmtDur, fmtZ, MIN } from '@/features/ops/time';
+import { flightDay, fmtDur, fmtZ, fmtZD, MIN } from '@/features/ops/time';
 import { useNow } from '@/hooks/useNow';
 import Countdown from '../Countdown';
 import StatusChip from '../StatusChip';
@@ -114,7 +114,12 @@ function Row({ f, dl, fuelEnd, selected, onOpen }) {
       }}
     >
       <Box>
-        <Typography variant="subtitle2">{f.flight_no}</Typography>
+        <Typography variant="subtitle2">
+          {f.flight_no}{' '}
+          <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>
+            {flightDay(f)}
+          </Typography>
+        </Typography>
         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
           {f.dep_iata} to {f.diverted_to ?? f.current_dest_iata}
         </Typography>
@@ -127,7 +132,7 @@ function Row({ f, dl, fuelEnd, selected, onOpen }) {
         <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
           {f.waiting_for
             ? `waiting: ${f.waiting_for.replaceAll('_', ' ').toLowerCase()}`
-            : `ETA ${fmtZ(ms(f.eta_utc ?? f.sta_utc))}`}
+            : `ETA ${fmtZD(ms(f.eta_utc ?? f.sta_utc))}`}
           {!f.waiting_for && f.arr_delay_min > 0 ? ` (+${f.arr_delay_min}m)` : ''}
         </Typography>
         <Typography

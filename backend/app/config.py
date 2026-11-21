@@ -18,4 +18,11 @@ WORKER_ENABLED = os.environ.get("WORKER_ENABLED", "true").lower() == "true"
 
 # --- Ask (Claude). Leave the key unset and only the predefined questions work.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-ASK_MODEL = os.environ.get("ASK_MODEL", "claude-opus-5-5")
+ASK_MODEL = os.environ.get("ASK_MODEL", "claude-haiku-5-5")  # cheapest/fastest; override with ASK_MODEL for harder questions
+# --- token / cost guards for free-text questions (predefined questions never call the API)
+ASK_MAX_TOKENS = int(os.environ.get("ASK_MAX_TOKENS", "400"))            # cap on the reply length
+ASK_MAX_QUESTION_CHARS = int(os.environ.get("ASK_MAX_QUESTION_CHARS", "300"))
+ASK_FLIGHTS_IN_PROMPT = int(os.environ.get("ASK_FLIGHTS_IN_PROMPT", "40"))  # flights sent as context
+ASK_CACHE_TTL_SEC = int(os.environ.get("ASK_CACHE_TTL_SEC", "300"))      # identical question + identical data = no API call
+ASK_RATE_PER_MIN = int(os.environ.get("ASK_RATE_PER_MIN", "6"))          # AI calls per user per minute
+ASK_DAILY_LIMIT = int(os.environ.get("ASK_DAILY_LIMIT", "150"))          # AI calls per day, whole server

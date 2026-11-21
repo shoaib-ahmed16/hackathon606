@@ -364,20 +364,39 @@ def load_crew(cur, data_dir, fmap, airports):
 
 
 def load_pax(cur, data_dir, fmap):
+    """Connecting passengers: inbound leg (lands at the hub) -> outbound leg (departs the hub).
+
+    The sheet lists EVERY connection twice: once with is_in_bound = TRUE and once with FALSE, where the two flight
+    blocks are swapped (the departing flight comes first). The flag is not reliable, so the direction is decided from
+    the airports: the block that arrives at the hub is the inbound. Both listings of a connection are counted once
+    (the larger figure if the two disagree). Connections where the outbound leaves before the inbound lands are skipped.
+    """
+    HUB = "SHJ"
     c = pd.read_excel(find(data_dir, "Connecting_pax_data*.xlsx")[0])
     c.columns = ["flight_date", "in_no", "in_o", "in_d", "in_reg", "in_std", "in_sta", "is_in_bound", "pax",
                  "out_no", "out_o", "out_d", "out_reg", "out_std", "out_sta"]
+    fkey = lambda no, o, std: f"{no}|{o}|{pd.Timestamp(std):%Y-%m-%dT%H:%M}"  # noqa: E731
     agg = {}
-    miss = 0
+    outside = odd = impossible = 0
     for r in c.itertuples():
-        i = fmap.get(f"{r.in_no}|{r.in_o}|{pd.Timestamp(r.in_std):%Y-%m-%dT%H:%M}")
-        o = fmap.get(f"{r.out_no}|{r.out_o}|{pd.Timestamp(r.out_std):%Y-%m-%dT%H:%M}")
-        if not i or not o:
-            miss += 1
+        if r.in_d == HUB and r.out_o == HUB:      # block 1 lands at the hub, block 2 departs it
+            ik, ok, lands, departs = fkey(r.in_no, r.in_o, r.in_std), fkey(r.out_no, r.out_o, r.out_std), r.in_sta, r.out_std
+        elif r.in_o == HUB and r.out_d == HUB:    # swapped listing
+            ik, ok, lands, departs = fkey(r.out_no, r.out_o, r.out_std), fkey(r.in_no, r.in_o, r.in_std), r.out_sta, r.in_std
+        else:
+            odd += 1
             continue
-        agg[(i, o)] = agg.get((i, o), 0) + int(r.pax)
+        i, o = fmap.get(ik), fmap.get(ok)
+        if not i or not o:
+            outside += 1
+            continue
+        if pd.Timestamp(departs) < pd.Timestamp(lands):
+            impossible += 1
+            continue
+        agg[(i, o)] = max(agg.get((i, o), 0), int(r.pax))
     execute_values(cur, "INSERT INTO fogops.pax_connection VALUES %s", [(i, o, p) for (i, o), p in agg.items()])
-    log(f"pax connections: {len(agg)} pairs ({miss} rows outside the 20-23 Nov rotation skipped)")
+    log(f"pax connections: {len(agg)} pairs, {sum(agg.values())} pax ({outside} rows outside the 20-23 Nov rotation, "
+        f"{impossible} impossible (outbound before inbound), {odd} not hub connections: skipped)")
 
 
 def load_history(cur, data_dir):

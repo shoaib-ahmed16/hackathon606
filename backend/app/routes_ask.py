@@ -3,9 +3,12 @@
  * Free text goes to Claude when ANTHROPIC_API_KEY is set, grounded ONLY on facts read from the database; otherwise a clear
    fallback lists what can be asked. Nothing the assistant says is stored as data, and every question is audited.
 """
+import hashlib
 import json
 import re
-from datetime import timedelta
+import time
+from collections import defaultdict, deque
+from datetime import date, timedelta, timezone
 
 import anthropic
 from fastapi import APIRouter, Depends
@@ -154,7 +157,36 @@ def a_draft(s, c, q, flights):
     return "Draft (review before sending):\n" + body, "v_flight_watch"
 
 
+def a_help(s, c, q, flights):
+    return ("I answer from the live data. Try: which crew runs out of legality next, what is the next deadline, where an aircraft is, "
+            "what time a flight must leave, who can replace a captain, what is waiting for approval, a situation summary, "
+            "or a flight number (e.g. G9464) for its status."), "built-in help"
+
+
+def _zd(ts):
+    return ts.astimezone(timezone.utc).strftime("%d %b %H:%MZ") if ts else "-"
+
+
+def a_flight(s, c, q, flights):
+    f = _find(flights, q)
+    if not f:
+        return "I could not find that flight or aircraft in this case.", "v_flight_watch"
+    parts = [f"{f['flight_no']} ({f['registration'] or 'reg n/a'}) {f['dep_iata']}-{f['planned_arr_iata']}: {f['status']}"]
+    if f.get("eta_utc"):
+        parts.append(f"ETA {_zd(f['eta_utc'])} ({local(f['eta_utc'])} SHJ)")
+    if f.get("diverted_to"):
+        parts.append(f"diverted to {f['diverted_to']}")
+    if f.get("waiting_for"):
+        parts.append(f"waiting for {f['waiting_for']}")
+    if f.get("crew_status"):
+        parts.append(f"crew {f['crew_status']}" + (f", margin {f['crew_margin_min']} min" if f.get("crew_margin_min") is not None else ""))
+    if f.get("recommendation"):
+        parts.append(f"recommendation: {f['recommendation']}" + (f" {f['recommended_alternate']}" if f.get("recommended_alternate") else ""))
+    return "; ".join(parts), "v_flight_watch"
+
+
 ROUTES = [
+    ("help", re.compile(r"^\s*(hi|hello|hey|thanks|thank you|ok|okay|help)\W*$|what can (you|i) (do|ask|answer)", re.I), a_help),
     ("crew_next", re.compile(r"(crew.*(run out|runs out|time out|times out|legal.*next|next))|(legal.*next)|(who.*(time|run)s? out)", re.I), a_crew_next),
     ("deadline", re.compile(r"(next|first|urgent).*(deadline|decision)|what.*(next|urgent)|deadline", re.I), a_deadline),
     ("draft", re.compile(r"\bdraft\b|\bmessage\b", re.I), a_draft),
@@ -163,6 +195,7 @@ ROUTES = [
     ("aircraft", re.compile(r"\bwhere\b.*\b(A6-?[A-Z]{3}|aircraft|tail)\b|waiting for", re.I), a_aircraft),
     ("pending", re.compile(r"approval|waiting for me|pending", re.I), a_pending),
     ("summary", re.compile(r"summar|situation|overview|status of|how are we", re.I), a_summary),
+    ("flight", re.compile(r"\bG9\d{3,4}D?\b|\bA6-?[A-Z]{3}\b", re.I), a_flight),  # bare flight/tail mention -> status card, no AI
 ]
 
 
@@ -201,31 +234,69 @@ def _facts(s, c, flights):
             "decision": f["last_decision"], "decision_status": f["decision_status"], "latest_legal_departure_z": z(f["latest_legal_offblocks_utc"]) if f["latest_legal_offblocks_utc"] else None,
             "deadline_z": z(dl[f["flight_id"]]["deadline_utc"]) if f["flight_id"] in dl and dl[f["flight_id"]]["deadline_utc"] else None, "deadline_reason": dl.get(f["flight_id"], {}).get("reason"),
             "open_data_exceptions": f["open_exceptions"],
-        } for f in flights[:60]],
+        } for f in flights[:config.ASK_FLIGHTS_IN_PROMPT]],
         "crew_next_to_time_out": [{"name": x["full_name"], "position": x["position_code"], "legs": x["duty_legs"], "legal_end_z": z(x["legal_end_utc"]), "minutes": x["minutes_until_legal_end"], "status": x["status"]} for x in fetch("SELECT * FROM v_crew_legality_ranking v WHERE v.scenario_id = %s AND v.minutes_until_legal_end >= 0 AND v.duty_id IN (SELECT l.duty_id FROM crew_duty_leg l JOIN case_flight cf ON cf.flight_id = l.flight_id WHERE l.scenario_id = %s AND l.is_active AND cf.case_id = %s) ORDER BY v.minutes_until_legal_end LIMIT 8", (s, s, c))],
         "decisions_waiting_for_approval": [{"flight": x["flight_no"], "decision": x["decision_type"], "alternate": x["alternate_iata"], "by": x["decided_by"]} for x in fetch("SELECT * FROM v_decision_log WHERE scenario_id = %s AND case_id = %s AND status = 'PROPOSED'", (s, c))],
     }
 
 
+def _compact(o):
+    """Drop empty values so fewer tokens are sent."""
+    if isinstance(o, dict):
+        return {k: _compact(v) for k, v in o.items() if v not in (None, "", [], {})}
+    if isinstance(o, list):
+        return [_compact(v) for v in o]
+    return o
+
+
 SYSTEM = """You are the decision-support assistant inside an airline operations console for fog disruption at Sharjah (SHJ).
 Answer ONLY from the FACTS JSON in the user message. If the facts do not contain the answer, say you do not have that information
 and name the screen or data that would hold it. Never invent flights, times, crew, fuel or rules. Quote times as 24h UTC with a Z
-and give SHJ local time (UTC+4) in brackets. Be brief and operational: lead with the answer, then the one or two facts behind it.
+and give SHJ local time (UTC+4) in brackets. Be brief and operational: lead with the answer, then the one or two facts behind it. Maximum 100 words.
 You recommend and explain; people decide. Never state that a decision has been made or an action executed."""
+
+
+_cache: dict = {}                       # key -> (expires_at, response)
+_calls: dict = defaultdict(deque)       # user -> timestamps of AI calls (rate limit)
+_day = {"d": date.today(), "n": 0}      # server-wide daily counter
+
+
+def _norm(q):
+    return re.sub(r"[^a-z0-9 ]", "", re.sub(r"\s+", " ", q.lower())).strip()
+
+
+def _allow(user):
+    """Per-user and per-day ceilings on AI calls. Returns an error message or None."""
+    now = time.time()
+    if _day["d"] != date.today():
+        _day.update(d=date.today(), n=0)
+    if _day["n"] >= config.ASK_DAILY_LIMIT:
+        return "The daily AI question limit has been reached. The predefined questions still work."
+    dq = _calls[str(user)]
+    while dq and now - dq[0] > 60:
+        dq.popleft()
+    if len(dq) >= config.ASK_RATE_PER_MIN:
+        return f"Too many AI questions in a minute (max {config.ASK_RATE_PER_MIN}). Wait a little or use a suggested question."
+    return None
 
 
 def _claude(question, facts):
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    kwargs = dict(model=config.ASK_MODEL, max_tokens=1200, system=SYSTEM,
-                  messages=[{"role": "user", "content": f"FACTS:\n{json.dumps(facts, default=str)}\n\nQUESTION: {question}"}],
-                  output_config={"effort": "low"})
-    try:  # server-side refusal fallback (recommended for these models); older SDKs without the parameter just skip it
-        msg = client.beta.messages.create(betas=["server-side-fallback-2026-07-01"], fallbacks="default", **kwargs)
-    except TypeError:
+    payload = json.dumps(_compact(facts), default=str, separators=(",", ":"))
+    kwargs = dict(model=config.ASK_MODEL, max_tokens=config.ASK_MAX_TOKENS, system=SYSTEM,
+                  messages=[{"role": "user", "content": f"FACTS:\n{payload}\n\nQUESTION: {question}"}])
+    try:  # no hidden "thinking": it can eat the whole token cap and costs money; answers are lookups over given facts
+        msg = client.messages.create(thinking={"type": "disabled"}, **kwargs)
+    except anthropic.BadRequestError:  # a model that does not accept the parameter
         msg = client.messages.create(**kwargs)
     if msg.stop_reason == "refusal":
-        return "The assistant declined to answer that question."
-    return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip() or "No answer was returned."
+        return "The assistant declined to answer that question.", None
+    text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
+    if not text:
+        text = "The answer was cut off (token limit). Ask a narrower question or use a suggested one."
+    elif msg.stop_reason == "max_tokens":
+        text += " ..."
+    return text, {"input": msg.usage.input_tokens, "output": msg.usage.output_tokens}
 
 
 @r.post("/ask")
@@ -240,8 +311,26 @@ def ask(b: Ask, user=Depends(actor)):
             text, src = fn(s, b.case_id, q, flights)
             return {"mode": "predefined", "question_id": qid, "answer": text, "source": f"Answered from {src}"}
     if config.ANTHROPIC_API_KEY:
+        if len(q) > config.ASK_MAX_QUESTION_CHARS:
+            return {"mode": "none", "answer": f"Please keep the question under {config.ASK_MAX_QUESTION_CHARS} characters.", "source": None}
+        facts = _facts(s, b.case_id, flights)
+        key = (s, b.case_id, _norm(q), hashlib.md5(json.dumps(facts, default=str, sort_keys=True).encode()).hexdigest())
+        hit = _cache.get(key)
+        if hit and hit[0] > time.time():  # same question on unchanged data: no tokens spent
+            return {**hit[1], "source": hit[1]["source"] + " (cached, 0 tokens)", "usage": {"input": 0, "output": 0, "cached": True}}
+        blocked = _allow(user)
+        if blocked:
+            return {"mode": "error", "answer": blocked, "source": None}
         try:
-            return {"mode": "ai", "answer": _claude(q, _facts(s, b.case_id, flights)), "source": f"AI ({config.ASK_MODEL}), grounded on this case's database facts only"}
+            _calls[str(user)].append(time.time())
+            _day["n"] += 1
+            text, usage = _claude(q, facts)
+            res = {"mode": "ai", "answer": text, "source": f"AI ({config.ASK_MODEL}), grounded on this case's database facts only"}
+            _cache[key] = (time.time() + config.ASK_CACHE_TTL_SEC, res)
+            if len(_cache) > 200:  # keep memory bounded
+                for k in [k for k, v in _cache.items() if v[0] < time.time()] or list(_cache)[:50]:
+                    _cache.pop(k, None)
+            return {**res, "usage": usage}
         except anthropic.AuthenticationError:
             return {"mode": "error", "answer": "The Claude API key was rejected. Check ANTHROPIC_API_KEY on the server.", "source": None}
         except anthropic.RateLimitError:

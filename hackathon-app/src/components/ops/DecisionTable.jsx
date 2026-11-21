@@ -15,7 +15,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useAppDispatch } from '@/app/hooks';
 import { selectFlight } from '@/features/ops/opsSlice';
 import { ms } from '@/features/ops/helpers';
-import { fmtTime } from '@/features/ops/time';
+import { flightDay, fmtZLD } from '@/features/ops/time';
 import EmptyState from '@/components/EmptyState';
 import StatusChip from './StatusChip';
 import MarginBar from './MarginBar';
@@ -30,7 +30,7 @@ export function Legend() {
   );
 }
 
-const T = (iso) => (iso ? fmtTime(ms(iso)) : '-');
+const T = (iso) => (iso ? fmtZLD(ms(iso)) : '-');
 
 // The decision table: status + freshness, crew margin, recommendation, latest legal vs target, owner.
 export default function DecisionTable({ flights, sort, onSort }) {
@@ -77,7 +77,10 @@ export default function DecisionTable({ flights, sort, onSort }) {
                 <TableCell>
                   <Typography component="div" variant="subtitle2">
                     {f.flight_no}{' '}
-                    <Chip size="small" variant="outlined" label={f.registration ?? 'no tail'} />
+                    <Chip size="small" variant="outlined" label={f.registration ?? 'no tail'} />{' '}
+                    <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>
+                      {flightDay(f)}
+                    </Typography>
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                     {f.dep_iata} to {dest}

@@ -9,7 +9,7 @@ import {
 } from '@/features/ops/opsApi';
 import { selectFlight } from '@/features/ops/opsSlice';
 import { iso, ms } from '@/features/ops/helpers';
-import { fmtTime, fmtZ, MIN } from '@/features/ops/time';
+import { flightDay, fmtTime, fmtZ, MIN } from '@/features/ops/time';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 import Countdown from '../Countdown';
 import StatCard from '@/components/StatCard';
@@ -145,7 +145,10 @@ export default function RecoveryLens({ d }) {
                     fontSize: 12,
                   }}
                 >
-                  <b>{it.flight_no}</b> <span>{it.dep_iata}</span>
+                  <b>{it.flight_no}</b> <span>{it.dep_iata}</span>{' '}
+                  <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>
+                    {flightDay(d.flights.find((x) => x.flight_id === it.flight_id))}
+                  </Typography>
                   <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
                     {it.current_location?.replaceAll('_', ' ').toLowerCase()}
                   </Typography>

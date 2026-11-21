@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Chip,
+  Collapse,
   Divider,
   Drawer,
   LinearProgress,
@@ -40,7 +41,7 @@ import {
   scenarioNowMs,
   stampMs,
 } from '@/features/ops/helpers';
-import { fmtDateTime, fmtDur, fmtTime, fmtZ } from '@/features/ops/time';
+import { flightDay, fmtDateTime, fmtDur, fmtZ, fmtZLD } from '@/features/ops/time';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 import StatusChip from './StatusChip';
 import MarginBar from './MarginBar';
@@ -65,7 +66,7 @@ const Section = ({ title, children }) => (
     {children}
   </Box>
 );
-const t = (v) => (v ? fmtTime(ms(v)) : '-');
+const t = (v) => (v ? fmtZLD(ms(v)) : '-'); // date + UTC + SHJ local, never an unlabeled time
 const human = (code) => String(code).replaceAll('_', ' ').toLowerCase();
 const WAITING = [
   'LANDING',
@@ -141,6 +142,7 @@ function DrawerBody({ d, f }) {
   const [feed] = useFlightEventMutation();
   const [swap] = useSwapCrewMutation();
   const [pick, setPick] = useState(null); // chosen option row
+  const [freeForm, setFreeForm] = useState(false); // record a decision without picking an option
   const [type, setType] = useState('');
   const [why, setWhy] = useState('');
   const [comment, setComment] = useState('');
@@ -183,6 +185,11 @@ function DrawerBody({ d, f }) {
   const conseqKey = pick ? (pick.action === 'HOLD' ? 'HOLD' : pick.alternate_iata) : null;
   const conseq = conseqKey ? dt?.consequences?.[conseqKey] : null;
   const close = () => dispatch(selectFlight(null));
+  const choose = (o) => {
+    setPick(o);
+    setType('');
+    setFreeForm(false);
+  };
 
   const run = async (fn, ok) => {
     try {
@@ -307,6 +314,72 @@ function DrawerBody({ d, f }) {
       'Crew swapped, legality recalculated',
     );
 
+  // Decision form: opens right under the option that was clicked (or at the bottom for "record without an option").
+  const formBoxSx = {
+    mt: 0.5,
+    p: 1.5,
+    border: 1,
+    borderColor: 'primary.main',
+    borderRadius: 1.5,
+    bgcolor: 'action.hover',
+  };
+  const decisionForm = (
+    <Stack spacing={1}>
+      <Typography variant="subtitle2">
+        {pick
+          ? `Record a decision for option #${pick.rank}: ${pick.action} ${pick.alternate_iata ?? ''}`
+          : 'Record a decision'}
+      </Typography>
+      <Conseq lines={conseq} />
+      {isOverride && (
+        <Box>
+          <Typography variant="caption" sx={{ color: 'warning.main' }}>
+            You chose a different option than the engine's first. Why? (required)
+          </Typography>
+          <Stack direction="row" sx={{ gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+            {REASONS.map((r) => (
+              <Chip
+                key={r}
+                size="small"
+                label={r}
+                color={reason === r ? 'primary' : 'default'}
+                variant={reason === r ? 'filled' : 'outlined'}
+                onClick={() => setReason(r)}
+              />
+            ))}
+          </Stack>
+        </Box>
+      )}
+      <TextField
+        select
+        label="Decision"
+        value={type || pick?.action || REC_TO_DECISION[f.recommendation] || 'OTHER'}
+        onChange={(e) => setType(e.target.value)}
+      >
+        {DECISION_TYPES.map((x) => (
+          <MenuItem key={x} value={x}>
+            {x.replaceAll('_', ' ')}
+          </MenuItem>
+        ))}
+      </TextField>
+      <TextField
+        autoFocus
+        label="Rationale (required)"
+        value={why}
+        onChange={(e) => setWhy(e.target.value)}
+        multiline
+        minRows={2}
+      />
+      <Button
+        variant="contained"
+        disabled={!why.trim() || saving || !actor || (isOverride && !reason)}
+        onClick={decide}
+      >
+        Record decision as {actor?.display_name}
+      </Button>
+    </Stack>
+  );
+
   return (
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
@@ -314,6 +387,7 @@ function DrawerBody({ d, f }) {
           <Typography variant="h5" component="div">
             {f.flight_no}{' '}
             <Chip size="small" variant="outlined" label={f.registration ?? 'no tail'} />{' '}
+            <Chip size="small" variant="outlined" color="primary" label={flightDay(f)} />{' '}
             <StatusChip status={f.status} />
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -374,8 +448,10 @@ function DrawerBody({ d, f }) {
 
       <Section title="Flight">
         <Box sx={{ display: 'grid', gap: 0.5, mt: 0.5 }}>
-          <Row k="Scheduled dep / arr" v={`${t(f.std_utc)} / ${t(f.sta_utc)}`} />
-          <Row k="Estimated dep / arr" v={`${t(f.etd_utc)} / ${t(f.eta_utc)}`} />
+          <Row k="Scheduled departure" v={t(f.std_utc)} />
+          <Row k="Scheduled arrival" v={t(f.sta_utc)} />
+          <Row k="Estimated departure" v={t(f.etd_utc)} />
+          <Row k="Estimated arrival" v={t(f.eta_utc)} />
           <Row k="Arrival delay" v={fmtDur(f.arr_delay_min)} />
           <Row k="Fog exposure" v={f.fog_exposure} />
           {f.waiting_for && <Row k="Aircraft waiting for" v={human(f.waiting_for)} />}
@@ -561,67 +637,77 @@ function DrawerBody({ d, f }) {
               const blocked = !o.is_executable;
               const chosen = pick?.rank === o.rank;
               return (
-                <Box
-                  key={`${o.rec_id}-${o.rank}`}
-                  onClick={() => !hasOpen && setPick(chosen ? null : o)}
-                  sx={{
-                    border: 1,
-                    borderColor: chosen ? 'primary.main' : 'divider',
-                    borderRadius: 1.5,
-                    p: 1,
-                    cursor: hasOpen ? 'default' : 'pointer',
-                    opacity: blocked ? 0.75 : 1,
-                    '&:hover': hasOpen ? undefined : { bgcolor: 'action.hover' },
-                  }}
-                >
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <Typography variant="subtitle2" sx={{ width: 20 }}>
-                      #{o.rank}
-                    </Typography>
-                    <Typography variant="subtitle2" sx={{ flex: 1 }}>
-                      {o.action === 'HOLD'
-                        ? 'Hold at SHJ'
-                        : `Divert to ${o.alternate_iata}${o.alternate_name ? ` (${o.alternate_name})` : ''}`}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      color={blocked ? 'error' : 'success'}
-                      variant="outlined"
-                      label={blocked ? 'Blocked' : 'Executable'}
-                    />
-                    {o.needs_verification && <Chip size="small" color="warning" label="Verify" />}
-                  </Stack>
-                  <Typography
-                    variant="caption"
-                    sx={{ display: 'block', color: 'text.secondary', fontFamily: 'monospace' }}
+                <Box key={`${o.rec_id}-${o.rank}`}>
+                  <Box
+                    onClick={() => !hasOpen && (chosen ? setPick(null) : choose(o))}
+                    sx={{
+                      border: 1,
+                      borderColor: chosen ? 'primary.main' : 'divider',
+                      borderRadius: 1.5,
+                      p: 1,
+                      cursor: hasOpen ? 'default' : 'pointer',
+                      opacity: blocked ? 0.75 : 1,
+                      '&:hover': hasOpen ? undefined : { bgcolor: 'action.hover' },
+                    }}
                   >
-                    score {o.score} - fuel margin {o.fuel_margin_min ?? '-'}m - crew margin{' '}
-                    {o.crew_margin_min ?? '-'}m
-                    {o.est_arrival_utc ? ` - arrive ${t(o.est_arrival_utc)}` : ''}
-                  </Typography>
-                  {o.blocking_constraints?.map((b) => (
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      <Typography variant="subtitle2" sx={{ width: 20 }}>
+                        #{o.rank}
+                      </Typography>
+                      <Typography variant="subtitle2" sx={{ flex: 1 }}>
+                        {o.action === 'HOLD'
+                          ? 'Hold at SHJ'
+                          : `Divert to ${o.alternate_iata}${o.alternate_name ? ` (${o.alternate_name})` : ''}`}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        color={blocked ? 'error' : 'success'}
+                        variant="outlined"
+                        label={blocked ? 'Blocked' : 'Executable'}
+                      />
+                      {o.needs_verification && <Chip size="small" color="warning" label="Verify" />}
+                    </Stack>
                     <Typography
-                      key={b.code}
                       variant="caption"
-                      sx={{ display: 'block', color: b.verify ? 'warning.main' : 'error.main' }}
+                      sx={{ display: 'block', color: 'text.secondary', fontFamily: 'monospace' }}
                     >
-                      {human(b.code)}
-                      {b.margin_min != null ? ` (${b.margin_min} min)` : ''}
+                      score {o.score} - fuel margin {o.fuel_margin_min ?? '-'}m - crew margin{' '}
+                      {o.crew_margin_min ?? '-'}m
+                      {o.est_arrival_utc ? ` - arrive ${t(o.est_arrival_utc)}` : ''}
                     </Typography>
-                  ))}
-                  {o.reasons?.slice(0, 2).map((r) => (
-                    <Typography
-                      key={r}
-                      variant="caption"
-                      sx={{ display: 'block', color: 'text.secondary' }}
-                    >
-                      {r}
-                    </Typography>
-                  ))}
+                    {o.blocking_constraints?.map((b) => (
+                      <Typography
+                        key={b.code}
+                        variant="caption"
+                        sx={{ display: 'block', color: b.verify ? 'warning.main' : 'error.main' }}
+                      >
+                        {human(b.code)}
+                        {b.margin_min != null ? ` (${b.margin_min} min)` : ''}
+                      </Typography>
+                    ))}
+                    {o.reasons?.slice(0, 2).map((r) => (
+                      <Typography
+                        key={r}
+                        variant="caption"
+                        sx={{ display: 'block', color: 'text.secondary' }}
+                      >
+                        {r}
+                      </Typography>
+                    ))}
+                  </Box>
+                  <Collapse in={chosen && !hasOpen} mountOnEnter unmountOnExit>
+                    <Box sx={formBoxSx}>{decisionForm}</Box>
+                  </Collapse>
                 </Box>
               );
             })}
           </Stack>
+        )}
+
+        {!hasOpen && options.data?.length > 0 && !pick && !freeForm && (
+          <Button size="small" sx={{ mt: 1 }} onClick={() => setFreeForm(true)}>
+            Record a decision without picking an option
+          </Button>
         )}
 
         {hasOpen ? (
@@ -666,59 +752,7 @@ function DrawerBody({ d, f }) {
             )}
           </Stack>
         ) : (
-          <Stack spacing={1} sx={{ mt: 1 }}>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              {pick
-                ? `Selected option #${pick.rank}: ${pick.action} ${pick.alternate_iata ?? ''}`
-                : 'Click an option above to base your decision on it (or just record one).'}
-            </Typography>
-            <Conseq lines={conseq} />
-            {isOverride && (
-              <Box>
-                <Typography variant="caption" sx={{ color: 'warning.main' }}>
-                  You chose a different option than the engine's first. Why? (required)
-                </Typography>
-                <Stack direction="row" sx={{ gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
-                  {REASONS.map((r) => (
-                    <Chip
-                      key={r}
-                      size="small"
-                      label={r}
-                      color={reason === r ? 'primary' : 'default'}
-                      variant={reason === r ? 'filled' : 'outlined'}
-                      onClick={() => setReason(r)}
-                    />
-                  ))}
-                </Stack>
-              </Box>
-            )}
-            <TextField
-              select
-              label="Decision"
-              value={type || pick?.action || REC_TO_DECISION[f.recommendation] || 'OTHER'}
-              onChange={(e) => setType(e.target.value)}
-            >
-              {DECISION_TYPES.map((x) => (
-                <MenuItem key={x} value={x}>
-                  {x.replaceAll('_', ' ')}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              label="Rationale (required)"
-              value={why}
-              onChange={(e) => setWhy(e.target.value)}
-              multiline
-              minRows={2}
-            />
-            <Button
-              variant="contained"
-              disabled={!why.trim() || saving || !actor || (isOverride && !reason)}
-              onClick={decide}
-            >
-              Record decision as {actor?.display_name}
-            </Button>
-          </Stack>
+          (!options.data?.length || freeForm) && <Box sx={formBoxSx}>{decisionForm}</Box>
         )}
       </Section>
 

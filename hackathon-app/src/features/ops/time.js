@@ -2,6 +2,7 @@ export const MIN = 60000;
 const dubai = { timeZone: 'Asia/Dubai' };
 const tf = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', ...dubai });
 const df = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', ...dubai });
+const dfz = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' });
 const zf = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit',
   minute: '2-digit',
@@ -20,6 +21,18 @@ export const fmtDate = (ms) => (ms == null ? '-' : df.format(ms));
 export const fmtDateTime = (ms) => `${fmtDate(ms)} ${fmtTime(ms)}`;
 export const fmtZ = (ms) => (ms == null ? '-' : `${zf.format(ms)}Z`);
 export const fmtZs = (ms) => (ms == null ? '-' : `${zsf.format(ms)}Z`);
+// Day helpers so a flight's date is always visible. Day = UTC date (same basis as the Z times).
+export const fmtDay = (ms) => (ms == null ? '-' : dfz.format(ms)); // "21 Nov"
+export const fmtZD = (ms) => (ms == null ? '-' : `${fmtDay(ms)} ${fmtZ(ms)}`); // "21 Nov 01:55Z"
+// "21 Nov 01:55Z / 05:55 SHJ" (adds the SHJ date only when it differs from the UTC date, e.g. 22:00Z = 02:00 next day)
+export const fmtZLD = (ms) => {
+  if (ms == null) return '-';
+  const sameDay = df.format(ms) === dfz.format(ms);
+  return `${fmtDay(ms)} ${fmtZ(ms)} / ${sameDay ? '' : `${df.format(ms)} `}${fmtTime(ms)} SHJ`;
+};
+// The date a flight belongs to: scheduled arrival (else departure)
+export const flightDay = (f) => fmtDay(Date.parse(f?.sta_utc ?? f?.std_utc ?? '') || null);
+
 export const fmtZL = (ms) => (ms == null ? '-' : `${fmtZ(ms)} / ${fmtTime(ms)} SHJ`);
 
 // 125 -> "2h 05m" (negative allowed)

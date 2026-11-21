@@ -1,0 +1,38 @@
+# Postgres + FastAPI for FogOps.
+#   docker compose up -d db
+#   FOGOPS_DSN=postgresql://postgres:postgres@127.0.0.1:5433/fogops ./fogops_db/rebuild.sh /path/to/excel fogops
+#   docker compose up -d --build api      ->  http://localhost:8000/docs
+services:
+  db:
+    image: postgres:16
+    container_name: fogops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fogops
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - '127.0.0.1:5433:5432' # localhost only; reach it with an SSH tunnel
+    volumes:
+      - fogops-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d fogops']
+      interval: 10s
+      retries: 10
+
+  api:
+    build: .
+    container_name: fogops-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FOGOPS_DSN: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/fogops
+      DEFAULT_ACTOR_ID: ${DEFAULT_ACTOR_ID:-1}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://130.61.182.207:8080}
+    ports:
+      - '8000:8000' # port 8000 is not open to the internet; the frontend nginx proxies to it
+
+volumes:
+  fogops-data:
