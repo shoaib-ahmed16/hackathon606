@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { OPS_API_URL } from '@/config/env';
 import { api } from '@/app/api';
@@ -28,15 +28,18 @@ import { selectCase, selectOps } from './opsSlice';
 
 const EMPTY_LIST = [];
 const EMPTY_RULES = { rules: [], flights: {}, errors: [] };
-const POLL = 10000; // fallback; the SSE stream below refreshes sooner
+const POLL_FALLBACK = 10000; // used only while the live stream is down
+const POLL_LIVE = 60000;     // a slow safety net while the live stream is connected (it pushes every change)
 
 // One hook for every screen: selected case + all DB read models, kept fresh.
 export function useOps() {
   const dispatch = useAppDispatch();
   const ops = useAppSelector(selectOps);
+  const [live, setLive] = useState(false);
+  const POLL = live ? POLL_LIVE : POLL_FALLBACK;
   const cases = useGetCasesQuery(undefined, { pollingInterval: 30000 });
   const user = useAppSelector(selectUser);
-  const alternates = useGetAlternateAirportsQuery({ hub: 'SHJ' }, { pollingInterval: 60000 });
+  const alternates = useGetAlternateAirportsQuery({ hub: 'SHJ' });
   const token = useAppSelector((s) => s.auth.token);
 
   // default to the newest case once, so the app opens on something real
@@ -63,15 +66,15 @@ export function useOps() {
   const decisions = useGetDecisionLogQuery(ctx, opt);
   const exceptions = useGetExceptionsQuery({ scenario_id: ops.scenarioId }, opt);
   const kpis = useGetKpisQuery({ case_id: ops.caseId }, opt);
-  const rules = useGetRulesQuery({ scenario_id: ops.scenarioId }, { skip: !ops.scenarioId, pollingInterval: 30000 });
+  const rules = useGetRulesQuery({ scenario_id: ops.scenarioId }, { skip: !ops.scenarioId });   // changes only when someone saves a rule, which refreshes it
   const ruleMatches = useGetRuleMatchesQuery(ctx, opt);
   const requests = useGetDataRequestsQuery({ scenario_id: ops.scenarioId, status: 'OPEN' }, { skip: !ops.scenarioId, pollingInterval: POLL });
   const approvals = useGetApprovalsQuery(ctx, opt);
   const subs = useGetMySubscriptionsQuery(
     { scenario_id: ops.scenarioId },
-    { pollingInterval: 30000, skip: !ops.scenarioId },
+    { skip: !ops.scenarioId },   // your own watch list: it changes only when you press Watch, which refreshes it
   );
-  const notifications = useGetMyNotificationsQuery(undefined, { pollingInterval: 30000 });
+  const notifications = useGetMyNotificationsQuery(undefined, { pollingInterval: 60000 });
 
   // live push: the DB NOTIFYs when anything changes; refetch everything tagged Ops
   // The browser asks for a one-time ticket (with its normal Authorization header) and only the ticket goes in the stream URL, so the session
@@ -89,9 +92,11 @@ export function useOps() {
         const { ticket } = await r.json();
         if (stopped) return;
         es = new EventSource(`${OPS_API_URL}/api/stream?ticket=${encodeURIComponent(ticket)}`);
+        es.onopen = () => setLive(true);
         es.addEventListener('reassess', refresh);
         es.addEventListener('notify', refresh);
         es.onerror = () => {
+          setLive(false);
           es.close();
           if (!stopped) timer = setTimeout(connect, 5000);
         };
@@ -102,6 +107,7 @@ export function useOps() {
     connect();
     return () => {
       stopped = true;
+      setLive(false);
       clearTimeout(timer);
       es?.close();
     };
