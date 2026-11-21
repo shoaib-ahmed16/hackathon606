@@ -35,7 +35,7 @@ function NoteSheet({ flightNo, onSend, onClose }) {
   return (
     <Sheet
       title={`Message to OCC about ${flightNo ?? 'this flight'}`}
-      sub="Everyone watching the flight sees it, with the time and your name."
+      sub="OCC gets an alert in the bell, and so does everyone watching the flight, with the time and your name."
       onClose={onClose}
       footer={
         <>

@@ -34,15 +34,21 @@ def cases(scenario_id: int | None = None):
 
 @r.get("/flights")
 def flights(scenario_id: int | None = None, case_id: int | None = None, limit: int = Query(1000, le=5000)):
-    """Single flight watch: status, ETA, fog exposure, captain, duty margin, recommendation, decision, owner."""
+    """Single flight watch: status, ETA, fog exposure, captain, duty margin, recommendation, decision, owner, severity, tags."""
+    # The case filter is added only when given and as a plain equality: with "(%s IS NULL OR case_id = %s)" Postgres cannot push
+    # it down into the heavy v_flight_watch view and evaluates EVERY case of the scenario (23 s for a 94-flight case).
+    where, params = "w.scenario_id = %s", [scn(scenario_id)]
+    if case_id is not None:
+        where += " AND w.case_id = %s"
+        params.append(case_id)
     return fetch(
         f"""SELECT w.*, sv.severity_score, sv.connecting_pax,
                    COALESCE((SELECT array_agg(ft.tag ORDER BY ft.tag) FROM flight_tag ft WHERE ft.scenario_id = w.scenario_id AND ft.flight_id = w.flight_id), '{{}}'::text[]) AS tags
               FROM v_flight_watch w
-              LEFT JOIN v_flight_severity sv ON sv.case_id = w.case_id AND sv.flight_id = w.flight_id
-             WHERE w.scenario_id = %s AND (%s::int IS NULL OR w.case_id = %s::int)
+              LEFT JOIN v_flight_severity sv ON sv.case_id = w.case_id AND sv.flight_id = w.flight_id AND sv.scenario_id = w.scenario_id
+             WHERE {where}
              ORDER BY coalesce(w.eta_utc, w.sta_utc) LIMIT {int(limit)}""",
-        (scn(scenario_id), case_id, case_id),
+        params,
     )
 
 

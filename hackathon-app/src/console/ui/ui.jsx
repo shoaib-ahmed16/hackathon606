@@ -24,13 +24,18 @@ export function Cd({ at, className = '', big = false }) {
 // Modal sheet (propose / approve / reject / execute / answer ...). Esc and a click outside close it.
 export function Sheet({ title, sub, children, footer, onClose, wide, bare }) {
   const ref = useRef(null);
+  const closeRef = useRef(onClose);
+  // parents pass a new function every render; keep the latest without re-running the mount effect below
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose?.();
+    closeRef.current = onClose;
+  });
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && closeRef.current?.();
     document.addEventListener('keydown', onKey);
-    const first = ref.current?.querySelector('textarea, input, select, button:not(.close-x)');
-    first?.focus();
+    // focus the first field ONCE when the sheet opens (re-focusing on every parent refresh moved the cursor while typing)
+    ref.current?.querySelector('textarea, input, select, button:not(.close-x)')?.focus();
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
   return createPortal(
     <div className="scrim open" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <div className={`sheet ${wide ? 'wide' : ''}`} ref={ref}>
@@ -50,11 +55,15 @@ export function Sheet({ title, sub, children, footer, onClose, wide, bare }) {
 
 // Right-hand drawer (approvals, notifications).
 export function Drawer({ title, sub, onClose, children }) {
+  const closeRef = useRef(onClose);
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose?.();
+    closeRef.current = onClose;
+  });
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && closeRef.current?.();
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
   return createPortal(
     <>
       <div className="panel-scrim open" onClick={onClose} style={{ zIndex: 54 }} />

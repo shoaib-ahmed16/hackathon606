@@ -34,7 +34,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* ---------- app frame ---------- */
 .app{display:grid;grid-template-rows:auto auto 1fr;grid-template-columns:minmax(0,1fr);height:100vh;position:relative}
 .app > *{min-width:0}
-.app.scenario-replay{box-shadow: inset 0 0 0 4px var(--replay)}
+.app.scenario-replay{box-shadow:none}
 .replay-banner{display:none;background:var(--replay);color:#fff;font-weight:600;text-align:center;padding:4px 12px;font-size:13px}
 .app.scenario-replay .replay-banner{display:block}
 
@@ -475,3 +475,10 @@ body{min-width:1024px}
   .alts-row{gap:4px}
   .strip > *{padding:8px 9px}
 }
+
+/* replay / what-if frame: a fixed overlay, so it always surrounds the visible screen (it used to be an inset shadow on the
+   100vh app box and stopped at the first screen, colliding with long pages such as Rules) */
+.app.scenario-replay::after{content:"";position:fixed;inset:0;border:4px solid var(--replay);pointer-events:none;z-index:30}
+/* pages (rules, integrations, audit ...) scroll INSIDE the layout row instead of overflowing the frame */
+.app > .page{overflow:auto;min-height:0;max-width:none;padding-right:20px}
+.app > .page > *{max-width:1280px}
