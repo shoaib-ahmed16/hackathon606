@@ -1,4 +1,4 @@
-# FOO full stack: Postgres + API + UI, one command:   docker compose up -d --build
+# FOOH full stack: Postgres + API + UI, one command:   docker compose up -d --build
 #   UI  -> http://<server>:8080   nginx. The browser calls the API through /ops-api on the SAME origin,
 #                                 so there is no cross-origin request and no CORS problem.
 #   API -> http://<server>:8888   FastAPI (login + all data). Direct calls from the 8080 UI origin are

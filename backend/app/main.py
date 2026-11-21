@@ -45,7 +45,7 @@ async def lifespan(_):
     pool.close()
 
 
-app = FastAPI(title="FOO API", description="FOO: disruption control for airline operations (fog operations and crew duty recovery)", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="FOOH API", description="FOOH: disruption control for airline operations (fog operations and crew duty recovery)", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(audit.AuditMiddleware)
 app.include_router(routes_auth.r)  # login is open; everything else needs a signed-in user

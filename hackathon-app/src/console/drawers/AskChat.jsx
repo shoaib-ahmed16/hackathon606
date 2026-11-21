@@ -102,7 +102,7 @@ export default function AskChat({ d, state, setState, onOpenView }) {
   if (state === 'min')
     return (
       <button type="button" className="chat-pill" onClick={() => setState('open')} aria-label="Open the assistant">
-        <span className="chat-dot" /> Ask FOO <span className="kbd">⌘K</span>
+        <span className="chat-dot" /> Ask FOOH <span className="kbd">⌘K</span>
         {log.length > 0 && <span className="chat-count">{log.filter((m) => m.role === 'bot').length}</span>}
       </button>
     );
@@ -112,7 +112,7 @@ export default function AskChat({ d, state, setState, onOpenView }) {
     <aside className="chat" aria-label="Assistant" data-src="ask() · guarded: read-only, domain-limited, no personal data">
       <header className="chat-h">
         <div>
-          <b>Ask FOO</b>
+          <b>Ask FOOH</b>
           <span className="k">Read-only · this disruption only · no personal data</span>
         </div>
         <span className="chat-btns">
@@ -125,7 +125,7 @@ export default function AskChat({ d, state, setState, onOpenView }) {
       <div className="chat-body" aria-live="polite">
         <div className="bub bot">
           <div className="answer">
-            Hi, I'm the FOO assistant. Ask me about the flights, crew, deadlines and approvals on this case, or how any screen works, for example "How does the Recovery tab work?". I only read data: I can't change anything, and I show crew by position and number, never by name.
+            Hi, I'm the FOOH assistant. Ask me about the flights, crew, deadlines and approvals on this case, or how any screen works, for example "How does the Recovery tab work?". I only read data: I can't change anything, and I show crew by position and number, never by name.
           </div>
           {!sug.data?.ai && sug.data && <div className="k" style={{ marginTop: 6 }}>Free-text questions need the AI key on the server; the suggested questions work now.</div>}
         </div>

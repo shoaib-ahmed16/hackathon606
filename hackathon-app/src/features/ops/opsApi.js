@@ -1,7 +1,7 @@
 import { api } from '@/app/api';
 import { OPS_API_URL } from '@/config/env';
 
-// FOO API (FastAPI + Postgres). All reads are DB views, all actions call DB functions, so the
+// FOOH API (FastAPI + Postgres). All reads are DB views, all actions call DB functions, so the
 // rules (legality, guardrails, audit) live in one place. Docs: backend/API_README.md
 const u = (path) => `${OPS_API_URL}${path}`;
 const TAG = 'Ops';

@@ -206,7 +206,7 @@ export function ExecuteSheet({ d, f, decision: x, onClose }) {
   return (
     <Sheet
       title={`Execute: ${decisionWhat(x)} (${f.flight_no})`}
-      sub={`Approved by ${x.approved_roles.map(roleLabel).join(' and ')}. This updates FOO and queues entries for the systems of record.`}
+      sub={`Approved by ${x.approved_roles.map(roleLabel).join(' and ')}. This updates FOOH and queues entries for the systems of record.`}
       onClose={onClose}
       footer={
         <>

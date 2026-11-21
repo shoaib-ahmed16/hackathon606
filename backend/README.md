@@ -1,6 +1,6 @@
-# FOO database (schema `fogops`)
+# FOOH database (schema `fogops`)
 
-Backing store for **FOO**, the disruption control room for airline operations (fog operations and crew duty recovery). The schema keeps its internal name `fogops`; renaming it would break existing databases.
+Backing store for **FOOH**, the disruption control room for airline operations (fog operations and crew duty recovery). The schema keeps its internal name `fogops`; renaming it would break existing databases.
 
 The database holds:
 

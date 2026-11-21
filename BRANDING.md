@@ -1,20 +1,23 @@
-# FOO: brand sheet
+# FOOH: brand sheet
 
 ## Name
-**FOO**. The product name chosen by the team. Short, one word, easy to say on a call or put on a door sign.
+**FOOH**. The product name chosen by the team. Short, one word, easy to say on a call or put on a door sign.
 Not yet checked for trademark or domain availability. Do that before any public launch.
 
 ## Tagline and one-liners
 - **Tagline:** Disruption control for airline operations.
-- **One line:** FOO turns the disruption "firefighter" group chat into one shared decision room, where the AI prepares the facts
+- **One line:** FOOH turns the disruption "firefighter" group chat into one shared decision room, where the AI prepares the facts
   and options and people stay responsible for every decision.
 - **Three proof points:** every affected flight ordered by how soon a decision is needed; crew legality, fuel and alternates on
   one screen; a full audit trail of who decided what and why.
 
 ## Logo
-An aircraft climbing out of fog: a white aircraft silhouette over two fading fog bands, on a deep-to-sky blue tile. (An earlier runway version read as a warning triangle at small sizes, so it was dropped.)
-- Files: `hackathon-app/public/favicon.svg` (also the app icon) and `hackathon-app/src/components/Logo.jsx` (`LogoMark`, `Logo`).
-- Use the mark alone at small sizes (favicon, collapsed sidebar); use mark plus the word "FOO" elsewhere.
+An aircraft climbing out of a fog bank on a deep-to-sky blue tile. The fog is drawn as soft layers that thicken toward the ground,
+the contrail cuts through the bank and dissolves into the mist, and a pale arc above marks the clear approach. It says what the
+product does in one glance: aircraft crossing fog, with a way through. (Earlier versions: a runway, which read as a warning triangle at small sizes,
+and hard-edged bands, which looked like blinds.)
+- Files: `hackathon-app/public/favicon.svg` (also the app icon), `public/logo.svg` (same artwork), `public/logo-1024.png` (transparent, for slides and posters), and `hackathon-app/src/components/Logo.jsx` (`LogoMark`, `Logo`).
+- Use the mark alone at small sizes (favicon, collapsed sidebar); use mark plus the word "FOOH" elsewhere.
 - Keep clear space of at least a quarter of the mark's width. Do not recolour, stretch or add effects.
 
 ## Colour
@@ -24,7 +27,8 @@ An aircraft climbing out of fog: a white aircraft silhouette over two fading fog
 | Logo tile, light end / app primary | `#0284c7` |
 | Dark-mode primary | `#38bdf8` |
 | Tile gradient mid-tone | `#0369a1` |
-| Aircraft and fog bands | white |
+| Aircraft and fog | white |
+| Contrail and approach arc | `#7dd3fc` / `#bae6fd` |
 
 Status colours (green, amber, red) are reserved for operational meaning and are never used for decoration.
 

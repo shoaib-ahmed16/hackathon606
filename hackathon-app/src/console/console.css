@@ -401,7 +401,7 @@ textarea{width:100%;min-height:70px;background:var(--surface-2);border:1px solid
 }
 
 
-/* =================== FOO additions (React port) =================== */
+/* =================== FOOH additions (React port) =================== */
 .app{height:100dvh}
 .cw-link{color:inherit;text-decoration:none}
 .btn.on-nav,.btn[aria-current="page"]{background:var(--surface-3);color:var(--text)}

@@ -1,4 +1,4 @@
-# FOO Console: Knowledge Transfer (Business View)
+# FOOH Console: Knowledge Transfer (Business View)
 
 This guide explains **what the screens do and why**, in plain language. It has no code. It is for operations people, product owners, judges and new team members who need to understand the product quickly.
 
@@ -8,7 +8,7 @@ This guide explains **what the screens do and why**, in plain language. It has n
 
 When fog closes or restricts Sharjah (SHJ) airport, aircraft are held in the air or diverted to other airports, and crews may run out of legal duty hours. Operations staff have to decide, quickly and correctly, **who holds, who diverts, who gets replaced, and in what order aircraft land once the airport reopens**.
 
-The FOO Console puts the facts for those decisions on one screen:
+The FOOH Console puts the facts for those decisions on one screen:
 
 - which flights are affected and how much time is left for each,
 - whether the fuel and the crew still allow waiting,
