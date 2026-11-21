@@ -43,7 +43,8 @@ export function useOps() {
   const openCases = useMemo(() => (cases.data ?? []).filter((c) => c.phase !== 'CLOSED'), [cases.data]);
   useEffect(() => {
     const known = openCases.some((c) => c.case_id === ops.caseId);
-    if (openCases.length && !known) dispatch(selectCase(openCases[0]));
+    // open on a case whose hub is actually restricted (the fog case), not on a quiet daily case
+    if (openCases.length && !known) dispatch(selectCase(openCases.find((c) => c.hub_restricted) ?? openCases[0]));
   }, [ops.caseId, openCases, dispatch]);
 
   const ctx = { scenario_id: ops.scenarioId, case_id: ops.caseId };

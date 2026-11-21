@@ -55,7 +55,9 @@ def deadlines(case_id: int, scenario_id: int | None = None):
                 d = {"deadline_utc": None, "kind": "verify", "reason": "Fuel endurance not reported", "why": ["No holding-endurance estimate has been entered, so neither holding nor a diversion can be marked executable."]}
             else:
                 opts = [o for o in fetch("SELECT * FROM rank_alternates(%s,%s)", (s, fid)) if o["is_executable"] and o["fuel_margin_min"] is not None]
-                best = max(opts, key=lambda o: o["fuel_margin_min"]) if opts else None
+                # The deadline belongs to the alternate the engine RECOMMENDS (else the top-ranked executable one), never to a different
+                # alternate with more spare fuel: that would give the duty manager minutes that do not exist for the recommended option.
+                best = next((o for o in opts if o["alt_iata"] == f.get("recommended_alternate")), None) or (min(opts, key=lambda o: o["rank"]) if opts else None)
                 if best:
                     d = {"deadline_utc": now + timedelta(minutes=max(0, best["fuel_margin_min"])), "kind": "divert", "reason": f"Last moment to divert to {best['alt_iata']} on fuel",
                          "why": [f"Holding endurance {end} min (quality: {str(inp.get('fuel_quality')).lower()})", f"Flight time to {best['alt_iata']} about {best['est_flight_min']} min ({round(float(best['distance_km']))} km plus approach)",

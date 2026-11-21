@@ -2,6 +2,9 @@ import { memo } from 'react';
 import { ms, fmtZday, human, isRecovered, isAirborne, recWhat, sevClass, sevWord, whereText, TAG_LABEL, decisionWhat, REC_TONE } from '../lib';
 import { Cd, Pill } from '../ui/ui';
 import { MIN } from '@/features/ops/time';
+import { etaOverdue } from '@/features/ops/boardFilters';
+
+const zhm = (t) => { const d = new Date(t); return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}Z`; };
 
 function FuelMeter({ f, fuelEnd, now }) {
   if (isAirborne(f) && !f.diverted_to) {
@@ -42,6 +45,15 @@ function CrewMeter({ f, now }) {
     return (
       <div className="meter verify">
         <div className="lbl"><span>Crew</span><b className="c-verify">no crew data</b></div>
+        <div className="track" />
+      </div>
+    );
+  // the duty clock only runs after sign-in: before that show when it starts, never a countdown (sign-in = legal end - max FDP)
+  const signIn = f.legal_end_utc && f.max_fdp_min ? ms(f.legal_end_utc) - f.max_fdp_min * MIN : null;
+  if (signIn != null && signIn > now)
+    return (
+      <div className="meter">
+        <div className="lbl"><span>Crew</span><b>Duty starts {zhm(signIn)}</b></div>
         <div className="track" />
       </div>
     );
@@ -105,7 +117,12 @@ const Row = memo(function Row({ f, cur, last, dl, fuelEnd, rules, selected, watc
       </div>
       <div className="where">
         {where}
-        <span className="k">{sub}{f.data_age_min != null && f.data_age_min > 15 ? ` · data ${f.data_age_min} min old` : ''}</span>
+        <span className="k">
+          {sub}
+          {/* data age only matters for a flight that is moving or about to: an old snapshot of a flight 3 days out is not news */}
+          {f.data_age_min != null && f.data_age_min > 15 && (isAirborne(f) || f.diverted_to || (f.std_utc && ms(f.std_utc) - now < 3 * 60 * MIN)) ? ` · data ${f.data_age_min} min old` : ''}
+          {etaOverdue(f, now) && <b className="c-risk"> · ETA overdue by {Math.max(1, Math.floor((now - ms(f.eta_utc)) / MIN))} min: verify position</b>}
+        </span>
       </div>
       <FuelMeter f={f} fuelEnd={fuelEnd} now={now} />
       <CrewMeter f={f} now={now} />
@@ -114,7 +131,7 @@ const Row = memo(function Row({ f, cur, last, dl, fuelEnd, rules, selected, watc
       </div>
       <div className="rec"><RecCell f={f} cur={cur} last={last} verifyFuel={verifyFuel} /></div>
       <div className="cd-cell">
-        {recovered ? <span className="k">Done</span> : at ? <><Cd at={at} big /><span className="k">{fmtZday(at, now)}</span></> : <><span className="cd-big c-verify">?</span><span className="k">{human(dl?.reason ?? 'verify')}</span></>}
+        {recovered ? <span className="k">Done</span> : at ? <><Cd at={at} big /><span className="k">{fmtZday(at, now)}</span></> : <><span className={`cd-big ${isAirborne(f) || f.diverted_to ? 'c-verify' : 'k'}`}>{isAirborne(f) || f.diverted_to ? '?' : '—'}</span><span className="k">{isAirborne(f) || f.diverted_to ? human(dl?.reason ?? 'verify') : 'no deadline running'}</span></>}
       </div>
     </div>
   );

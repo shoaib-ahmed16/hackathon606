@@ -1,0 +1,270 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>FOOH Demo Test Report</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column, ops-log feel; findings as severity-striped rows, wide tables scroll in place */
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --fg:#14212c; --muted:#5a6b78; --line:#d9e0e6; --accent:#1c5a8a;
+  --crit:#b3261e; --crit-bg:#fbe9e7; --high:#b4590a; --high-bg:#fdf0e1; --med:#7a6400; --med-bg:#faf4d6; --low:#4d5f6d; --low-bg:#eaeef1;
+  --ok:#1f7a45; --ok-bg:#e4f4ea;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f161c; --surface:#16212a; --fg:#e3eaf0; --muted:#97a8b5; --line:#2a3945; --accent:#7db7e6;
+  --crit:#ff8a80; --crit-bg:#3a1d1b; --high:#ffb36b; --high-bg:#3a2a17; --med:#e6cf5c; --med-bg:#332e14; --low:#aab9c4; --low-bg:#22303a;
+  --ok:#74d39c; --ok-bg:#163327; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161c; --surface:#16212a; --fg:#e3eaf0; --muted:#97a8b5; --line:#2a3945; --accent:#7db7e6;
+  --crit:#ff8a80; --crit-bg:#3a1d1b; --high:#ffb36b; --high-bg:#3a2a17; --med:#e6cf5c; --med-bg:#332e14; --low:#aab9c4; --low-bg:#22303a;
+  --ok:#74d39c; --ok-bg:#163327; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:30px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:21px;font-weight:600;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:16px;font-weight:600}
+p{margin:0;max-width:72ch}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.meta{color:var(--muted);font-size:14px;display:flex;flex-wrap:wrap;gap:6px 18px}
+header{display:flex;flex-direction:column;gap:10px}
+section{display:flex;flex-direction:column;gap:16px}
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.counts{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-block}
+.c-crit{color:var(--crit);background:var(--crit-bg)} .c-high{color:var(--high);background:var(--high-bg)}
+.c-med{color:var(--med);background:var(--med-bg)} .c-low{color:var(--low);background:var(--low-bg)} .c-ok{color:var(--ok);background:var(--ok-bg)}
+ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+li{max-width:80ch}
+code,.mono{font-family:var(--mono);font-size:13px}
+.finding{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--low);border-radius:4px;padding:14px 16px;display:grid;grid-template-columns:64px 1fr;gap:4px 14px}
+.finding.crit{border-left-color:var(--crit)} .finding.high{border-left-color:var(--high)} .finding.med{border-left-color:var(--med)}
+.fid{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--muted);grid-row:span 3}
+.finding h3{grid-column:2}
+.finding .body{grid-column:2;display:flex;flex-direction:column;gap:6px;min-width:0}
+.lbl{font-weight:600}
+.ref{font-size:13px;color:var(--muted)}
+.list{display:flex;flex-direction:column;gap:10px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:620px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+ol.recs{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
+ol.recs li::marker{font-family:var(--mono);color:var(--accent);font-weight:600}
+a{color:var(--accent)}
+@media (max-width:560px){.finding{grid-template-columns:1fr}.fid{grid-row:auto}.finding h3,.finding .body{grid-column:1}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">Test report · FOOH disruption control · build at http://130.61.182.207:8080</span>
+  <h1>FOOH demo readiness test</h1>
+  <div class="meta"><span>Run 21 Nov 2026</span><span>Measured against: Product &amp; Operations Guide, Developer Guide, DEMO_READINESS checklist</span><span>Mode: read-only</span></div>
+</header>
+
+<section class="verdict">
+  <h2 style="border:0;padding:0">Verdict</h2>
+  <p>The fog replay case (#1) is close to demo-ready. Its numbers now match the guide's reference values: 5 flights watched, 656 connecting passengers, 2 diverted, 1 holding, 2 crew at risk, and severity scores of 66/36/36/18/10. The Ask assistant answers three of the four 3-minute-test questions from live data. Four problems would be visible to judges and need fixing first. The worst: the flight panel offers to divert an aircraft that has already diverted and landed, and one deadline counts down to the wrong alternate.</p>
+  <div class="counts">
+    <span class="chip c-crit">4 blockers</span><span class="chip c-high">5 high</span><span class="chip c-med">8 medium</span><span class="chip c-low">5 low</span><span class="chip c-ok">11 checks passed</span>
+  </div>
+</section>
+
+<section>
+  <h2>What works</h2>
+  <ul>
+    <li><b>Replay KPIs match the guide.</b> Flights affected, connecting passengers, diverted/holding, crew at risk and the severity ranking all match Developer Guide §4.3.</li>
+    <li><b>The LVP rule is enforced everywhere.</b> G9455's captain is not LVP-qualified, so holding is blocked, the flight is flagged, and Recovery parks it with the reason.</li>
+    <li><b>Unknown data is never shown as safe.</b> AUH, DWC and MCT show "?" with "Ask station", and the engine keeps them as "verify first".</li>
+    <li><b>Ask (⌘K) answers questions 1–3 correctly</b> and names its source view (e.g. <code>v_crew_legality_ranking</code>).</li>
+    <li><b>The replacement finder filters out standby crew who aren't LVP-qualified</b>, with a plain reason for each.</li>
+    <li><b>Downstream impact is built:</b> same-aircraft knock-on legs and each crew member's next duty and rest.</li>
+    <li><b>The recovery plan respects 12 arrivals/h</b> and sets aside flights that can't be sequenced, with reasons.</li>
+    <li><b>The feed ignores stale messages:</b> G9472 shows a <code>POSITION (IGNORED_STALE)</code> entry.</li>
+    <li><b>The API requires sign-in:</b> anonymous calls get 401.</li>
+    <li><b>No errors since the redeploy:</b> no HTTP errors, and no NaN, "undefined" or "Invalid Date" on screen.</li>
+    <li><b>Responses are fast:</b> 150–330 ms typical; the slowest is <code>/exceptions</code> at about 640 ms.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Findings</h2>
+
+  <div class="list">
+    <h3><span class="chip c-crit">Blocker</span></h3>
+
+    <div class="finding crit"><span class="fid">B1</span>
+      <h3>The flight panel offers to divert aircraft that already diverted</h3>
+      <div class="body">
+        <p><span class="lbl">Seen:</span> G9464 landed at RKT at 02:04Z after an executed diversion (its own briefing shows <i>DIVERT EXECUTED RKT</i>). The decision area still says "No decision yet. The engine's top option is Divert to RKT", with a <b>Propose: Divert to RKT</b> button. The recommendations rank six alternates by fuel margin, plus "Keep holding", for an aircraft on blocks. There are two options numbered #1 (Divert RKT and Replace the crew), and "Earlier decisions (1)" contradicts "No decision yet".</p>
+        <p><span class="lbl">Fix:</span> once a diversion is executed, the decision area shows that decision and its status. The options switch to the at-alternate set: replace crew, commander discretion, or depart by the latest legal time. Number the options once.</p>
+        <p class="ref">Product guide §5.4 (decision area first), Developer guide §7.1</p>
+      </div></div>
+
+    <div class="finding crit"><span class="fid">B2</span>
+      <h3>One deadline counts down to a different alternate than the recommendation</h3>
+      <div class="body">
+        <p><span class="lbl">Seen:</span> for G9455 the engine recommends <b>Divert to FJR</b>, leaving the hold by 03:18Z. The deadline card and board counter instead show "Last moment to divert to <b>RKT</b> on fuel: 03:23Z". That gives the duty manager 5 minutes that don't exist for the recommended option.</p>
+        <p><span class="lbl">Fix:</span> take the deadline from the top executable option, or from the earliest leave-by time among executable options, and name that alternate.</p>
+        <p class="ref">Developer guide §7.2 DeadlineCard</p>
+      </div></div>
+
+    <div class="finding crit"><span class="fid">B3</span>
+      <h3>Stale ETAs drive crew legality</h3>
+      <div class="body">
+        <p><span class="lbl">Seen:</span> at 02:45Z, G9455 (ETA 02:10Z) and G9621 (ETA 02:15Z) still show "Airborne". The crew bar says "Lands 02:10Z", 35 minutes in the past, and the 110-minute margin at landing is computed from that past time. These crews look safer than they are.</p>
+        <p><span class="lbl">Fix:</span> projected landing = the later of the ETA and now plus remaining time. Mark the row "ETA overdue" and lower the confidence. Raise a verification item when ETA &lt; now and the flight is still airborne.</p>
+        <p class="ref">Product guide §2.2 (missing or conflicting data means "verification required")</p>
+      </div></div>
+
+    <div class="finding crit"><span class="fid">B4</span>
+      <h3>Live cases still use the wrong clock</h3>
+      <div class="body">
+        <p><span class="lbl">Seen:</span> the LIVE scenario clock is 20 Nov 16:45Z, but case #5 holds 23 Nov arrivals. All 98 flights show crews with "57 h – 83 h left", "data 477 min old", every row in "Decide soon" with "?", and the KPI bar says 98 flights affected and 4,867 passengers affected, with no disruption at all. The header says "data 0 s ago" while every row says 477 min.</p>
+        <p><span class="lbl">Fix:</span> deploy the time-base rules (TB-1 to TB-5). Show "Duty starts HH:MMZ" for duties that haven't started. Don't count SCHEDULED flights as affected unless the hub is restricted. For the demo, open on case #1 or hide the LIVE cases.</p>
+        <p class="ref">DEMO_READINESS §1 issues 1–2, §3 Must-2</p>
+      </div></div>
+  </div>
+
+  <div class="list">
+    <h3><span class="chip c-high">High</span></h3>
+
+    <div class="finding high"><span class="fid">H1</span>
+      <h3>The replacement finder assumes zero travel time to the alternate</h3>
+      <div class="body">
+        <p><span class="lbl">Seen:</span> replacing G9464's captain, the standby candidates are searched at <code>station=SHJ</code> with <code>positioning_min 0</code> and <code>legs_to_operate 3</code>. Each is shown signing in now (02:45Z) with a projected end of 03:10Z. The aircraft is at RKT, so the crew needs road positioning and operates only one leg (G9464D RKT–SHJ).</p>
+        <p><span class="lbl">Fix:</span> pass the aircraft's current station and the recovery leg (<code>from_leg</code>), and add the assumed SHJ→RKT road time to sign-in.</p>
+        <p class="ref">Product guide §3.3 (replacement crew: assumed road times), 3-minute test Q4</p>
+      </div></div>
+
+    <div class="finding high"><span class="fid">H2</span>
+      <h3>A crew decision was proposed and approved by the same person</h3>
+      <div class="body">
+        <p><span class="lbl">Seen:</span> the audit trail shows Crew Controller 1 inserting decision #4 (CREW_REPLACE, PROPOSED) and then approval #3 (APPROVED) on it.</p>
+        <p><span class="lbl">Fix:</span> refuse an approval from the decision's proposer (a database check plus a 403 from the API). The guide says "Crew Control manager" approves crew replacements.</p>
+        <p class="ref">Product guide §4.1–4.2</p>
+      </div></div>
+
+    <div class="finding high"><span class="fid">H3</span>
+      <h3>The aeroMart outbox is empty after two executed diversions</h3>
+      <div class="body">
+        <p><span class="lbl">Seen:</span> Integrations → Outbox reads "The outbox is empty". The guide's validation of 06/07 queued one aeroMart entry for each executed diversion, which would be two in this replay.</p>
+        <p><span class="lbl">Fix:</span> confirm <code>07_proposed_triggers.sql</code> (T3) is deployed before the replay runs, then rerun the replay.</p>
+        <p class="ref">Developer guide §4.3 validation runs</p>
+      </div></div>
+
+    <div class="finding high"><span class="fid">H4</span>
+      <h3>The Station view doesn't work on a phone</h3>
+      <div class="body">
+        <p><span class="lbl">Seen:</span> <code>body</code> has <code>min-width: 1024px</code>. At 375 px the page is laid out 1024 px wide, so the station buttons sit off-screen behind horizontal scroll. Checklist item 14 fails.</p>
+        <p><span class="lbl">Fix:</span> remove the min-width, and stack the Station view into one column with large tap targets below about 768 px.</p>
+        <p class="ref">DEMO_READINESS §4 flow 14, Developer guide §7.3</p>
+      </div></div>
+
+    <div class="finding high"><span class="fid">H5</span>
+      <h3>Security of the hosted build</h3>
+      <div class="body">
+        <ul>
+          <li>Plain HTTP on :8080, so the sign-in and bearer token travel unencrypted. There's nothing on 443.</li>
+          <li>The token is kept in <code>localStorage</code>, and the live stream sends it in the URL (<code>/api/stream?token=…</code>), so it lands in nginx access logs and browser history.</li>
+          <li><code>/ops-api/docs</code> and <code>/ops-api/openapi.json</code> are public. They map all 80 endpoints, including a generic <code>POST /api/records/{table}</code>, <code>DELETE /api/cases/{id}</code> and <code>POST /api/feed/push</code>.</li>
+          <li>The generic table writer bypasses the "API is thin, functions only" contract. Deleting cases contradicts "never delete operational rows" (Developer guide §12).</li>
+          <li>The server version is shown (<code>nginx/1.27.5</code>). There's no Content-Security-Policy or X-Frame-Options header.</li>
+          <li>Before this update, the login page printed the demo users and their shared password. I didn't recheck it after the update, so please confirm whether it's still there.</li>
+        </ul>
+        <p><span class="lbl">Fix:</span> put the app behind HTTPS on a hostname, and move the token to an HttpOnly cookie or a short-lived stream ticket. Restrict the docs to admins. Remove or role-lock <code>records/{table}</code> and case delete. Remove the password from the login page.</p>
+      </div></div>
+  </div>
+
+  <div class="list">
+    <h3><span class="chip c-med">Medium</span></h3>
+    <div class="finding med"><span class="fid">M1</span><h3>Stand counts disagree</h3><div class="body"><p>The header strip shows "RKT ✓ 4 stands", while the alternates table in the same panel shows RKT 2, after the two diverted aircraft. Show one figure: stands left.</p></div></div>
+    <div class="finding med"><span class="fid">M2</span><h3>Station status contradicts itself</h3><div class="body"><p>G9464 has every step ticked, including "Ready to depart", yet reads "OCC needs: confirm the aircraft is ready". Both RKT aircraft say "Waiting for arrival slot" while SHJ is open at 12/h and Recovery already slots G9588D at 03:20Z. Drive "waiting for" from the recovery plan.</p></div></div>
+    <div class="finding med"><span class="fid">M3</span><h3>The next-deadline bar skips overdue deadlines</h3><div class="body"><p>G9464's latest legal departure passed at 02:38Z (it sits in the "Act now" lane), but the header and KPI show G9472 in 27 min. Show overdue items first, in red, as "passed N min ago".</p></div></div>
+    <div class="finding med"><span class="fid">M4</span><h3>Engine codes and raw IDs on screen</h3><div class="body"><p>Examples: <code>CREW_NOT_LVP_QUALIFIED_FOR_HUB</code> and <code>ENDURANCE_ENDS_BEFORE_REOPENING</code> in the rationale; "Decision approved: crew_replace" and "Crew replacement: 108877 out, 109809 in" in the briefing; "disruption_case INSERT" in the live briefing; crew shown as "CC 106683" in downstream impact. Map codes to plain words and show names (or position + flight). DEMO_READINESS issue 7 is still open.</p></div></div>
+    <div class="finding med"><span class="fid">M5</span><h3>Different screens use different clocks</h3><div class="body"><p>The briefing shows scenario time (02:20Z), the Audit page shows server time (12:40Z) for the same events, and Data quality shows "raised 21 Nov 16:39" with no zone (it's SHJ local). Label each one, or show scenario time with the server time on hover.</p></div></div>
+    <div class="finding med"><span class="fid">M6</span><h3>Polling load</h3><div class="body"><p>Each open board re-fetches 17 endpoints about every 8 s, even though the <code>/api/stream</code> event stream is connected. <code>/exceptions</code> returns all 644 open exceptions (252 KB, not filtered by scenario) every time. That's about 2.5 MB per minute per browser. Refresh on stream events, poll slowly as a fallback, and filter exceptions by case.</p></div></div>
+    <div class="finding med"><span class="fid">M7</span><h3>Deep links aren't live</h3><div class="body"><p>The panel buttons read "Link template not configured yet", while Integrations lists templates (example.com placeholders). This is MVP story 10: either show the placeholder link or hide the buttons for the demo.</p></div></div>
+    <div class="finding med"><span class="fid">M8</span><h3>Data oddities in live case #5</h3><div class="body"><p>A five-digit flight number, <code>G91831</code> (KTM→SHJ), and two flights with "no tail" (G9133, G9106). Check the loader for these rows.</p></div></div>
+  </div>
+
+  <div class="list">
+    <h3><span class="chip c-low">Low</span></h3>
+    <div class="finding"><span class="fid">L1</span><h3>The FDP band shows a timezone</h3><div class="body"><p>"band Asia/Dubai" appears where the band ("18:00–21:59") belongs.</p></div></div>
+    <div class="finding"><span class="fid">L2</span><h3>Wording glitches</h3><div class="body"><p>Recovery shows "Reopens in passed 2 min 25 s ago" and "Cannot be sequenced now resolve the reason first".</p></div></div>
+    <div class="finding"><span class="fid">L3</span><h3>Dates are missing or garbled</h3><div class="body"><p>"not back until 21 02:44Z" and "Decision moment 21 02:45Z". Downstream next-duty times have no date ("03:20Z … 72.2 h rest").</p></div></div>
+    <div class="finding"><span class="fid">L4</span><h3>Ask doesn't say a deadline has passed</h3><div class="body"><p>Asked when G9464 must leave, Ask answers "off-blocks by 02:38Z" at 02:46Z without saying that time has already passed.</p></div></div>
+    <div class="finding"><span class="fid">L5</span><h3>Crew Control rows aren't clickable</h3><div class="body"><p>Clicking a flight number in the Crew Control list does nothing; only the "Open" button works.</p></div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Demo checklist (DEMO_READINESS §4)</h2>
+  <p>Writes were out of scope, so the flows that change data were not run. "Not run" means not tested, not failed.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>Flow</th><th>Result</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td>Reset</td><td><span class="chip c-low">Not run</span></td><td>Writes data</td></tr>
+      <tr><td class="n">2</td><td>Fog onset</td><td><span class="chip c-low">Not run</span></td><td>Writes data</td></tr>
+      <tr><td class="n">3</td><td>Feed: ETA, duplicate, late message</td><td><span class="chip c-med">Partial</span></td><td>A stale message was ignored (seen in the G9472 timeline)</td></tr>
+      <tr><td class="n">4</td><td>Recommendation with reasons</td><td><span class="chip c-med">Partial</span></td><td>Ranked options and blocked reasons are shown; B1, B2 and M4</td></tr>
+      <tr><td class="n">5</td><td>Missing data "?"</td><td><span class="chip c-med">Partial</span></td><td>"?" and "Ask station" are shown; entering a value wasn't run</td></tr>
+      <tr><td class="n">6</td><td>Propose → approve → execute</td><td><span class="chip c-low">Not run</span></td><td>Writes data; the audit shows the replay did this. See H2 and H3</td></tr>
+      <tr><td class="n">7</td><td>Guardrail (Station or AI approves)</td><td><span class="chip c-low">Not run</span></td><td>Needs other role logins</td></tr>
+      <tr><td class="n">8</td><td>Crew timeout and replacement</td><td><span class="chip c-med">Partial</span></td><td>Candidates are listed; positioning is wrong (H1)</td></tr>
+      <tr><td class="n">9–11</td><td>Judge changes (ETA, reopening, crew)</td><td><span class="chip c-low">Not run</span></td><td>Writes data</td></tr>
+      <tr><td class="n">12</td><td>Recovery at 12/h</td><td><span class="chip c-ok">Pass</span></td><td>Ordered slots; G9455 and G9464D parked with reasons</td></tr>
+      <tr><td class="n">13</td><td>Report</td><td><span class="chip c-low">Not run</span></td><td>Generating a report writes a row</td></tr>
+      <tr><td class="n">14</td><td>Station view on a phone</td><td><span class="chip c-crit">Fail</span></td><td>1024 px minimum width (H4)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>3-minute test (DEMO_READINESS §5)</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Question</th><th>Result</th><th>What the app answered</th></tr></thead>
+    <tbody>
+      <tr><td>Which crew runs out of legality next?</td><td><span class="chip c-ok">Pass</span></td><td>G9464 CP, legal end 03:30Z, margin 0:20 (Ask and Crew Control view)</td></tr>
+      <tr><td>Where is aircraft X and what is it waiting for?</td><td><span class="chip c-ok">Pass</span></td><td>A6-AOK at RKT, waiting for an arrival slot, next G9464D (but see M2)</td></tr>
+      <tr><td>What time must it leave to land legal?</td><td><span class="chip c-med">Pass, with a gap</span></td><td>02:38Z / 06:38 SHJ, operational target 02:08Z. Doesn't say the time has passed (L4)</td></tr>
+      <tr><td>Alternate crew without hitting rosters?</td><td><span class="chip c-med">Partial</span></td><td>Names roster-safe, LVP-qualified captains; travel time to RKT is ignored (H1)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Recommended order of work before the demo</h2>
+  <ol class="recs">
+    <li><b>Fix the at-alternate panel (B1).</b> Show the executed diversion and offer only recovery options. Judges will open G9464 first because it's the top "Act now" row.</li>
+    <li><b>Tie the deadline to the recommended option (B2)</b>, and show overdue deadlines first (M3).</li>
+    <li><b>Handle stale ETAs (B3)</b> with "ETA overdue" and a projected landing of at least now plus remaining time.</li>
+    <li><b>Open the demo on case #1</b> and deploy TB-1 to TB-5 (B4), or hide the LIVE cases until the clock is right.</li>
+    <li><b>Correct the replacement finder (H1)</b> and <b>block self-approval (H2)</b>. Both show up in the crew-timeout part of the script.</li>
+    <li><b>Redeploy 06/07 before the replay</b> so the aeroMart outbox fills (H3), and rerun <code>db_validation.sql</code> aiming for 0 FAIL.</li>
+    <li><b>Make the Station view responsive (H4)</b> and translate engine codes into plain words (M4).</li>
+    <li><b>Before the demo goes on a shared network:</b> HTTPS on a hostname, token out of the URL and localStorage, docs and the generic writer locked down (H5).</li>
+    <li><b>Cut the polling load (M6)</b> so a room full of laptops doesn't slow the server.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>Coverage and limits</h2>
+  <ul>
+    <li>Tested in a browser session you signed in to, on the build deployed during this session (after your update). Cases #1 (replay) and #5 (live) were checked in detail.</li>
+    <li>Read-only: no proposals, approvals, executions, what-if runs, live data pushes, reports or new cases. Flows 1, 2, 6, 7, 9–11 and 13 need a demo copy and your go-ahead.</li>
+    <li>Only one role was used, so the guardrails for other roles weren't exercised.</li>
+    <li>The database wasn't reachable from here, so <code>db_validation.sql</code> wasn't run. The kit's <code>e2e_smoke.py</code> has no sign-in step, so its checks (console and HTTP errors, bad values, long crew times, layout) were reproduced by hand in the signed-in browser.</li>
+    <li>Kit improvement: add a login step to <code>e2e_smoke.py</code> that reads test credentials from an environment variable, so it can run unattended against the hosted build.</li>
+  </ul>
+</section>
+
+</div>
+
+</body></html>

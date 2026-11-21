@@ -48,7 +48,9 @@ const optView = (o) => {
 
 function Decision({ d, f, list, cur, topOpt, gaps, openSheet }) {
   const log = cur ? d.decisions.find((l) => l.decision_id === cur.decision_id) : null;
-  const hist = list.filter((x) => x !== cur);
+  // an aircraft that has already diverted: its executed diversion IS the decision on record, not "no decision yet"
+  const executed = f.diverted_to ? list.find((x) => x.decision_type === 'DIVERT' && x.status === 'EXECUTED') : null;
+  const hist = list.filter((x) => x !== cur && x !== executed);
   const role = d.actor.role_code;
   const history = hist.length > 0 && (
     <details className="history">
@@ -61,6 +63,17 @@ function Decision({ d, f, list, cur, topOpt, gaps, openSheet }) {
   if (!cur) {
     let body;
     if (isRecovered(f)) body = <div className="dec-empty">No decision needed. Flight completed.</div>;
+    else if (executed)
+      body = (
+        <>
+          <div className="dec-empty">
+            <Pill tone="legal">Diversion executed</Pill> {decisionWhat(executed)} · {executed.proposed_by} {hhmm(executed.decided_at)}. The aircraft is at {f.diverted_to}.
+          </div>
+          <div className="dec-empty" style={{ marginTop: 6 }}>
+            {gaps.length ? <>Next step: <b>resolve the data gaps below first</b>.</> : topOpt ? <>Next step at {f.diverted_to}: the engine's top option is <b>{topOpt.what}</b>.</> : 'No open decision at the alternate yet.'}
+          </div>
+        </>
+      );
     else if (gaps.length) body = <div className="dec-empty">No decision can be proposed yet: <b>resolve the data gaps below first</b>. Options stay blocked until fuel is known.</div>;
     else if (!topOpt) body = <div className="dec-empty">No open decision. {f.recommendation ? '' : 'The engine has no recommendation for this flight.'}</div>;
     else
@@ -388,7 +401,7 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
   const margin = f.crew_margin_min;
   const sv = f.severity_score ?? 0;
   const fdp = detail?.fdp;
-  const crew = fdp ? { signIn: ms(fdp.sign_in_utc), legal: ms(fdp.legal_end_utc), disc: ms(fdp.discretion_end_utc), proj: ms(fdp.projected_end_utc) } : null;
+  const crew = fdp ? { signIn: ms(fdp.sign_in_utc), legal: ms(fdp.legal_end_utc), disc: ms(fdp.discretion_end_utc), proj: isAirborne(f) && !f.diverted_to ? Math.max(ms(fdp.projected_end_utc), minuteNow) : ms(fdp.projected_end_utc) } : null;
   const crewRisk = !isRecovered(f) && ['AT_RISK', 'DISCRETION_REQUIRED', 'EXCEEDED'].includes(f.crew_status);
   const run = async (fn, ok) => {
     try {
@@ -472,6 +485,7 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
       {!isRecovered(f) && (
         <div className="sec" data-src="v_crew_legality_ranking · crew_qualification">
           <h3>Crew duty <Pill tone={(verdictPill[f.crew_status] ?? 't-verify').slice(2)}>{human(f.crew_status ?? 'unknown').replace(/^./, (c) => c.toUpperCase())}</Pill></h3>
+          {isAirborne(f) && !f.diverted_to && f.eta_utc && ms(f.eta_utc) < minuteNow && <div className="c-risk" style={{ marginBottom: 6 }}>ETA {fmtZ(ms(f.eta_utc))} has passed ({Math.floor((minuteNow - ms(f.eta_utc)) / MIN)} min ago) and the aircraft is still airborne. The landing marker shows now, not the old estimate. Verify the position.</div>}
           {crew && crew.signIn > minuteNow && <div className="k" style={{ marginBottom: 6 }}>Duty starts {fmtZ(crew.signIn)} · legal until {fmtZ(crew.legal)} (the clock only runs after sign-in)</div>}
           {crew && <Ribbon c={crew} />}
           <dl className="facts" style={{ marginTop: 12 }}>

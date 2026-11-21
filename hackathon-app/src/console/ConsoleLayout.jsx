@@ -219,7 +219,8 @@ function Bar({ d, onSheet }) {
     }
   };
   const dated = d.deadlines.filter((x) => x.deadline_utc).sort((a, b) => ms(a.deadline_utc) - ms(b.deadline_utc));
-  const next = dated.find((x) => ms(x.deadline_utc) >= now) ?? dated[dated.length - 1];
+  // a deadline that passed within the last hour still comes first (in red, "passed N min ago"); older ones do not hide what is coming
+  const next = dated.find((x) => ms(x.deadline_utc) >= now - 3600000) ?? dated[dated.length - 1];
   const nextAt = next ? ms(next.deadline_utc) : null;
   const goLens = (l) => {
     dispatch(setLens(l));

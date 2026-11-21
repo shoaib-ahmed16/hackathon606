@@ -8,15 +8,23 @@ import { isAirborne, isRecovered, liveLabel } from '@/console/lib';
 export const CREW_RISK = ['AT_RISK', 'DISCRETION_REQUIRED', 'EXCEEDED'];
 export const ruleKey = (id) => `rule:${id}`;
 
+// An aircraft still in the air whose estimated landing time has already passed: the ETA is stale, so what hangs on it is unverified.
+export const etaOverdue = (f, nowMs) => isAirborne(f) && !f.diverted_to && f.eta_utc != null && nowMs != null && new Date(f.eta_utc).getTime() < nowMs;
+
 // Needs verification = unverified crew data, open exceptions, unknown fuel on an airborne flight, or an open data request.
 export const needsVerification = (f, ctx) =>
   f.crew_status === 'VERIFICATION_REQUIRED' ||
   f.open_exceptions > 0 ||
   (isAirborne(f) && !f.diverted_to && ctx.fuelBy[f.flight_id] == null) ||
-  ctx.requested.has(f.flight_id);
+  ctx.requested.has(f.flight_id) ||
+  etaOverdue(f, ctx.nowMs);
 
 export function matches(f, key, ctx) {
-  if (key === 'affected') return !isRecovered(f) && f.status !== 'CANCELLED';
+  if (key === 'affected') {
+    if (isRecovered(f) || f.status === 'CANCELLED') return false;
+    // in the air or at an alternate = affected; a flight that has not left yet only while its hub is closed or under LVP
+    return isAirborne(f) || Boolean(f.diverted_to) || ctx.hubRestricted !== false;
+  }
   if (key === 'lvp') return Boolean(f.lvp_required) && f.lvp_crew_ok !== true;
   if (key === 'crew') return !isRecovered(f) && CREW_RISK.includes(f.crew_status);
   if (key === 'verify') return needsVerification(f, ctx);

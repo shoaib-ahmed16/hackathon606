@@ -25,7 +25,10 @@ def users():
 def cases(scenario_id: int | None = None):
     """All disruption cases (newest first), with their scenario. Optional scenario filter."""
     return fetch(
-        """SELECT c.*, s.name AS scenario_name, s.kind AS scenario_kind, s.sim_clock_utc
+        """SELECT c.*, s.name AS scenario_name, s.kind AS scenario_kind, s.sim_clock_utc,
+                  -- is the hub of this case closed or under LVP right now (scenario clock)? the app opens on a case where it is
+                  EXISTS (SELECT 1 FROM v_airport_status_current a
+                           WHERE a.scenario_id = c.scenario_id AND a.iata = c.hub_iata AND (a.op_status <> 'OPEN' OR a.lvp_in_force)) AS hub_restricted
              FROM disruption_case c JOIN scenario s USING (scenario_id)
             WHERE (%s::int IS NULL OR c.scenario_id = %s::int) ORDER BY c.case_id DESC""",
         (scenario_id, scenario_id),
@@ -42,10 +45,11 @@ def flights(scenario_id: int | None = None, case_id: int | None = None, limit: i
         where += " AND w.case_id = %s"
         params.append(case_id)
     return fetch(
-        f"""SELECT w.*, sv.severity_score, sv.connecting_pax,
+        f"""SELECT w.*, sv.severity_score, sv.connecting_pax, fcl.max_fdp_min, fcl.projected_end_utc,
                    COALESCE((SELECT array_agg(ft.tag ORDER BY ft.tag) FROM flight_tag ft WHERE ft.scenario_id = w.scenario_id AND ft.flight_id = w.flight_id), '{{}}'::text[]) AS tags
               FROM v_flight_watch w
               LEFT JOIN v_flight_severity sv ON sv.case_id = w.case_id AND sv.flight_id = w.flight_id AND sv.scenario_id = w.scenario_id
+              LEFT JOIN v_flight_crew_legality fcl ON fcl.scenario_id = w.scenario_id AND fcl.flight_id = w.flight_id
              WHERE {where}
              ORDER BY coalesce(w.eta_utc, w.sta_utc) LIMIT {int(limit)}""",
         params,
@@ -151,6 +155,11 @@ def recommendation_options(case_id: int, flight_id: int | None = None, scenario_
              JOIN recommendation_option o ON o.rec_id = v.rec_id AND o.rank = v.rank
             WHERE v.scenario_id = %s
               AND EXISTS (SELECT 1 FROM case_flight cf WHERE cf.case_id = %s AND cf.flight_id = v.flight_id)
+              -- only the OPEN recommendation: an executed one (ACCEPTED) is history and is shown only while nothing newer is open,
+              -- otherwise an aircraft that already diverted would again be offered "Divert to ..." and two options would both be #1
+              AND (v.rec_status = 'PROPOSED'
+                   OR (v.rec_status = 'ACCEPTED' AND NOT EXISTS (SELECT 1 FROM recommendation r2
+                                                                  WHERE r2.scenario_id = v.scenario_id AND r2.flight_id = v.flight_id AND r2.status = 'PROPOSED')))
               AND (%s::bigint IS NULL OR v.flight_id = %s::bigint)
             ORDER BY v.flight_no, v.rank LIMIT 2000""",
         (scn(scenario_id), case_id, flight_id, flight_id),

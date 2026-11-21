@@ -44,7 +44,7 @@ export default function KpiBar({ d, ctx }) {
   }, [d.flights, ctx]);
 
   const dated = d.deadlines.filter((x) => x.deadline_utc && !d.flights.find((f) => f.flight_id === x.flight_id && isRecovered(f))).sort((a, b) => ms(a.deadline_utc) - ms(b.deadline_utc));
-  const next = dated.find((x) => ms(x.deadline_utc) >= now) ?? dated[dated.length - 1];
+  const next = dated.find((x) => ms(x.deadline_utc) >= now - 3600000) ?? dated[dated.length - 1]; // overdue within the last hour comes first
   const apply = (f) => {
     if (!BOARD_LENSES.includes(d.ops.lens)) dispatch(setLens('occ')); // the board lives in the OCC / Dispatch lens
     only(f);

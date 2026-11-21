@@ -15,7 +15,7 @@ import FlightPanel from '../panel/FlightPanel';
 import CrewView from '../lenses/CrewView';
 import RecoveryView from '../lenses/RecoveryView';
 import StationView from '../lenses/StationView';
-import { isRecovered } from '../lib';
+import { isAirborne, isRecovered } from '../lib';
 
 const LANES = [
   ['act', 'Act now', 'under 15 min', 'lane-act'],
@@ -35,7 +35,8 @@ function Board({ d }) {
   const dlBy = useMemo(() => Object.fromEntries(d.deadlines.map((x) => [x.flight_id, x])), [d.deadlines]);
   const fuelBy = useMemo(() => Object.fromEntries(d.fuel.map((x) => [x.flight_id, ms(x.as_of_utc) + x.est_holding_endurance_min * MIN])), [d.fuel]);
   const requested = useMemo(() => new Set(d.openRequests.map((r) => r.flight_id)), [d.openRequests]);
-  const ctx = useMemo(() => ({ fuelBy, requested, subscribed: d.subscribed, ruleMatches: d.ruleMatches }), [fuelBy, requested, d.subscribed, d.ruleMatches]);
+  const hubRestricted = Boolean(d.kase?.hub_restricted);
+  const ctx = useMemo(() => ({ fuelBy, requested, subscribed: d.subscribed, ruleMatches: d.ruleMatches, hubRestricted, nowMs: nowMin * MIN }), [fuelBy, requested, d.subscribed, d.ruleMatches, hubRestricted, nowMin]);
   const byFlight = useMemo(() => {
     const m = {};
     for (const x of d.approvals) (m[x.flight_id] ??= []).push(x);
@@ -48,7 +49,8 @@ function Board({ d }) {
     const laneOf = (f) => {
       if (isRecovered(f)) return 'done';
       const dl = dlBy[f.flight_id];
-      if (!dl?.deadline_utc) return 'soon';
+      // no deadline: unknown fuel in the air needs a look soon; a flight on the ground with nothing running is just monitored
+      if (!dl?.deadline_utc) return isAirborne(f) || f.diverted_to ? 'soon' : 'mon';
       const m = (ms(dl.deadline_utc) - nowMin * MIN) / MIN;
       return m < 15 ? 'act' : m <= 45 ? 'soon' : 'mon';
     };
