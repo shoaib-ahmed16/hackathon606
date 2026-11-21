@@ -12,7 +12,7 @@ const TYPE_WORD = { CREW_REPLACE: 'crew replacement', DIVERT: 'diversion', HOLD:
 const STATUS_WORD = { PROPOSED: 'proposed', APPROVED: 'approved', REJECTED: 'rejected', EXECUTED: 'executed', REVOKED: 'withdrawn' };
 const word = (t) => TYPE_WORD[t] ?? String(t).replaceAll('_', ' ').toLowerCase();
 const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
-const plain = (s = '') => {
+export const plain = (s = '') => {
   let m = /^INSERT (\w+) decision \d+ \((\w+)\)/.exec(s);
   if (m) return `Proposed: ${word(m[1])}`;
   m = /^UPDATE (\w+) decision \d+ \((\w+)\)/.exec(s);
@@ -40,7 +40,7 @@ export default function Briefing({ d }) {
   return (
     <div className="briefing" data-src="v_case_timeline since last_seen">
       <h3>
-        <Pill tone="ai">Briefing</Pill> {since ? `Since you last looked at ${fmtZ(ms(since))}` : 'Latest activity on this case'}
+        <Pill tone="ai">What's new</Pill> {since ? `Since you last marked this as seen, ${fmtZ(ms(since))}` : 'Latest activity on this case'}
         {data?.new_recommendations > 0 && <span className="k">{data.new_recommendations} engine updates</span>}
         <button className="btn sm ghost" style={{ marginLeft: 'auto' }} onClick={() => dispatch(markSeen(iso(now)))}>
           Mark as seen

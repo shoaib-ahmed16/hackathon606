@@ -70,6 +70,8 @@ function ValueInput({ row, spec, onChange }) {
 
 // Rule builder: a few conditions joined by AND / OR over the whitelisted fields only. The preview runs the real rule
 // against the open case so you see how many flights it would catch before saving.
+const Req = () => <span className="req" title="Required" aria-hidden="true">*</span>;
+
 export default function NewRuleForm({ d }) {
   const catalogue = useGetRuleFieldsQuery();
   const fields = catalogue.data?.fields;
@@ -85,6 +87,7 @@ export default function NewRuleForm({ d }) {
   const [rowsState, setRowsState] = useState(null); // null until edited: first row comes from the field list
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null);
+  const [tried, setTried] = useState(false); // after one Save click, missing fields are marked
   const { scenario_id, case_id } = d.ctx;
 
   const rows = useMemo(() => rowsState ?? (fields ? [blankRow(fields)] : []), [rowsState, fields]);
@@ -129,6 +132,7 @@ export default function NewRuleForm({ d }) {
   };
 
   const reset = () => {
+    setTried(false);
     setName('');
     setDescription('');
     setValidTo('');
@@ -139,7 +143,15 @@ export default function NewRuleForm({ d }) {
     setError(null);
   };
 
+  const valueMissing = (r) => !(['is_null', 'not_null'].includes(r.op) || (r.value !== '' && r.value != null && !(Array.isArray(r.value) && r.value.length === 0)));
+  const problems = [!name.trim() && 'Name', !description.trim() && 'Description', !complete && 'a value for every condition'].filter(Boolean);
+  const bad = (cond) => tried && cond;
   const save = async () => {
+    if (problems.length) {
+      setTried(true);
+      toast.error(`Still needed: ${problems.join(', ')}`);
+      return;
+    }
     try {
       await create({
         scenario_id,
@@ -170,8 +182,9 @@ export default function NewRuleForm({ d }) {
       </div>
       <div className="rowf">
         <label style={{ flex: '2 1 220px' }}>
-          Name
-          <input className="field-in" value={name} placeholder="e.g. Flights with medical cases" onChange={(e) => setName(e.target.value)} />
+          <span>Name <Req /></span>
+          <input className={`field-in ${bad(!name.trim()) ? 'invalid' : ''}`} aria-required="true" aria-invalid={bad(!name.trim())} value={name} placeholder="e.g. Flights with medical cases" onChange={(e) => setName(e.target.value)} />
+          {bad(!name.trim()) && <span className="field-err">Give the rule a name</span>}
         </label>
         <label style={{ flex: '1 1 160px' }}>
           What it does
@@ -184,19 +197,20 @@ export default function NewRuleForm({ d }) {
       </div>
       {kinds[kind] && <div className={`note ${kind === 'CONSTRAINT' ? 'warn' : ''}`}>{kinds[kind]}</div>}
       <label>
-        Description (shown on alerts and flight rows)
-        <textarea className="field-in" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <span>Description (shown on alerts and flight rows) <Req /></span>
+        <textarea className={`field-in ${bad(!description.trim()) ? 'invalid' : ''}`} aria-required="true" aria-invalid={bad(!description.trim())} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+        {bad(!description.trim()) && <span className="field-err">Say what the rule does, in a sentence</span>}
       </label>
 
       <div className="rowf">
-        <b style={{ fontSize: 13 }}>A flight matches when</b>
+        <b style={{ fontSize: 13 }}>A flight matches when <Req /></b>
         <button type="button" className={`btn sm ${mode === 'all' ? 'primary' : ''}`} onClick={() => setMode('all')}>all of these are true</button>
         <button type="button" className={`btn sm ${mode === 'any' ? 'primary' : ''}`} onClick={() => setMode('any')}>any of these is true</button>
       </div>
       {rows.map((r, i) => {
         const sp = spec(r.field);
         return (
-          <div className="cond" key={i}>
+          <div className={`cond ${bad(valueMissing(r)) ? 'cond-invalid' : ''}`} key={i}>
             <select className="field-in" aria-label="Field" value={r.field} onChange={(e) => setRow(i, { field: e.target.value, op: 'eq', value: '' })}>
               {fields?.map((f) => (
                 <option key={f.field} value={f.field}>{f.label}</option>
@@ -208,6 +222,7 @@ export default function NewRuleForm({ d }) {
               ))}
             </select>
             <ValueInput row={r} spec={sp} onChange={(v) => setRow(i, { value: v })} />
+            {bad(valueMissing(r)) && <span className="field-err" style={{ flexBasis: '100%' }}>Choose or enter a value for this condition</span>}
             <button type="button" className="btn sm ghost" disabled={rows.length === 1} onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}>
               Remove
             </button>
@@ -241,9 +256,10 @@ export default function NewRuleForm({ d }) {
         </div>
       )}
       <div>
-        <button type="button" className="btn primary" disabled={!name.trim() || !description.trim() || !complete || saving} onClick={save}>
+        <button type="button" className="btn primary" disabled={saving} onClick={save}>
           Save rule
         </button>
+        <span className="k" style={{ marginLeft: 10 }}><Req /> required</span>
       </div>
     </div>
   );

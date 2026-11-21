@@ -7,7 +7,6 @@ import { ms } from '@/features/ops/helpers';
 import { useConsole } from '../ConsoleContext';
 import { useMinuteNow } from '@/hooks/useNow';
 import { MIN } from '@/features/ops/time';
-import Briefing from '../board/Briefing';
 import DispatchView from '../lenses/DispatchView';
 import Filters from '../board/Filters';
 import KpiBar from '../board/KpiBar';
@@ -78,7 +77,6 @@ function Board({ d }) {
     <>
       <KpiBar d={d} ctx={ctx} />
       <Filters d={d} />
-      {d.ops.briefing && <Briefing d={d} />}
       <div className="board-count" aria-live="polite" data-testid="board-count">
         Showing <b>{shown}</b> of {d.flights.length} flights
         {chips.length > 0 && ` · ${chips.map((c) => filterLabel(c, d.ruleMatches)).join(' + ')}`}
@@ -148,7 +146,7 @@ export default function BoardPage() {
   }, [lens, selected, dispatch, close]);
 
   return (
-    <div className="main" style={hasPanel ? undefined : { gridTemplateColumns: '1fr' }}>
+    <div className={`main${hasPanel ? " has-panel" : ""}`} style={hasPanel ? undefined : { gridTemplateColumns: '1fr' }}>
       <section className="view" aria-live="polite">
         {lens === 'occ' && <Board d={d} />}
         {lens === 'dispatch' && <DispatchView d={d} />}

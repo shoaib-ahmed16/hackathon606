@@ -8,11 +8,12 @@ import { useSignOut } from '@/features/auth/useSignOut';
 import {
   useAddRecordMutation,
   useCloseCaseMutation,
+  useGetBriefingQuery,
   useDeleteCaseMutation,
   usePushFeedMutation,
   useSetScenarioClockMutation,
 } from '@/features/ops/opsApi';
-import { selectCase, setLens, toggleBriefing, toggleSources } from '@/features/ops/opsSlice';
+import { markSeen, selectCase, setLens, toggleSources } from '@/features/ops/opsSlice';
 import { useOps } from '@/features/ops/useOps';
 import { iso, ms, stampMs } from '@/features/ops/helpers';
 import { toggleMode } from '@/features/ui/uiSlice';
@@ -28,6 +29,7 @@ import NewCaseSheet from './sheets/NewCaseSheet';
 import ReportSheet from './sheets/ReportSheet';
 import WhatIfSheet from './sheets/WhatIfSheet';
 import { Cd, Pill, Sheet } from './ui/ui';
+import { plain } from './board/Briefing';
 import { fmtTime, fmtZ, fmtZday, roleLabel } from './lib';
 
 const LENSES = [
@@ -37,6 +39,55 @@ const LENSES = [
   ['station', 'Station'],
   ['recovery', 'Recovery'],
 ];
+
+// "What's new": changes on this case since the operator last pressed "Mark all as seen". A popover, so it works on every screen.
+function WhatsNew({ d }) {
+  const dispatch = useAppDispatch();
+  const now = useNow();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const since = d.ops.lastSeenAt;
+  const { data } = useGetBriefingQuery({ ...d.ctx, since: since ?? undefined }, { skip: !d.ctx.case_id, pollingInterval: 15000 });
+  const items = [...(data?.items ?? [])].reverse();   // newest first
+  const n = items.length;
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const esc = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  return (
+    <span className="wn-wrap" ref={ref}>
+      <button type="button" className="whatsnew" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="dialog"
+        title="What changed on this case since you last pressed Mark all as seen: decisions, approvals, status changes">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z" /></svg>
+        <span>What's new</span>
+        {n > 0 ? <span className="wn-count" aria-label={`${n} changes`}>{n > 99 ? '99+' : n}</span> : <span className="wn-none">all caught up</span>}
+      </button>
+      {open && (
+        <div className="wn-pop" role="dialog" aria-label="What's new on this case" data-src="v_case_timeline since last_seen">
+          <div className="wn-head">
+            <b>What's new on this case</b>
+            <span className="k">{since ? `Since you last marked it as seen, ${fmtZ(ms(since))}` : 'Latest activity on this case'}</span>
+          </div>
+          {n === 0 ? <div className="wn-empty">Nothing new. You are up to date.</div> : (
+            <ul className="wn-list">
+              {items.slice(0, 12).map((i, k) => (
+                <li key={k}><span className="wn-time">{fmtZ(ms(i.occurred_at))}</span><span>{plain(i.summary)}{i.actor ? <span className="k"> · {i.actor}</span> : null}</span></li>
+              ))}
+            </ul>
+          )}
+          {n > 12 && <div className="k" style={{ padding: '0 14px 6px' }}>Showing the latest 12 of {n}.</div>}
+          <div className="wn-foot">
+            <button type="button" className="btn sm primary" disabled={n === 0} onClick={() => { dispatch(markSeen(iso(now))); setOpen(false); }}>Mark all as seen</button>
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
 
 // Wall-clock + scenario clock in the strip. Its own component so only it ticks every second.
 function Clock({ refreshedAt, kase, role }) {
@@ -128,10 +179,10 @@ function Strip({ d, onSheet, onAirport }) {
   }, [d.alternates, airport, options, hub?.iata]);
   return (
     <header className="strip" aria-label="Situation">
-      <div className="brand">
+      <NavLink to="/" end className="brand brand-link" title="Go to the home board" aria-label={`${APP_NAME}: home`}>
         <LogoMark size={36} />
         <span className="bn">{APP_NAME}</span>
-      </div>
+      </NavLink>
       <div className="scn" data-src="scenario / disruption_case">
         <span className="k">Case</span>
         <span className="scn-row">
@@ -305,9 +356,7 @@ function Bar({ d, onSheet }) {
           <span className="k">No deadline is running right now.</span>
         )}
       </div>
-      <button className="btn ghost" onClick={() => { if (loc.pathname !== '/') navigate('/'); dispatch(toggleBriefing()); }} aria-pressed={ops.briefing}>
-        Since you last looked
-      </button>
+      <WhatsNew d={d} />
       <div className="lenses" role="group" aria-label="Role lens">
         {LENSES.map(([k, label]) => (
           <button key={k} className="lens" aria-pressed={ops.lens === k && loc.pathname === '/'} onClick={() => goLens(k)}>
