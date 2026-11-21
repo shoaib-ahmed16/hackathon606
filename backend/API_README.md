@@ -75,6 +75,14 @@ deterministically from the database, with the source named. Free text goes to Cl
 compact JSON snapshot of this case's database facts and is told to answer only from it. Default model `claude-opus-5-5` (`ASK_MODEL` to change),
 low effort, server-side refusal fallback on. The key never leaves the server. Without a key, free text returns a clear "not configured" message.
 
+**Guard rails (enforced in `routes_ask.py`, before any answer, not only in the prompt)**
+- **Read-only.** Requests to delete, update, approve, execute, cancel, divert, send ... (and SQL-like text) are refused. The assistant has no tools and no write path. Its "next step" buttons only navigate (open a flight, approvals, a view).
+- **No personal data.** Crew appear as position and crew number. Questions asking for names, phone, e-mail, address, passport etc. are refused, and every answer (predefined or AI) passes a scrubber that masks crew names, e-mail addresses and phone numbers.
+- **One domain.** Free text that is not about this disruption is refused without calling the model. The model prompt repeats this and returns JSON (`answer`, `flights`, `out_of_scope`); flight cards are built only for flight numbers that exist in the case.
+- **Prompt injection.** Attempts to change the rules, reveal the prompt or ask for keys/passwords are refused. The question is passed to the model as untrusted text.
+- **Audit.** Every question and every refusal (`ASK_REFUSED`, with the reason) is recorded.
+- **Response shape:** `{ mode, answer, source, items: [{ flight_id, flight_no, route, status, chips[], actions[] }], actions[] }`; `mode` is `predefined | ai | refused | fallback | error`.
+
 ## Endpoints (scenario-scoped; no `scenario_id` = LIVE)
 
 | Method | Path | Source |

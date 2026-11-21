@@ -363,7 +363,7 @@ export default function ConsoleLayout() {
         </div>
         {sheet === 'approvals' && <ApprovalsDrawer d={d} onClose={close} />}
         {sheet === 'notes' && <NotesDrawer d={d} onClose={close} />}
-        {sheet === 'ask' && <AskSheet d={d} onClose={close} />}
+        {sheet === 'ask' && <AskSheet d={d} onClose={close} onOpenView={setSheet} />}
         {sheet === 'whatif' && <WhatIfSheet d={d} onClose={close} />}
         {sheet === 'report' && <ReportSheet d={d} onClose={close} />}
         {sheet === 'newcase' && <NewCaseSheet d={d} onClose={close} />}
