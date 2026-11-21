@@ -566,3 +566,65 @@ button.alt:hover,.hub-btn:hover{border-color:var(--ai)}
 .checklist{display:flex;flex-direction:column;gap:8px}
 .ck-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ck-act{margin-left:auto;display:flex;gap:6px}
+
+/* ===== Modern top chrome: no divider lines, soft rounded groups, pill navigation ===== */
+.strip{align-items:center;gap:10px;padding:10px 16px;min-height:0;background:var(--surface);border-bottom:none;box-shadow:0 1px 0 color-mix(in srgb,var(--line) 60%,transparent),0 6px 18px -14px rgba(0,0,0,.45)}
+.strip > *{border-right:none;padding:0}
+.strip > .brand{padding:0 8px 0 0}
+.strip > .scn,.strip > .hub,.strip > .hub-btn,.strip > .alts{background:color-mix(in srgb,var(--surface-2) 75%,transparent);border-radius:14px;padding:7px 12px;border:none}
+.hub-btn:hover{background:var(--surface-3)}
+.strip > .clock{padding:0 4px}
+.strip .k{font-size:11.5px;letter-spacing:.02em}
+.scn > .k,.alts > .k{text-transform:uppercase;font-size:10px;letter-spacing:.08em;font-weight:600;opacity:.8}
+.scn select{appearance:none;-webkit-appearance:none;background:var(--surface-3) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%238AA0BC' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 10px center;border:none;border-radius:999px;padding:6px 28px 6px 12px;font-weight:500;cursor:pointer;transition:background-color .15s,box-shadow .15s}
+.scn select:hover{background-color:color-mix(in srgb,var(--surface-3) 80%,var(--ai) 20%)}
+.scn select:focus-visible{outline:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--ai) 60%,transparent)}
+.hub-code{font-size:19px;letter-spacing:.01em}
+.hub-edit{border:none;background:var(--surface-3);border-radius:999px;width:22px;height:22px;padding:0;display:inline-flex;align-items:center;justify-content:center;transition:background-color .15s,color .15s}
+.hub-edit:hover{background:var(--ai-bg);color:var(--ai)}
+.alts-row{gap:6px}
+.alt{border:none;border-radius:10px;padding:4px 9px;background:var(--surface-3);transition:transform .12s,background-color .15s;cursor:pointer}
+.alt:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--surface-3) 80%,var(--ai) 20%)}
+.alt.verify{border:none;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--verify) 45%,transparent);background:color-mix(in srgb,var(--verify) 8%,var(--surface-3))}
+.alt.blocked{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--exceeded) 45%,transparent);background:color-mix(in srgb,var(--exceeded) 9%,var(--surface-3))}
+.clock-btn{border:none;background:var(--surface-3);border-radius:999px;padding:1px 9px;line-height:18px;transition:background-color .15s,color .15s}
+.clock-btn:hover:not(:disabled){background:var(--ai-bg);color:var(--ai)}
+
+/* buttons: filled-soft, no outline */
+.btn{border:none;background:var(--surface-2);border-radius:10px;padding:8px 13px;transition:background-color .15s,box-shadow .15s,transform .1s}
+.btn:hover{background:var(--surface-3)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible,.lens:focus-visible{outline:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--ai) 60%,transparent)}
+.btn.primary{box-shadow:0 4px 14px -6px var(--ai)}
+.btn.danger{border:none;background:color-mix(in srgb,var(--exceeded) 12%,var(--surface-2))}
+.btn.on{background:var(--ai-bg);box-shadow:none}
+.strip-actions{gap:8px}
+.strip-actions .btn{background:var(--surface-2);padding:8px 14px;border-radius:999px}
+.strip-actions .icon-btn{width:36px;height:36px;padding:0;border-radius:50%;justify-content:center}
+.kbd{border:none;background:var(--surface-3);border-radius:6px;padding:1px 6px}
+
+/* second row: role lens as a segmented control, actions as pill tabs */
+.bar{background:transparent;border-bottom:none;padding:10px 16px 6px;gap:8px}
+.lenses{background:var(--surface);border:none;border-radius:999px;padding:4px;gap:2px;box-shadow:0 1px 2px rgba(0,0,0,.18),inset 0 0 0 1px color-mix(in srgb,var(--line) 70%,transparent)}
+.lens{border-radius:999px;padding:6px 14px;transition:background-color .15s,color .15s}
+.lens:hover{color:var(--text)}
+.lens[aria-pressed="true"]{background:var(--ai);color:#04121F;font-weight:600;box-shadow:0 2px 8px -3px var(--ai)}
+[data-theme="light"] .lens[aria-pressed="true"]{color:#fff}
+.tools{display:inline-flex;align-self:flex-start;gap:2px;padding:4px;background:var(--surface);border-radius:999px;box-shadow:0 1px 2px rgba(0,0,0,.14),inset 0 0 0 1px color-mix(in srgb,var(--line) 70%,transparent);max-width:100%}
+.tools .btn,.tools a.btn{border-radius:999px;padding:6px 14px;background:transparent;color:var(--muted);font-weight:500}
+.tools .btn:hover{background:var(--surface-2);color:var(--text)}
+.tools .btn[aria-current="page"],.tools .btn.on-nav{background:var(--ai-bg);color:var(--ai);font-weight:600;box-shadow:none}
+.tools-pop{border:none;border-radius:14px;padding:6px;box-shadow:0 14px 40px -12px rgba(0,0,0,.55),inset 0 0 0 1px color-mix(in srgb,var(--line) 70%,transparent)}
+.tools-pop .btn{border-radius:10px}
+.next .t-risk,.next .pill{border-radius:999px}
+@media (max-width:900px){.strip{gap:8px;padding:8px 10px}.bar{padding:8px 10px 4px}}
+.strip{gap:8px;padding:9px 14px}
+.strip > .scn,.strip > .hub,.strip > .hub-btn,.strip > .alts{padding:6px 10px}
+.alt{padding:3px 7px}
+.strip-actions .btn{padding:8px 12px}
+.strip-actions{gap:6px}
+.scn select{max-width:200px}
+.strip-actions{flex-shrink:0}
+.strip-actions .btn{flex-shrink:0}
+.strip-actions .icon-btn{width:36px;min-width:36px;height:36px}
+.strip-actions .icon-btn svg{width:18px;height:18px;flex-shrink:0}
