@@ -1,0 +1,12 @@
+.venv
+__pycache__
+*.pyc
+.env
+Hack606_Fog_Ops
+fogops_db
+fogops_db.zip
+db
+*.sql
+*.txt
+!requirements.txt
+README.md

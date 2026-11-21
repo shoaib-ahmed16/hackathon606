@@ -1,0 +1,90 @@
+# FogOps full stack: Postgres + API + UI, one command:   docker compose up -d --build
+#   UI  -> http://<server>:8080   nginx. The browser calls the API through /ops-api on the SAME origin,
+#                                 so there is no cross-origin request and no CORS problem.
+#   API -> http://<server>:8888   FastAPI (login + all data). Direct calls from the 8080 UI origin are
+#                                 also allowed by CORS_ORIGINS, in case something calls :8888 directly.
+#   Security service -> http://<server>:8889 (Spring Boot, database "fogops").
+#   DB  -> 127.0.0.1:5433 on the server only (use an SSH tunnel). Created from backend/db/init/ the
+#          FIRST time the volume is empty.
+name: hackathon
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fogops
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    ports:
+      - '127.0.0.1:${DB_PORT:-5433}:5432'
+    volumes:
+      - fogops-data-17:/var/lib/postgresql/data
+      - ./backend/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d fogops']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s # first start restores the dump
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FOGOPS_DSN: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@db:5432/fogops
+      DEFAULT_ACTOR_ID: ${DEFAULT_ACTOR_ID:-1}
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-FogOps@2026}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://130.61.182.207:8080,http://localhost:3000}
+      # Ask (free-text questions). Leave empty and only the suggested questions work.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ASK_MODEL: ${ASK_MODEL:-claude-opus-5-5}
+    ports:
+      - '${API_PORT:-8888}:8000'
+
+  web:
+    build:
+      context: ./hackathon-app
+      args:
+        VITE_OPS_API_URL: ${OPS_API_URL:-/ops-api} # same-origin proxy -> no CORS
+        VITE_API_URL: ${VITE_API_URL:-} # empty: the app calls /api/... on its own origin
+        VITE_WS_URL: ${VITE_WS_URL:-}
+    # lets nginx reach services published on the VM (e.g. the security service on 8889)
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - '${HTTP_PORT:-8080}:80'
+
+  # ---- Security service (Spring Boot, ./hackathonTeamYashasvi), uses the shared "db" ----
+  security:
+    build: ./hackathonTeamYashasvi
+    container_name: yashasvi-security
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '${SECURITY_PORT:-8889}:8888' # 8888 on the host is already used by the FogOps api
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fogops
+      DB_USERNAME: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env}
+      MANAGEMENT_TRACING_ENABLED: 'false'
+    healthcheck:
+      test: ['CMD-SHELL', "bash -c 'exec 3<>/dev/tcp/localhost/8888 && printf \"GET /actuator/health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q UP <&3'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+volumes:
+  fogops-data-17:

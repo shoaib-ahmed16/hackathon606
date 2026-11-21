@@ -10,7 +10,7 @@ spring:
   application:
     name: security-micro-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/${DB_NAME:hackathon_yashasvi}
+    url: jdbc:postgresql://localhost:${DB_PORT:5433}/fogops
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
@@ -21,6 +21,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # the shared fogops schema already holds the FogOps tables, so baseline it instead of failing
+    baseline-on-migrate: true
+    baseline-version: 0
   jpa:
     hibernate:
       ddl-auto: validate

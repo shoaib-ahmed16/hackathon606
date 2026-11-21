@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FogOps — OCC disruption console (clickable mockup)</title>
+<!--
+=====================================================================================
+FOGOPS CONSOLE — UI SPEC FOR DEVELOPERS AND AGENTS
+=====================================================================================
+What this file is
+  A self-contained, clickable mockup of the Fog Operations & Crew Duty Recovery console.
+  Dummy data = the 21 Nov 2026 fog replay at 02:30Z (see fogops_db/sql/05_demo_fog_replay.sql).
+  No backend: all state lives in the DATA object in the <script> block.
+  Toggle "Data sources" in the header to see which DB view/function feeds each component.
+
+Users / role lenses (same app, different default focus and actions)
+  OCC         full board sorted by deadline, approvals queue, sets hub status, report
+  Dispatch    board + fuel/alternate focus, proposes HOLD / DIVERT
+  Crew        legality runway (Q1), replacement finder (Q4), commander discretion
+  Station     tablet view for one airport, big buttons for ground updates
+  Recovery    arrival-slot planner after the hub reopens (drag to re-sequence)
+
+Screen anatomy
+  [Situation strip]  scenario badge | hub status | alternates | clock UTC+SHJ | approvals | Ask (Ctrl/Cmd+K)
+  [Deadline bar]     single most urgent deadline + "Since you last looked" briefing toggle
+  [Board]            lanes: Act now (<15 min) / Decide soon (15-45) / Monitoring (>45) / Recovered
+                     row = flight, where it is, fuel bar, crew bar, LVP, AI chip, countdown
+  [Flight panel]     AI decision card (confidence, assumptions, Accept / Other options / Reject)
+                     crew duty ribbon (sign-in -> legal end -> discretion zone, now + projected end)
+                     aircraft state + "waiting for", timeline, comments
+  [Sheets]           consequence preview before every decision; override reasons; approvals
+
+Interaction rules (UX contract)
+  1. Rows sorted by next hard deadline = min(fuel decision time, latest legal departure, crew legal end).
+  2. Unknown is never green: VERIFY = grey dashed + "?".
+  3. Every decision shows a consequence preview; overriding the AI needs one reason chip.
+  4. Proposals by Dispatch/Crew need approval by an approver role (OCC/Dispatch/Crew/Recovery).
+  5. AI recommendation changes are announced in the row ("changed: HOLD -> DIVERT FJR, why").
+  6. REPLAY / WHAT-IF scenarios get a magenta frame + banner so they can't be mistaken for LIVE.
+  7. Times: absolute as "02:38Z / 06:38 SHJ"; deadlines as countdowns.
+  8. Keyboard: J/K move, Enter open, A accept, Ctrl/Cmd+K ask, Esc close.
+
+Backend mapping (fogops PostgreSQL)
+  hub/alternate strip  v_airport_status_current
+  board rows           v_flight_watch (+ proposed next_deadline_utc, deadline_reason)
+  AI card / options    v_recommendation_options, propose_hold_or_divert(), rank_alternates()
+  crew ribbon / Q1     v_crew_legality_ranking, fdp_calculation.inputs ("Why?")
+  latest departure     latest_departure_calc (+ live departure_legality in v_flight_watch)
+  accept / propose     INSERT decision (status PROPOSED)
+  approve              INSERT decision_approval, then execute_diversion() / swap_crew()
+  consequence preview  proposed function preview_diversion(decision) — read-only
+  replacement (Q4)     standby_candidates()
+  station buttons      UPDATE diversion, INSERT case_comment, ingest_flight_event()
+  recovery planner     build_recovery_plan(), v_recovery_plan_current
+  timeline / briefing  v_case_timeline (briefing = rows since user's last_seen, proposed)
+  what-if              clone_scenario() + side-by-side diff
+  live updates         LISTEN fogops_reassess -> worker -> WebSocket push
+=====================================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-cond: "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", system-ui, sans-serif;
+  --r-sm: 4px; --r-md: 8px; --r-lg: 12px;
+}
+[data-theme="dark"]{
+  --bg:#0C1522; --surface:#122033; --surface-2:#18293F; --surface-3:#203450;
+  --line:#243955; --line-2:#2F4767;
+  --text:#E4EBF4; --muted:#93A4BC; --faint:#62758F;
+  --legal:#3CC08C; --risk:#F2A93B; --disc:#A68AF5; --exceeded:#F05D52; --verify:#8C98AB;
+  --ai:#5DB2F7; --ai-bg:#16304B; --replay:#E255C3;
+  --legal-bg:#123528; --risk-bg:#3A2A10; --disc-bg:#2A2148; --exceeded-bg:#3D1916; --verify-bg:#222C3A;
+  --shadow: 0 12px 32px rgba(0,0,0,.45);
+  color-scheme: dark;
+}
+[data-theme="light"]{
+  --bg:#EDF1F6; --surface:#FFFFFF; --surface-2:#F5F7FA; --surface-3:#E9EEF5;
+  --line:#D6DEE9; --line-2:#C3CFDE;
+  --text:#14213A; --muted:#51627C; --faint:#8593A8;
+  --legal:#138556; --risk:#A9660A; --disc:#6A4ED0; --exceeded:#C4302A; --verify:#66738A;
+  --ai:#1D6FC4; --ai-bg:#E3EFFC; --replay:#B0228C;
+  --legal-bg:#E2F4EC; --risk-bg:#FBF0DD; --disc-bg:#EEE9FC; --exceeded-bg:#FBE5E3; --verify-bg:#EDF0F4;
+  --shadow: 0 12px 32px rgba(20,33,58,.16);
+  color-scheme: light;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.45;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--ai);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+
+/* ---------- app frame ---------- */
+.app{display:grid;grid-template-rows:auto auto 1fr;grid-template-columns:minmax(0,1fr);height:100vh;position:relative}
+.app > *{min-width:0}
+.app.scenario-replay{box-shadow: inset 0 0 0 4px var(--replay)}
+.replay-banner{display:none;background:var(--replay);color:#fff;font-weight:600;text-align:center;padding:4px 12px;font-size:13px}
+.app.scenario-replay .replay-banner{display:block}
+
+/* ---------- situation strip ---------- */
+.strip{display:flex;align-items:stretch;gap:0;background:var(--surface);border-bottom:1px solid var(--line);min-height:58px;overflow-x:auto}
+.strip > *{border-right:1px solid var(--line);padding:8px 14px;display:flex;flex-direction:column;justify-content:center;white-space:nowrap;flex-shrink:0}
+.strip > .spacer{flex-shrink:1}
+.brand{font-weight:700;font-size:15px;letter-spacing:.01em}
+.brand small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+@media (max-width:1700px){ .brand small{display:none} .strip > *{padding:8px 11px} .who{display:none} }
+.scn{gap:4px}
+.scn select{background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);border-radius:var(--r-sm);padding:3px 6px;font:inherit;font-size:13px}
+.scn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--legal);margin-right:6px}
+.scenario-replay .scn-dot{background:var(--replay)}
+.hub{min-width:0}
+.hub-line{display:flex;gap:8px;align-items:center;flex-wrap:nowrap}
+.hub-code{font-weight:700;font-size:18px}
+.k{color:var(--muted);font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600;border:1px solid transparent;white-space:nowrap}
+.t-legal{color:var(--legal);background:var(--legal-bg)}
+.t-risk{color:var(--risk);background:var(--risk-bg)}
+.t-disc{color:var(--disc);background:var(--disc-bg)}
+.t-exceeded{color:var(--exceeded);background:var(--exceeded-bg)}
+.t-verify{color:var(--verify);background:var(--verify-bg);border:1px dashed var(--verify)}
+.t-ai{color:var(--ai);background:var(--ai-bg)}
+.t-neutral{color:var(--muted);background:var(--surface-2);border-color:var(--line)}
+.alts{gap:3px}
+.alts-row{display:flex;gap:6px}
+.alt{display:flex;flex-direction:column;align-items:flex-start;border-radius:var(--r-sm);padding:3px 7px;background:var(--surface-2);border:1px solid var(--line);font-size:11.5px;line-height:1.25}
+.alt b{font-size:13px}
+.alt.verify{border-style:dashed;color:var(--verify)}
+.alt.blocked{color:var(--exceeded)}
+.clock{align-items:flex-end}
+.clock-z{font-size:20px;font-weight:600}
+.clock-l{color:var(--muted);font-size:12px}
+.strip .spacer{flex:1;border-right:none;padding:0}
+.strip-actions{flex-direction:row!important;align-items:center;gap:8px;border-right:none!important}
+.btn{border:1px solid var(--line-2);background:var(--surface-2);border-radius:var(--r-md);padding:7px 12px;font-weight:500;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--surface-3)}
+.btn.primary{background:var(--ai);border-color:var(--ai);color:#04121F;font-weight:600}
+[data-theme="light"] .btn.primary{color:#fff}
+.btn.danger{color:var(--exceeded);border-color:color-mix(in srgb,var(--exceeded) 50%,var(--line-2))}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--text);background:var(--surface-2)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.badge-count{background:var(--risk);color:#1B1203;border-radius:999px;padding:0 7px;font-weight:700;font-size:12px}
+.kbd{border:1px solid var(--line-2);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:11px;color:var(--muted)}
+
+/* ---------- deadline bar + lens tabs ---------- */
+.bar{display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--surface-2);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.next{display:flex;align-items:center;gap:10px;font-size:14px}
+.next .cd{font-weight:700;font-size:16px}
+.lenses{display:flex;gap:2px;margin-left:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:3px}
+.lens{border:none;background:transparent;padding:5px 12px;border-radius:6px;font-size:13px;color:var(--muted);font-weight:500}
+.lens[aria-pressed="true"]{background:var(--surface-3);color:var(--text);font-weight:600}
+.who{color:var(--muted);font-size:13px}
+.tools{display:flex;gap:2px}
+.tools .btn{padding:5px 9px}
+#srcBtn[aria-pressed="true"]{background:#FFE066;color:#3A2E00}
+
+/* ---------- main layout ---------- */
+.main{display:grid;grid-template-columns:minmax(0,1fr) 460px;min-height:0;min-width:0}
+.view{overflow:auto;min-height:0}
+.panel{border-left:1px solid var(--line);background:var(--surface);overflow:auto;min-height:0}
+@media (max-width:1380px){
+  .row{grid-template-columns:92px minmax(120px,1fr) 96px 104px minmax(150px,1.4fr) 86px}
+  .row > div:nth-child(5){display:none}
+}
+@media (max-width:1180px){
+  .main{grid-template-columns:1fr}
+  .panel{position:fixed;right:0;top:0;bottom:0;width:min(460px,100%);z-index:40;box-shadow:var(--shadow);transform:translateX(100%);transition:transform .2s}
+  .panel.open{transform:none}
+}
+
+/* briefing */
+.briefing{margin:12px 16px 0;border:1px solid color-mix(in srgb,var(--ai) 40%,var(--line));background:var(--ai-bg);border-radius:var(--r-lg);padding:12px 14px}
+.briefing h3{margin:0 0 6px;font-size:14px;display:flex;align-items:center;gap:8px}
+.briefing ul{margin:0;padding-left:18px}
+.briefing li{margin:2px 0}
+.briefing[hidden]{display:none}
+
+/* ---------- board ---------- */
+.board{padding:6px 16px 24px}
+.lane{margin-top:14px}
+.lane-h{display:flex;align-items:baseline;gap:10px;margin:0 0 6px;font-size:14px;font-weight:600}
+.lane-h .k{font-weight:400}
+.lane-act .lane-h{color:var(--exceeded)}
+.lane-soon .lane-h{color:var(--risk)}
+.rows{border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;background:var(--surface)}
+.row{display:grid;grid-template-columns:96px minmax(130px,1.1fr) 104px 112px 62px minmax(170px,1.5fr) 92px;align-items:center;gap:12px;
+  padding:10px 14px;border-top:1px solid var(--line);cursor:pointer;position:relative}
+.row:first-child{border-top:none}
+.row:hover{background:var(--surface-2)}
+.row[aria-selected="true"]{background:var(--surface-3)}
+.row[aria-selected="true"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ai)}
+.flt b{font-size:15px;font-family:var(--font-cond);font-weight:600}
+.flt .k{display:block}
+.where{font-size:13px}
+.where .k{display:block}
+.meter{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.meter .track{height:6px;border-radius:3px;background:var(--surface-3);overflow:hidden}
+.meter .fill{height:100%;border-radius:3px}
+.meter .lbl{display:flex;justify-content:space-between;color:var(--muted)}
+.meter .lbl b{color:var(--text);font-weight:600}
+.meter.verify .track{background:repeating-linear-gradient(45deg,var(--surface-3) 0 4px,transparent 4px 8px);border:1px dashed var(--verify)}
+.rec{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.rec .changed{font-size:12px;color:var(--ai)}
+.cd-cell{text-align:right}
+.cd-big{font-size:18px;font-weight:700;display:block;line-height:1.1;white-space:nowrap}
+.cd-big.long{font-size:14px}
+.cd-cell .k{display:block}
+.c-legal{color:var(--legal)} .c-risk{color:var(--risk)} .c-disc{color:var(--disc)} .c-exceeded{color:var(--exceeded)} .c-verify{color:var(--verify)} .c-muted{color:var(--muted)}
+.pulse{animation:pulse 1.6s ease-out 2}
+@keyframes pulse{0%{box-shadow:inset 0 0 0 2px var(--ai)}100%{box-shadow:inset 0 0 0 2px transparent}}
+@media (max-width:900px){
+  .row{grid-template-columns:1fr 1fr;row-gap:8px}
+  .cd-cell{text-align:left}
+}
+
+/* ---------- flight panel ---------- */
+.p-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:10px;position:sticky;top:0;background:var(--surface);z-index:2}
+.p-head h2{margin:0;font-size:20px;font-family:var(--font-cond);font-weight:600}
+.p-head .k{display:block}
+.p-head .close{margin-left:auto}
+.sec{padding:14px 16px;border-bottom:1px solid var(--line)}
+.sec h3{margin:0 0 10px;font-size:13px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px}
+.ai-card{border:1px solid color-mix(in srgb,var(--ai) 45%,var(--line));background:var(--ai-bg);border-radius:var(--r-lg);padding:12px 14px}
+.ai-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;color:var(--ai);font-weight:600}
+.ai-top .conf{margin-left:auto;display:flex;align-items:center;gap:6px;color:var(--muted);font-weight:500}
+.conf-bar{width:60px;height:5px;background:var(--surface-3);border-radius:3px;overflow:hidden}
+.conf-bar i{display:block;height:100%;background:var(--ai)}
+.ai-action{font-size:19px;font-weight:700;margin:2px 0 6px}
+.ai-why{margin:0 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 10px}
+.chip{font-size:12px;border-radius:999px;padding:2px 8px;border:1px solid var(--line-2);color:var(--muted);background:var(--surface)}
+.chip.q-forecast{border-color:var(--risk);color:var(--risk)}
+.chip.q-estimated{border-style:dashed;border-color:var(--verify);color:var(--verify)}
+.chip.q-measured{border-color:var(--legal);color:var(--legal)}
+.ai-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.state-note{margin-top:10px;padding:8px 10px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line);font-size:13px}
+.opts{margin-top:10px;display:none;flex-direction:column;gap:6px}
+.opts.open{display:flex}
+.opt{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:start;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);text-align:left}
+.opt:hover:not(.blocked){border-color:var(--ai)}
+.opt.blocked{cursor:not-allowed;opacity:.75}
+.opt.verify{border-style:dashed}
+.opt .rk{font-weight:700;color:var(--muted)}
+.opt .what{font-weight:600}
+.opt .why{font-size:12px;color:var(--muted)}
+.opt .why.bad{color:var(--exceeded)}
+.opt .why.vfy{color:var(--verify)}
+.opt .sc{font-size:12px;color:var(--muted);text-align:right}
+.why-btn{border:none;background:none;color:var(--ai);font-size:12px;padding:0 2px;text-decoration:underline;text-underline-offset:2px}
+
+/* duty ribbon */
+.ribbon{position:relative;height:34px;margin:4px 0 2px}
+.rb-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-top:4px}
+.rb-legend span{display:inline-flex;align-items:center;gap:5px}
+.rb-legend i{display:inline-block;width:3px;height:12px;border-radius:1px}
+.lg-now{background:var(--text)} .lg-proj{background:var(--ai)} .lg-legal{background:var(--exceeded)}
+.rb-legend i.lg-disc{width:14px;background:repeating-linear-gradient(45deg,var(--disc) 0 3px,transparent 3px 6px)}
+.rb-track{position:absolute;left:0;right:0;top:10px;height:14px;border-radius:7px;background:var(--surface-3);overflow:hidden}
+.rb-used{position:absolute;top:0;bottom:0;left:0;background:color-mix(in srgb,var(--legal) 55%,transparent)}
+.rb-disc{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--disc) 45%,transparent) 0 5px,transparent 5px 10px)}
+.rb-mark{position:absolute;top:4px;width:2px;height:26px;background:var(--text)}
+.rb-mark.proj{background:var(--ai)}
+.rb-mark.legal{background:var(--exceeded);width:2px}
+.rb-lab{position:absolute;font-size:11px;color:var(--muted);white-space:nowrap;transform:translateX(-50%)}
+.rb-lab.top{top:-4px}.rb-lab.bot{top:40px}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px}
+.facts dt{color:var(--muted)}
+.facts dd{margin:0}
+.crew-list{display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:13px}
+.crew-li{display:flex;gap:8px;align-items:center}
+.crew-li .pos{width:28px;font-weight:600;color:var(--muted)}
+.tl{list-style:none;margin:0;padding:0;font-size:13px}
+.tl li{display:grid;grid-template-columns:58px 1fr;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
+.tl li:first-child{border-top:none}
+.tl .t{color:var(--muted)}
+.tl .who{font-size:12px}
+.comment-box{display:flex;gap:6px;margin-top:8px}
+.comment-box input{flex:1;background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r-md);padding:7px 10px;color:var(--text);font:inherit}
+
+/* ---------- sheet / modal ---------- */
+.scrim{position:fixed;inset:0;background:rgba(5,10,18,.55);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+.scrim.open{display:flex}
+.sheet{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-lg);width:min(640px,100%);max-height:90vh;overflow:auto;box-shadow:var(--shadow)}
+.sheet-h{padding:16px 18px;border-bottom:1px solid var(--line)}
+.sheet-h h2{margin:0;font-size:18px}
+.sheet-h p{margin:4px 0 0;color:var(--muted)}
+.sheet-b{padding:16px 18px}
+.sheet-f{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.conseq{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.conseq li{display:grid;grid-template-columns:22px 1fr;gap:8px}
+.conseq .ic{font-weight:700}
+.reason-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.reason-chips button{border:1px solid var(--line-2);background:var(--surface-2);border-radius:999px;padding:4px 11px;font-size:13px}
+.reason-chips button[aria-pressed="true"]{background:var(--ai);border-color:var(--ai);color:#04121F;font-weight:600}
+textarea{width:100%;min-height:70px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r-md);color:var(--text);font:inherit;padding:8px 10px;margin-top:8px}
+.field-l{font-size:13px;font-weight:600;margin:14px 0 2px}
+.approver-note{font-size:13px;color:var(--muted);margin-top:12px}
+
+/* drawer (approvals) */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--line-2);box-shadow:var(--shadow);z-index:55;transform:translateX(100%);transition:transform .2s;display:flex;flex-direction:column}
+.drawer.open{transform:none}
+.drawer .sheet-b{overflow:auto;flex:1}
+.appr{border:1px solid var(--line);border-radius:var(--r-lg);padding:12px;margin-bottom:10px}
+.appr h4{margin:0 0 4px;font-size:15px}
+
+/* palette */
+.palette{width:min(620px,100%);align-self:flex-start;margin-top:10vh}
+.palette input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--text);font:inherit;font-size:17px;padding:16px 18px;outline:none}
+.pal-list{padding:8px}
+.pal-item{display:block;width:100%;text-align:left;background:none;border:none;padding:9px 10px;border-radius:var(--r-md);color:var(--text)}
+.pal-item:hover,.pal-item.on{background:var(--surface-2)}
+.pal-ans{padding:14px 18px;border-top:1px solid var(--line);font-size:14px}
+.pal-ans .src{font-size:12px;color:var(--muted);margin-top:8px}
+
+/* toast */
+.toasts{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:80}
+.toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:var(--r-md);padding:10px 14px;box-shadow:var(--shadow);font-size:14px;min-width:260px}
+
+/* ---------- crew lens ---------- */
+.crew-view{padding:14px 16px 24px}
+.runway{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);overflow:hidden}
+.rw-row{display:grid;grid-template-columns:150px 120px minmax(260px,1fr) 110px 130px;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--line)}
+.rw-row:first-child{border-top:none}
+.rw-row .ribbon{margin:0;height:34px}
+.rw-head{font-size:12px;color:var(--muted);font-weight:600;background:var(--surface-2)}
+.cand{display:grid;grid-template-columns:1fr auto;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-md);margin-bottom:8px}
+.cand.bad{opacity:.7}
+
+/* ---------- station tablet ---------- */
+.station{padding:16px;max-width:980px}
+.st-card{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);padding:16px;margin-bottom:16px}
+.st-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.st-top h3{margin:0;font-size:22px;font-family:var(--font-cond)}
+.need{margin:10px 0 14px;padding:10px 12px;border-radius:var(--r-md);background:var(--risk-bg);color:var(--risk);font-weight:600}
+.big-btns{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.big{min-height:72px;border-radius:var(--r-lg);border:1px solid var(--line-2);background:var(--surface-2);font-size:16px;font-weight:600;padding:10px}
+.big:hover{background:var(--surface-3)}
+.big.done{background:var(--legal-bg);border-color:var(--legal);color:var(--legal)}
+
+/* ---------- recovery ---------- */
+.recovery{padding:14px 16px 24px}
+.slots-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.slots{display:grid;grid-template-columns:repeat(12,minmax(84px,1fr));min-width:1008px}
+.slot{border-left:1px solid var(--line);min-height:118px;padding:6px;display:flex;flex-direction:column;gap:6px}
+.slot:first-child{border-left:none}
+.slot .st{font-size:12px;color:var(--muted)}
+.slot.over{background:var(--ai-bg)}
+.blk{border-radius:var(--r-md);padding:6px 8px;font-size:12px;cursor:grab;border:1px solid var(--line-2);background:var(--surface-3)}
+.blk b{display:block;font-size:13px}
+.blk.legal{border-left:4px solid var(--legal)} .blk.risk{border-left:4px solid var(--risk)} .blk.verify{border-left:4px dashed var(--verify)}
+.parking{margin-top:14px;border:1px dashed var(--line-2);border-radius:var(--r-lg);padding:12px}
+.parking .blk{cursor:not-allowed;border-left:4px solid var(--exceeded);display:inline-block;margin:4px 6px 0 0}
+
+/* ---------- what-if ---------- */
+.cmp{width:100%;border-collapse:collapse;font-size:13px}
+.cmp th,.cmp td{text-align:left;padding:7px 8px;border-top:1px solid var(--line)}
+.cmp th{color:var(--muted);font-weight:600}
+.cmp tr.diff td{background:var(--ai-bg)}
+
+/* ---------- data-source annotations ---------- */
+[data-src]{position:relative}
+.show-src [data-src]::after{content:attr(data-src);position:absolute;top:-1px;right:-1px;z-index:5;font:500 10.5px/1.3 var(--font);
+  background:#FFE066;color:#3A2E00;padding:1px 5px;border-radius:3px;pointer-events:none;max-width:280px;white-space:normal;text-align:left}
+
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.empty{padding:20px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div>
+    <div class="replay-banner" id="replayBanner">Replay scenario — nothing here affects live operations</div>
+    <header class="strip" aria-label="Situation">
+      <div class="brand">FogOps<small>SHJ disruption console</small></div>
+      <div class="scn" data-src="scenario (LIVE / REPLAY / WHATIF)">
+        <span class="k">Scenario</span>
+        <label class="sr" for="scnSel">Scenario</label>
+        <span><span class="scn-dot"></span><select id="scnSel"><option value="live">Live</option><option value="replay">Replay: 21 Nov fog</option></select></span>
+      </div>
+      <div class="hub" data-src="v_airport_status_current (SHJ)">
+        <div class="hub-line"><span class="hub-code">SHJ</span><span class="pill t-exceeded" id="hubStatus">Closed</span><span class="pill t-disc">LVP in force</span><span class="k">RVR 50 m</span></div>
+        <div class="hub-line k" id="hubReopen">Reopens ~02:45Z (forecast) · arrivals 0 → 12/h</div>
+      </div>
+      <div class="alts" data-src="v_airport_status_current (alternates) + open diversions">
+        <span class="k">Alternates</span>
+        <div class="alts-row" id="altRow"></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="clock" data-src="scenario_now()">
+        <span class="clock-z" id="clkZ">02:30:00Z</span>
+        <span class="clock-l" id="clkL">06:30 SHJ · feed 20 s ago</span>
+      </div>
+      <div class="strip-actions">
+        <button class="btn" id="apprBtn" data-src="decision WHERE status=PROPOSED">Approvals <span class="badge-count" id="apprCount">1</span></button>
+        <button class="btn" id="askBtn" title="Ask a question (Ctrl/Cmd + K)">Ask <span class="kbd">⌘K</span></button>
+      </div>
+    </header>
+  </div>
+
+  <div class="bar">
+    <div class="next" data-src="min(v_flight_watch.next_deadline_utc) — proposed column">
+      <span class="pill t-exceeded" id="nextPill">Next deadline</span>
+      <span id="nextText"></span>
+    </div>
+    <button class="btn ghost" id="briefBtn">Since you last looked</button>
+    <div class="lenses" role="group" aria-label="Role lens">
+      <button class="lens" data-lens="occ" aria-pressed="true">OCC</button>
+      <button class="lens" data-lens="dispatch" aria-pressed="false">Dispatch</button>
+      <button class="lens" data-lens="crew" aria-pressed="false">Crew Control</button>
+      <button class="lens" data-lens="station" aria-pressed="false">Station</button>
+      <button class="lens" data-lens="recovery" aria-pressed="false">Recovery</button>
+    </div>
+    <span class="who" id="whoAmI">OCC Duty Manager</span>
+    <span class="tools">
+      <button class="btn ghost" id="whatifBtn" title="Try a what-if scenario">What if…</button>
+      <button class="btn ghost" id="reportBtn" title="Generate disruption report">Report</button>
+      <button class="btn ghost" id="srcBtn" aria-pressed="false" title="Show which database view feeds each part">Data sources</button>
+      <button class="btn ghost" id="themeBtn" title="Switch light/dark">Theme</button>
+    </span>
+  </div>
+
+  <div class="main" id="main">
+    <section class="view" id="view" aria-live="polite"></section>
+    <aside class="panel" id="panel" aria-label="Flight details"></aside>
+  </div>
+</div>
+
+<!-- sheets -->
+<div class="scrim" id="scrim" role="dialog" aria-modal="true"><div class="sheet" id="sheet"></div></div>
+<aside class="drawer" id="drawer" aria-label="Approvals"></aside>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+/* =====================================================================
+   DUMMY DATA — mirrors fogops DB rows at 21 Nov 2026 02:30Z (replay)
+   ===================================================================== */
+const BASE = Date.UTC(2026,10,21,2,30,0);
+const T = (hhmm, dayOffset=0) => { const [h,m]=hhmm.split(':').map(Number); return Date.UTC(2026,10,21+dayOffset,h,m,0); };
+const START = Date.now();
+const now = () => BASE + (Date.now()-START);
+
+const DATA = {
+  user: {occ:'OCC Duty Manager', dispatch:'Dispatcher 1', crew:'Crew Controller 1', station:'RKT Station', recovery:'Recovery Coordinator'},
+  alternates: [
+    {iata:'RKT', txt:'2 of 4 stands', tone:'ok'},
+    {iata:'FJR', txt:'6 of 6 stands', tone:'ok'},
+    {iata:'AAN', txt:'No fuel', tone:'blocked'},
+    {iata:'DWC', txt:'Unconfirmed', tone:'verify'},
+    {iata:'AUH', txt:'Unconfirmed', tone:'verify'},
+    {iata:'MCT', txt:'Unconfirmed', tone:'verify'},
+  ],
+  flights: [
+    { id:'G9464', from:'DEL', to:'SHJ', reg:'A6-AOK', where:'On ground at RKT', whereSub:'Diverted · on blocks 02:04Z',
+      status:{t:'Diverted', tone:'disc'}, fuel:{state:'onground', txt:'Refuelled'},
+      crew:{signIn:T('17:00',-1), legal:T('03:30'), disc:T('06:30'), proj:T('03:30'), legs:3, max:'10:30', rule:27, band:'18:00–21:59', lvp:true,
+            members:[['CP','Capt. #111684',true],['FO','F/O #780350',true],['CS','Cab. sup. #108620',null],['CC','4 cabin crew',null]]},
+      deadline:{at:T('02:38'), reason:'Latest legal departure from RKT', why:[
+        'Crew signed in 17:00Z (21:00 SHJ local) → band 18:00–21:59',
+        'Diversion made it 3 sectors → captain limit 10:30 (rule 27, GCAA FDP v1)',
+        'Legal end 17:00Z + 10:30 = 03:30Z',
+        'RKT→SHJ block 52 min (P90 of 54 flights)',
+        'Latest legal off-blocks 03:30Z − 52 min = 02:38Z; operational target 02:08Z (30 min buffer)']},
+      rec:{type:'Depart RKT by 02:38Z', short:'Depart by 02:38Z or replace crew', conf:.58, tone:'risk',
+           why:'Crew can still reach SHJ legally if off-blocks by 02:38Z. After that the flight needs commander discretion or the standby crew (ready about 03:30Z).',
+           assumptions:[['SHJ reopens 02:45Z','forecast'],['Block time P90 history','measured'],['Arrival slot 03:30Z free','estimated']]},
+      options:[
+        {rk:1, what:'Depart RKT now (off-blocks by 02:38Z)', why:['Lands about 03:30Z, crew legal end 03:30Z — no slack for delays'], exec:true, score:.66},
+        {rk:2, what:'Depart under commander discretion', why:['Latest with discretion 05:38Z','Captain must agree; logged as discretion'], exec:true, score:.58},
+        {rk:3, what:'Replace crew with standby (by road)', why:['2 roster-safe LVP captains · ready about 03:30Z'], exec:true, score:.51},
+      ],
+      conseq:{1:[['✓','Off-blocks RKT by 02:38Z, lands SHJ about 03:30Z (slot requested)'],['!','Crew lands with 0–4 min of legal time — any ATC delay needs commander discretion'],['✓','Frees 1 RKT stand (2 → 3 free)'],['i','161 connecting passengers re-protected on later departures']],
+              2:[['!','Captain extends FDP; latest off-blocks becomes 05:38Z'],['i','Recorded as COMMANDER_DISCRETION decision, visible in the report']],
+              3:[['✓','Standby captain #110252 + F/O called out, 60 min road SHJ→RKT'],['!','Departure no earlier than about 03:30Z'],['✓','New crew legal until about 15:30Z, no planned roster broken']]},
+      approver:'OCC', owner:'Dispatcher 1', updated:20,
+      timeline:[['01:20','Dispatcher 1','Decided DIVERT RKT (followed AI option 1)'],['01:20','OCC Duty Manager','Approved diversion'],['02:04','SIM feed','On blocks at RKT'],['02:05','RKT Station','Refuel done, pax on board']]},
+
+    { id:'G9472', from:'MAA', to:'SHJ', reg:'A6-ARE', where:'Holding near SHJ', whereSub:'Since 02:10Z · ETA 02:55Z',
+      status:{t:'Holding', tone:'risk'}, fuel:{state:'air', end:T('03:05'), quality:'estimated'},
+      crew:{signIn:T('16:35',-1), legal:T('03:50'), disc:T('06:50'), proj:T('02:55'), legs:2, max:'11:15', rule:26, band:'18:00–21:59', lvp:true,
+            members:[['CP','Capt. #110071',true],['FO','F/O #109863',true],['CS','Cab. sup. #106683',null],['CC','4 cabin crew',null]]},
+      deadline:{at:T('02:42'), reason:'Last moment to divert to FJR on fuel', why:[
+        'Holding endurance until 03:05Z (estimate at 01:15Z: 110 min)',
+        'Flight time to FJR 23 min (85 km + approach)',
+        'Divert decision needed by 03:05Z − 23 min = 02:42Z']},
+      rec:{type:'Divert to FJR', short:'Divert FJR', conf:.72, tone:'ai', changed:'Changed at 02:10Z: Hold → Divert FJR. Reopening slipped to 02:45Z, fuel spare at landing fell to 10 min (< 15 min buffer).',
+           why:'Holding would land at 02:55Z with only 10 min fuel spare. FJR has 6 free stands and the crew stay legal for the diversion leg.',
+           assumptions:[['Fuel endurance','estimated'],['SHJ reopens 02:45Z','forecast'],['Distance from SHJ area','estimated']]},
+      options:[
+        {rk:1, what:'Divert to FJR', why:['Fuel margin on arrival 12 min','6 stands free','Return needs discretion or replacement crew'], exec:true, score:.78},
+        {rk:2, what:'Divert to RKT', why:['Fuel margin 17 min','Only 2 stands left (reserved for recovery)'], exec:true, score:.71},
+        {rk:3, what:'Keep holding', why:['Lands 02:55Z with 10 min spare — below the 15 min buffer'], exec:true, score:.20, warn:true},
+        {rk:4, what:'Divert to AAN', why:['No fuel at AAN'], exec:false},
+        {rk:5, what:'Divert to DWC', why:['Status not confirmed by station — verify first'], exec:false, verify:true},
+        {rk:6, what:'Divert to MCT', why:['Cannot reach with remaining fuel'], exec:false},
+      ],
+      conseq:{1:[['✓','Creates G9472D FJR→SHJ recovery flight'],['!','Adds 1 sector for 7 crew: captain limit 11:15 → 10:30, legal end 03:50Z → 03:05Z'],['!','Return to SHJ will need commander discretion or a replacement crew'],['✓','FJR stands 6 → 5'],['i','164 connecting passengers affected']],
+              2:[['✓','Creates G9472D RKT→SHJ'],['!','RKT stands 2 → 1 (recovery space tight)'],['!','Adds 1 sector for 7 crew']],
+              3:[['!','Lands 02:55Z with about 10 min fuel spare if SHJ reopens on time'],['✕','If reopening slips again, diversion fuel may no longer cover FJR']]},
+      pending:{by:'Dispatcher 1', role:'Dispatch', at:'02:24', option:1, rationale:'Agree with AI: hold buffer below 15 min after the reopening slipped.'},
+      approver:'OCC', owner:'Dispatcher 1', updated:15,
+      timeline:[['01:15','FogOps engine','Recommended HOLD (25 min spare)'],['02:10','Met / OCC','SHJ reopening revised 02:30Z → 02:45Z'],['02:10','FogOps engine','Recommendation changed to DIVERT FJR'],['02:24','Dispatcher 1','Proposed DIVERT FJR — waiting for OCC']]},
+
+    { id:'G9455', from:'CCJ', to:'SHJ', reg:'A6-ANR', where:'Airborne, 40 min out', whereSub:'ETA 02:10Z → holding expected',
+      status:{t:'Airborne', tone:'neutral'}, fuel:{state:'air', end:T('03:15'), quality:'estimated'},
+      crew:{signIn:T('16:45',-1), legal:T('04:00'), disc:T('07:00'), proj:T('02:55'), legs:2, max:'11:15', rule:26, band:'18:00–21:59', lvp:false,
+            members:[['CP','Capt. #110877',false],['FO','F/O #780374',true],['CS','Cab. sup. #103941',null],['CC','4 cabin crew',null]]},
+      deadline:{at:T('02:52'), reason:'Last moment to divert to FJR on fuel', why:['Endurance until 03:15Z (estimate)','23 min to FJR → decide by 02:52Z']},
+      rec:{type:'Divert to FJR', short:'Divert FJR — captain not LVP', conf:.71, tone:'ai',
+           why:'The captain is not LVP-qualified, so the flight cannot land at SHJ while LVP is in force, even after reopening.',
+           assumptions:[['LVP stays in force after reopening','forecast'],['Fuel endurance','estimated']]},
+      options:[
+        {rk:1, what:'Divert to FJR', why:['Fuel margin 22 min','Return needs an LVP-qualified captain'], exec:true, score:.80},
+        {rk:2, what:'Divert to RKT', why:['Fuel margin 27 min','Only 2 stands left'], exec:true, score:.74},
+        {rk:3, what:'Hold for LVP cancellation', why:['Captain not LVP-qualified for SHJ'], exec:false},
+        {rk:4, what:'Divert to DWC', why:['Status not confirmed — verify first'], exec:false, verify:true},
+      ],
+      conseq:{1:[['✓','Creates G9455D FJR→SHJ'],['!','Adds 1 sector: captain legal end 04:00Z → 03:15Z'],['!','Return under LVP needs an LVP-qualified captain (Crew Control notified)'],['✓','FJR stands 6 → 5'],['i','124 connecting passengers affected']],
+              2:[['✓','Creates G9455D RKT→SHJ'],['!','RKT stands 2 → 1']]},
+      approver:'OCC', owner:'Dispatcher 1', updated:35,
+      timeline:[['01:15','FogOps engine','Recommended DIVERT RKT (captain not LVP)'],['02:10','FogOps engine','Re-ranked: DIVERT FJR (RKT stands filling)']]},
+
+    { id:'G9108', from:'BAH', to:'SHJ', reg:'A6-AQT', where:'Airborne', whereSub:'ETA 02:55Z',
+      status:{t:'Airborne', tone:'neutral'}, fuel:{state:'unknown'},
+      crew:{signIn:T('22:50',-1), legal:T('09:05'), disc:T('12:05'), proj:T('02:55'), legs:2, max:'10:15', rule:42, band:'00:00–05:59', lvp:true,
+            members:[['CP','Capt. #104114',true],['FO','F/O #109946',true]]},
+      deadline:{at:null, reason:'Fuel endurance not reported'},
+      rec:{type:'Verify fuel before deciding', short:'Verify fuel endurance', conf:.30, tone:'verify',
+           why:'No fuel estimate has been entered for this flight, so neither holding nor any diversion can be marked executable.',
+           assumptions:[['Fuel endurance','missing']]},
+      options:[
+        {rk:1, what:'Keep holding', why:['Fuel endurance unknown — verify first'], exec:false, verify:true},
+        {rk:2, what:'Divert to RKT', why:['Fuel endurance unknown — verify first'], exec:false, verify:true},
+        {rk:3, what:'Divert to FJR', why:['Fuel endurance unknown — verify first'], exec:false, verify:true},
+      ],
+      conseq:{}, approver:'DISPATCH', owner:'Dispatcher 1', updated:25,
+      timeline:[['01:50','SIM feed','Airborne, ETA 02:55Z']]},
+
+    { id:'G9161', from:'DMM', to:'SHJ', reg:'A6-AQP', where:'On ground at DMM', whereSub:'STD 01:45Z · held at origin',
+      status:{t:'Departure held', tone:'neutral'}, fuel:{state:'onground', txt:'Full'},
+      crew:{signIn:T('00:45'), legal:T('11:00'), disc:T('14:00'), proj:T('04:15'), legs:2, max:'10:15', rule:42, band:'00:00–05:59', lvp:true,
+            members:[['CP','Capt. #102812',true],['FO','F/O #106495',true]]},
+      deadline:{at:T('03:05'), reason:'Planned departure to arrive after reopening'},
+      rec:{type:'Hold departure until 03:05Z', short:'Delay departure to 03:05Z', conf:.75, tone:'ai',
+           why:'Arriving after reopening avoids 35 min of holding. Crew stays legal (legal end 11:00Z).',
+           assumptions:[['SHJ reopens 02:45Z','forecast']]},
+      options:[{rk:1, what:'Hold departure until 03:05Z', why:['Lands about 04:15Z, no airborne holding'], exec:true, score:.82},
+               {rk:2, what:'Depart now and hold', why:['About 35 min holding, fuel available'], exec:true, score:.40}],
+      conseq:{1:[['✓','New ETD 03:05Z sent to DMM station'],['i','Passengers informed of 80 min delay']]},
+      approver:'OCC', owner:'Dispatcher 1', updated:40,
+      timeline:[['01:40','OCC Duty Manager','Held departure at DMM']]},
+
+    { id:'G9621', from:'CAI', to:'SHJ', reg:'A6-ANL', where:'Holding near SHJ', whereSub:'Since 02:15Z · ETA 02:45Z',
+      status:{t:'Holding', tone:'legal'}, fuel:{state:'air', end:T('03:45'), quality:'estimated'},
+      crew:{signIn:T('16:50',-1), legal:T('04:05'), disc:T('07:05'), proj:T('02:55'), legs:2, max:'11:15', rule:26, band:'18:00–21:59', lvp:true,
+            members:[['CP','Capt. #100062',true],['FO','F/O #108859',true],['CS','Cab. sup. #106241',null],['CC','4 cabin crew',null]]},
+      deadline:{at:T('03:22'), reason:'Last moment to divert to FJR on fuel', why:['Endurance until 03:45Z (estimate)','23 min to FJR → 03:22Z']},
+      rec:{type:'Keep holding', short:'Hold — 50 min spare', conf:.80, tone:'legal',
+           why:'Fuel and crew cover the forecast reopening with 50 min fuel spare at landing.',
+           assumptions:[['SHJ reopens 02:45Z','forecast'],['Fuel endurance','estimated']]},
+      options:[{rk:1, what:'Keep holding', why:['Lands about 02:55Z with 50 min fuel spare','Crew margin 1 h 10 min'], exec:true, score:1.83},
+               {rk:2, what:'Divert to FJR', why:['Fuel margin 52 min'], exec:true, score:.79}],
+      conseq:{1:[['✓','Stays in the SHJ arrival sequence (slot 02:45Z proposed)']]},
+      approver:'DISPATCH', owner:'Dispatcher 1', updated:12, accepted:true,
+      timeline:[['01:15','FogOps engine','Recommended HOLD'],['02:10','FogOps engine','Still HOLD after reopening slip']]},
+
+    { id:'G9588', from:'CMB', to:'SHJ', reg:'A6-ARJ', where:'On ground at RKT', whereSub:'Waiting for replacement crew (ETA 03:20Z)',
+      status:{t:'Diverted', tone:'disc'}, fuel:{state:'onground', txt:'Refuelled'},
+      crew:{signIn:T('02:20'), legal:T('15:20'), disc:T('18:20'), proj:T('04:15'), legs:1, max:'13:00', rule:1, band:'06:00–07:59', lvp:true,
+            members:[['CP','Capt. #105145 (standby)',true],['FO','F/O #780206 (standby)',true],['CS','Cab. sup. (standby)',null],['CC','3 cabin crew (standby)',null]]},
+      deadline:{at:T('14:28'), reason:'Latest legal departure (new crew)', why:['New crew sign-in 02:20Z (06:20 SHJ) → band 06:00–07:59, 1 sector, 13:00 (rule 1)','Legal end 15:20Z − 52 min RKT→SHJ = 14:28Z']},
+      rec:{type:'No decision needed now', short:'Replacement crew en route', conf:.9, tone:'legal',
+           why:'Original crew exceeded FDP after the diversion; 6 standby crew are on the road from SHJ.', assumptions:[['Road time SHJ→RKT 60 min','estimated']]},
+      options:[], conseq:{}, approver:'CREW_CONTROL', owner:'Crew Controller 1', updated:30, accepted:true,
+      timeline:[['01:20','Dispatcher 1','DIVERT RKT approved and executed'],['01:52','SIM feed','On blocks at RKT'],['02:20','Crew Controller 1','Replaced 6 crew from standby (decision 4)']]},
+
+    { id:'G9254', from:'ALA', to:'SHJ', reg:'A6-AOJ', where:'On blocks at SHJ', whereSub:'Landed 01:05Z before closure',
+      status:{t:'Arrived', tone:'legal'}, fuel:{state:'onground', txt:'—'},
+      crew:{signIn:T('19:40',-1), legal:T('07:25'), disc:T('10:25'), proj:T('01:05'), legs:1, max:'11:45', rule:0, band:'', lvp:true, members:[]},
+      deadline:{at:null, reason:'Completed'}, recovered:true,
+      rec:{type:'Completed', short:'Arrived', conf:1, tone:'legal', why:'Landed before closure.', assumptions:[]},
+      options:[], conseq:{}, owner:'—', updated:90, timeline:[['01:05','SIM feed','On blocks SHJ']]},
+  ],
+  briefing: [
+    'SHJ reopening slipped to 02:45Z (Met forecast). LVP stays in force after reopening.',
+    'G9472: AI changed HOLD → DIVERT FJR. Dispatch proposed it — it is waiting for your approval.',
+    'G9464 at RKT must leave within minutes or needs commander discretion / replacement crew.',
+    'G9588: 6 crew replaced from standby by Crew Control; new crew legal until 15:20Z.',
+    'G9108: no fuel endurance reported — options are blocked until Dispatch verifies.',
+  ],
+  crewCandidates: {
+    G9464: [
+      {id:'#110252', pos:'CP', pattern:'SBY 1 (02:00–08:00)', lvp:true, legal:'15:30Z', margin:'+12 h 05 min', verdict:'Candidate', tone:'legal'},
+      {id:'#780119', pos:'FO', pattern:'SBY 1 (02:00–08:00)', lvp:true, legal:'15:30Z', margin:'+12 h 05 min', verdict:'Candidate', tone:'legal'},
+      {id:'#102161', pos:'CP', pattern:'SBY 1 (02:00–08:00)', lvp:true, legal:'15:30Z', margin:'+12 h 05 min', verdict:'Legal but breaks planned roster (SHJ-DOH tomorrow 06:10Z)', tone:'risk'},
+      {id:'#100046', pos:'CP', pattern:'SBY 1 (02:00–08:00)', lvp:false, legal:'15:30Z', margin:'—', verdict:'Not LVP-qualified (LVP in force at SHJ)', tone:'exceeded'},
+    ]
+  },
+  recovery: {
+    reopen:T('02:45'), cap:12,
+    slots: { '02:45':['G9621'], '02:55':['G9108'], '03:00':['G9472'], '03:20':['G9588D'], '03:30':['G9464D'] },
+    blocks: {
+      G9621:{label:'G9621 CAI', sub:'Holding · fuel to 03:45Z', earliest:T('02:45'), latest:T('03:40'), tone:'legal'},
+      G9108:{label:'G9108 BAH', sub:'Airborne · fuel unknown', earliest:T('02:55'), latest:null, tone:'verify'},
+      G9472:{label:'G9472 MAA', sub:'Holding · fuel to 03:05Z', earliest:T('02:55'), latest:T('03:00'), tone:'risk'},
+      G9588D:{label:'G9588D RKT', sub:'New crew · ready 03:20Z', earliest:T('03:20'), latest:T('15:20'), tone:'legal'},
+      G9464D:{label:'G9464D RKT', sub:'Crew legal end 03:30Z', earliest:T('03:30'), latest:T('03:30'), tone:'risk'},
+    },
+    parked:[{label:'G9455 CCJ', why:'Captain not LVP-qualified while LVP in force'}]
+  }
+};
+
+/* =====================================================================
+   STATE + HELPERS
+   ===================================================================== */
+const S = { lens:'occ', sel:'G9472', showSrc:false, briefing:true, decided:{}, station:{} };
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const fmtZ = t => { const d=new Date(t); return pad(d.getUTCHours())+':'+pad(d.getUTCMinutes())+'Z'; };
+const fmtL = t => { const d=new Date(t+4*3600e3); return pad(d.getUTCHours())+':'+pad(d.getUTCMinutes()); };
+const minsTo = t => Math.floor((t-now())/60000);
+function cd(t){
+  if(t==null) return '?';
+  const m = minsTo(t);
+  if(m < 0) return 'passed '+(-m)+' min ago';
+  if(m < 60) return m+' min';
+  return Math.floor(m/60)+' h '+pad(m%60)+' min';
+}
+function toneFor(t){ if(t==null) return 'verify'; const m=minsTo(t); return m<0?'exceeded':m<15?'exceeded':m<45?'risk':'legal'; }
+function laneOf(f){
+  if(f.recovered) return 'done';
+  if(f.deadline.at==null) return 'soon';
+  const m=minsTo(f.deadline.at); return m<15?'act':m<=45?'soon':'mon';
+}
+function flight(id){ return DATA.flights.find(f=>f.id===id); }
+function toast(msg){ const el=document.createElement('div'); el.className='toast'; el.textContent=msg; $('#toasts').appendChild(el); setTimeout(()=>el.remove(),3800); }
+function pending(){ return DATA.flights.filter(f=>f.pending && !S.decided[f.id]); }
+
+/* =====================================================================
+   HEADER
+   ===================================================================== */
+function renderAlts(){
+  $('#altRow').innerHTML = DATA.alternates.map(a=>`<span class="alt ${a.tone==='verify'?'verify':a.tone==='blocked'?'blocked':''}" title="${esc(a.iata+': '+a.txt)}"><b>${a.iata} ${a.tone==='verify'?'?':a.tone==='blocked'?'✕':'✓'}</b>${esc(a.txt)}</span>`).join('');
+}
+function tick(){
+  const t=now(), d=new Date(t);
+  $('#clkZ').textContent = pad(d.getUTCHours())+':'+pad(d.getUTCMinutes())+':'+pad(d.getUTCSeconds())+'Z';
+  $('#clkL').textContent = fmtL(t)+' SHJ · feed '+(15+ (d.getUTCSeconds()%10))+' s ago';
+  const live = DATA.flights.filter(f=>f.deadline.at && !f.recovered && minsTo(f.deadline.at)>-60).sort((a,b)=>a.deadline.at-b.deadline.at)[0];
+  if(live){
+    $('#nextText').innerHTML = `<b class="cd c-${toneFor(live.deadline.at)}">${cd(live.deadline.at)}</b> ${esc(live.id)} — ${esc(live.deadline.reason)} (${fmtZ(live.deadline.at)} / ${fmtL(live.deadline.at)} SHJ)`;
+  }
+  $('#apprCount').textContent = pending().length;
+  const ln=$('.rb-legend .lg-now'); if(ln) ln.parentElement.lastChild.textContent='Now '+fmtZ(now());
+  $('#apprCount').style.display = pending().length? '' : 'none';
+  document.querySelectorAll('[data-cd]').forEach(el=>{
+    const v = el.getAttribute('data-cd'); if(v==='') return;
+    const at=Number(v); el.textContent = cd(at); el.className = el.className.replace(/c-\w+/,'c-'+toneFor(at));
+  });
+}
+
+/* =====================================================================
+   BOARD (OCC / Dispatch lenses)
+   ===================================================================== */
+function meterFuel(f){
+  if(f.fuel.state==='unknown') return `<div class="meter verify" data-src="flight_fuel_estimate (missing)"><div class="lbl"><span>Fuel</span><b class="c-verify">? verify</b></div><div class="track"></div></div>`;
+  if(f.fuel.state==='onground') return `<div class="meter"><div class="lbl"><span>Fuel</span><b>${esc(f.fuel.txt)}</b></div><div class="track"><div class="fill" style="width:100%;background:var(--faint)"></div></div></div>`;
+  const m=minsTo(f.fuel.end), pct=Math.max(4,Math.min(100,m/120*100)), tone=m<20?'exceeded':m<45?'risk':'legal';
+  return `<div class="meter" data-src="flight_fuel_estimate (quality: ${f.fuel.quality})"><div class="lbl"><span>Fuel</span><b class="c-${tone}">${m} min${f.fuel.quality==='estimated'?'*':''}</b></div><div class="track"><div class="fill" style="width:${pct}%;background:var(--${tone})"></div></div></div>`;
+}
+function meterCrew(f){
+  const c=f.crew; if(f.recovered) return `<div class="meter"><div class="lbl"><span>Crew</span><b>Done</b></div><div class="track"></div></div>`;
+  const margin=Math.floor((c.legal-c.proj)/60000), tone = margin<0?'disc':margin<60?'risk':'legal';
+  const left=minsTo(c.legal), pct=Math.max(4,Math.min(100,left/240*100));
+  const txt = margin<0 ? 'Needs discretion' : (left<60? left+' min left' : Math.floor(left/60)+' h '+pad(left%60)+' left');
+  return `<div class="meter" data-src="v_crew_legality_ranking"><div class="lbl"><span>Crew</span><b class="c-${tone}">${txt}</b></div><div class="track"><div class="fill" style="width:${pct}%;background:var(--${tone})"></div></div></div>`;
+}
+function lvpCell(f){
+  if(f.recovered) return '<span class="k">—</span>';
+  return f.crew.lvp ? `<span class="pill t-legal" title="Both pilots LVP-qualified">LVP ✓</span>` : `<span class="pill t-exceeded" title="Captain not LVP-qualified">LVP ✕</span>`;
+}
+function recChip(f){
+  const d=S.decided[f.id];
+  if(f.recovered) return `<span class="pill t-neutral">Arrived before closure</span>`;
+  if(d) return `<span class="pill ${d.final?'t-legal':'t-risk'}">${esc(d.label)}</span>`;
+  if(f.pending) return `<span class="pill t-risk">Waiting for ${S.lens==='occ'?'your':'OCC'} approval</span><span class="k">${esc(f.pending.by)} proposed: ${esc(f.options[f.pending.option-1].what)}</span>`;
+  const cls = f.rec.tone==='verify'?'t-verify':f.rec.tone==='legal'?'t-legal':f.rec.tone==='risk'?'t-risk':'t-ai';
+  return `<span class="pill ${cls}">${f.rec.tone==='verify'?'? ':''}AI: ${esc(f.rec.short)}</span>${f.rec.changed?`<span class="changed">Changed: Hold → Divert FJR</span>`:''}`;
+}
+function rowHtml(f){
+  const at=f.deadline.at;
+  return `<div class="row ${f.rec.changed&&!S.seenChange?'pulse':''}" role="option" tabindex="0" data-id="${f.id}" aria-selected="${S.sel===f.id}" data-src="v_flight_watch">
+    <div class="flt"><b>${f.id}</b><span class="k">${f.from}→${f.to}</span><span class="k">${f.reg}</span></div>
+    <div class="where">${esc(f.where)}<span class="k">${esc(f.whereSub)}</span></div>
+    ${meterFuel(f)}
+    ${meterCrew(f)}
+    <div>${lvpCell(f)}</div>
+    <div class="rec" data-src="v_recommendation_options (rank 1)">${recChip(f)}</div>
+    <div class="cd-cell" data-src="next_deadline_utc (proposed)">${f.recovered?'<span class="k">Done</span>':
+      `<span class="cd-big ${at&&minsTo(at)>=60?'long':''} c-${toneFor(at)}" data-cd="${at??''}">${cd(at)}</span><span class="k">${at?fmtZ(at):'Verify'}</span>`}</div>
+  </div>`;
+}
+function renderBoard(){
+  const lanes=[['act','Act now','under 15 min','lane-act'],['soon','Decide soon','15–45 min','lane-soon'],['mon','Monitoring','more than 45 min',''],['done','Recovered','','']];
+  let fl = DATA.flights.slice().sort((a,b)=>(a.deadline.at??(now()+20*60000))-(b.deadline.at??(now()+20*60000)));
+  if(S.lens==='dispatch') fl = fl.filter(f=>!f.recovered);
+  let html = `<div class="briefing" id="briefing" ${S.briefing?'':'hidden'} data-src="v_case_timeline since last_seen (proposed)">
+     <h3><span class="pill t-ai">AI briefing</span> Since you last looked at 02:12Z</h3>
+     <ul>${DATA.briefing.map(b=>`<li>${esc(b)}</li>`).join('')}</ul></div><div class="board" role="listbox" aria-label="Flights by deadline">`;
+  for(const [k,name,sub,cls] of lanes){
+    const items=fl.filter(f=>laneOf(f)===k); if(!items.length) continue;
+    html += `<div class="lane ${cls}"><h2 class="lane-h">${name} <span class="k">${sub} · ${items.length} flight${items.length>1?'s':''}</span></h2><div class="rows">${items.map(rowHtml).join('')}</div></div>`;
+  }
+  html += `<p class="k" style="margin-top:14px">* Fuel values marked with an asterisk are estimates. Grey dashed means not verified — never treated as safe.</p></div>`;
+  $('#view').innerHTML = html;
+  document.querySelectorAll('.row').forEach(r=>{
+    r.addEventListener('click',()=>select(r.dataset.id));
+    r.addEventListener('keydown',e=>{ if(e.key==='Enter') select(r.dataset.id); });
+  });
+}
+
+/* =====================================================================
+   FLIGHT PANEL
+   ===================================================================== */
+function ribbon(c, compact){
+  const start=c.signIn, end=c.disc, span=end-start;
+  const p = t => Math.max(0,Math.min(100,(t-start)/span*100));
+  const n=p(now()), l=p(c.legal), pr=p(c.proj);
+  return `<div class="ribbon ${compact?'compact':''}" aria-label="Crew duty timeline">
+    <div class="rb-track"><div class="rb-used" style="width:${n}%"></div><div class="rb-disc" style="left:${l}%;right:0"></div></div>
+    <div class="rb-mark" style="left:${n}%" title="Now"></div><div class="rb-mark proj" style="left:${pr}%" title="Projected landing ${fmtZ(c.proj)}"></div><div class="rb-mark legal" style="left:${l}%" title="Legal end ${fmtZ(c.legal)}"></div>
+  </div>${compact?'':`<div class="rb-legend">
+    <span><i class="lg-now"></i>Now ${fmtZ(now())}</span><span><i class="lg-proj"></i>Lands ${fmtZ(c.proj)}</span>
+    <span><i class="lg-legal"></i>Legal end ${fmtZ(c.legal)}</span><span><i class="lg-disc"></i>Discretion to ${fmtZ(c.disc)}</span>
+    <span class="k">Sign-in ${fmtZ(c.signIn)}</span></div>`}`;
+}
+function select(id){
+  S.sel=id; if(id==='G9472') S.seenChange=true;
+  document.querySelectorAll('.row').forEach(r=>r.setAttribute('aria-selected', r.dataset.id===id));
+  renderPanel(); $('#panel').classList.add('open');
+}
+function renderPanel(){
+  const f=flight(S.sel); if(!f){ $('#panel').innerHTML='<div class="empty">Select a flight to see options, crew legality and history.</div>'; return; }
+  const d=S.decided[f.id];
+  const isApprover = ['occ','dispatch','crew','recovery'].includes(S.lens);
+  let actions='';
+  if(d){
+    actions = `<div class="state-note">${d.final?'✓':'⏳'} ${esc(d.note)}</div>`;
+  } else if(f.pending && S.lens==='occ'){
+    actions = `<div class="state-note"><b>${esc(f.pending.by)}</b> proposed <b>${esc(f.options[f.pending.option-1].what)}</b> at ${f.pending.at}Z: “${esc(f.pending.rationale)}”</div>
+      <div class="ai-buttons" style="margin-top:10px"><button class="btn primary" data-act="approve">Review and approve</button><button class="btn danger" data-act="rejectProposal">Reject proposal</button></div>`;
+  } else if(f.pending){
+    actions = `<div class="state-note">⏳ Proposed by ${esc(f.pending.by)} — waiting for OCC approval.</div>`;
+  } else if(f.options.length && f.rec.tone!=='verify' && !f.accepted){
+    actions = `<div class="ai-buttons"><button class="btn primary" data-act="accept">Accept: ${esc(f.options[0].what)}</button><button class="btn" data-act="toggleOpts">Other options</button><button class="btn ghost" data-act="reject">Reject</button></div>`;
+  } else if(f.rec.tone==='verify'){
+    actions = `<div class="ai-buttons"><button class="btn primary" data-act="askFuel">Request fuel from crew</button><button class="btn" data-act="enterFuel">Enter fuel estimate</button><button class="btn" data-act="toggleOpts">See blocked options</button></div>`;
+  } else if(f.options.length){
+    actions = `<div class="ai-buttons"><button class="btn" data-act="toggleOpts">See options</button></div>`;
+  }
+  const opts = f.options.map(o=>{
+    const blocked=!o.exec; const cls = blocked?(o.verify?'opt blocked verify':'opt blocked'):'opt';
+    return `<button class="${cls}" data-opt="${o.rk}" ${blocked?'aria-disabled="true"':''}><span class="rk">${o.rk}</span>
+      <span><span class="what">${esc(o.what)}</span>${o.why.map(w=>`<span class="why ${blocked?(o.verify?'vfy':'bad'):''}" style="display:block">${blocked?(o.verify?'? ':'✕ '):(o.warn?'! ':'')}${esc(w)}</span>`).join('')}</span>
+      <span class="sc">${o.exec?('Score '+o.score.toFixed(2)):(o.verify?'Verify':'Blocked')}</span></button>`; }).join('');
+  const qcls = q => q==='forecast'?'q-forecast':q==='estimated'||q==='missing'?'q-estimated':'q-measured';
+  const crewMargin = Math.floor((f.crew.legal-f.crew.proj)/60000);
+  $('#panel').innerHTML = `
+  <div class="p-head"><div><h2>${f.id} ${f.from}→${f.to}</h2><span class="k">${f.reg} · A320 · owner ${esc(f.owner)} · updated ${f.updated} s ago</span></div>
+    <button class="btn ghost close" data-act="closePanel" aria-label="Close panel">Close</button></div>
+  <div class="sec" data-src="recommendation + recommendation_option">
+    <div class="ai-card">
+      <div class="ai-top"><span>AI recommendation</span><span class="conf">Confidence ${Math.round(f.rec.conf*100)}% <span class="conf-bar"><i style="width:${f.rec.conf*100}%"></i></span></span></div>
+      <div class="ai-action">${esc(f.rec.type)}</div>
+      ${f.rec.changed?`<div class="changed" style="color:var(--ai);font-size:13px;margin-bottom:6px">↻ ${esc(f.rec.changed)}</div>`:''}
+      <p class="ai-why">${esc(f.rec.why)}</p>
+      ${f.rec.assumptions.length?`<div class="chips" data-src="recommendation.assumptions / data_quality">${f.rec.assumptions.map(([a,q])=>`<span class="chip ${qcls(q)}">${esc(a)} · ${q}</span>`).join('')}</div>`:''}
+      ${actions}
+      <div class="opts ${f.rec.tone==='verify'?'':''}" id="opts">${opts}</div>
+    </div>
+  </div>
+  ${f.deadline.at?`<div class="sec"><h3>Deadline <button class="why-btn" data-act="why">Why this time?</button></h3>
+    <div style="display:flex;align-items:baseline;gap:10px"><span class="cd-big c-${toneFor(f.deadline.at)}" data-cd="${f.deadline.at}">${cd(f.deadline.at)}</span>
+    <span>${esc(f.deadline.reason)}: <b>${fmtZ(f.deadline.at)}</b> / ${fmtL(f.deadline.at)} SHJ</span></div>
+    <div id="whyBox" hidden data-src="fdp_calculation.inputs / latest_departure_calc.assumptions"><ol style="margin:8px 0 0;padding-left:18px;font-size:13px">${(f.deadline.why||[]).map(w=>`<li>${esc(w)}</li>`).join('')}</ol></div></div>`:''}
+  ${f.recovered?'':`<div class="sec" data-src="fdp_calculation (binding crew) + crew_qualification">
+    <h3>Crew duty <span class="pill ${crewMargin<0?'t-disc':crewMargin<60?'t-risk':'t-legal'}">${crewMargin<0?'Needs discretion':crewMargin<60?'At risk':'Legal'}</span></h3>
+    ${ribbon(f.crew)}
+    <dl class="facts" style="margin-top:14px">
+      <dt>Limit</dt><dd>${f.crew.max} · ${f.crew.legs} sector${f.crew.legs>1?'s':''} · band ${f.crew.band} SHJ · rule ${f.crew.rule}</dd>
+      <dt>Legal end</dt><dd>${fmtZ(f.crew.legal)} / ${fmtL(f.crew.legal)} SHJ · with discretion ${fmtZ(f.crew.disc)}</dd>
+      <dt>Margin at landing</dt><dd>${crewMargin<0?`<span class="c-disc">${-crewMargin} min over — needs discretion</span>`:crewMargin+' min'}</dd>
+    </dl>
+    <div class="crew-list">${f.crew.members.map(([p,n,l])=>`<div class="crew-li"><span class="pos">${p}</span><span>${esc(n)}</span>${l===true?'<span class="pill t-legal">LVP ✓</span>':l===false?'<span class="pill t-exceeded">Not LVP</span>':''}</div>`).join('')}</div>
+    ${(crewMargin<60||f.id==='G9464')&&DATA.crewCandidates[f.id]?`<div style="margin-top:10px"><button class="btn" data-act="findCrew">Find replacement crew</button></div>`:''}
+  </div>`}
+  <div class="sec" data-src="v_aircraft_whereabouts + diversion">
+    <h3>Aircraft</h3>
+    <dl class="facts"><dt>Where</dt><dd>${esc(f.where)}</dd><dt>Detail</dt><dd>${esc(f.whereSub)}</dd><dt>Status</dt><dd>${esc(f.status.t)}</dd></dl>
+  </div>
+  <div class="sec" data-src="v_case_timeline (this flight)">
+    <h3>Timeline and comments</h3>
+    <ul class="tl">${f.timeline.slice().reverse().map(([t,w,x])=>`<li><span class="t">${t}Z</span><span>${esc(x)}<span class="who k" style="display:block">${esc(w)}</span></span></li>`).join('')}</ul>
+    <div class="comment-box"><label class="sr" for="cmt">Add a comment</label><input id="cmt" placeholder="Add a comment for all teams"><button class="btn" data-act="comment">Post</button></div>
+  </div>`;
+  bindPanel(f);
+}
+function bindPanel(f){
+  $('#panel').querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',()=>act(b.dataset.act,f)));
+  $('#panel').querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>{
+    const o=f.options.find(x=>x.rk==b.dataset.opt);
+    if(!o.exec){ toast(o.verify?'Blocked until verified: '+o.why[0]:'Not executable: '+o.why[0]); return; }
+    if(f.pending||f.accepted||S.decided[f.id]) return;
+    openDecision(f,o.rk);
+  }));
+}
+function act(a,f){
+  if(a==='closePanel'){ $('#panel').classList.remove('open'); return; }
+  if(a==='toggleOpts'){ $('#opts').classList.toggle('open'); return; }
+  if(a==='accept'){ openDecision(f,1); return; }
+  if(a==='reject'){ openReject(f); return; }
+  if(a==='why'){ const w=$('#whyBox'); w.hidden=!w.hidden; return; }
+  if(a==='approve'){ openApprove(f); return; }
+  if(a==='rejectProposal'){ openReject(f,true); return; }
+  if(a==='findCrew'){ openCrewFinder(f); return; }
+  if(a==='askFuel'){ toast('Message drafted to G9108 crew (ACARS): "Report fuel on board and holding endurance."'); f.timeline.push([fmtZ(now()).slice(0,5),DATA.user[S.lens]||'You','Requested fuel endurance from crew']); renderPanel(); return; }
+  if(a==='enterFuel'){ openFuel(f); return; }
+  if(a==='comment'){ const v=$('#cmt').value.trim(); if(!v) return; f.timeline.push([fmtZ(now()).slice(0,5), (DATA.user[S.lens]||'You')+' ('+S.lens+')', v]); renderPanel(); toast('Comment posted to the shared timeline'); }
+}
+
+/* =====================================================================
+   SHEETS: decision / consequence preview / approve / reject
+   ===================================================================== */
+function openSheet(html){ $('#sheet').innerHTML=html; $('#scrim').classList.add('open'); const f=$('#sheet').querySelector('button, input, textarea'); f&&f.focus(); }
+function closeSheet(){ $('#scrim').classList.remove('open'); }
+const REASONS=['Station capacity','ATC restriction','Crew preference','Commercial / connections','Fuel information','Other'];
+function conseqList(f,rk){ const c=(f.conseq[rk]||[['i','No downstream changes detected']]);
+  return `<ul class="conseq" data-src="preview_diversion(decision) — proposed, read-only">${c.map(([i,t])=>`<li><span class="ic ${i==='✓'?'c-legal':i==='!'?'c-risk':i==='✕'?'c-exceeded':'c-muted'}">${i}</span><span>${esc(t)}</span></li>`).join('')}</ul>`; }
+function openDecision(f,rk){
+  const o=f.options.find(x=>x.rk===rk); const override = rk!==1;
+  const role = S.lens==='occ'?'OCC':S.lens==='crew'?'Crew Control':S.lens==='recovery'?'Recovery':'Dispatch';
+  const needsApproval = S.lens!=='occ';
+  openSheet(`<div class="sheet-h"><h2>${esc(o.what)} — ${f.id}</h2><p>Review what will happen before you ${needsApproval?'propose':'decide'}.</p></div>
+  <div class="sheet-b">${conseqList(f,rk)}
+    ${override?`<div class="field-l">Why are you choosing a different option than the AI? (required)</div><div class="reason-chips" id="rc">${REASONS.map(r=>`<button aria-pressed="false">${r}</button>`).join('')}</div>`:''}
+    <div class="field-l">Rationale (shared with all teams)</div>
+    <textarea id="rat">${override?'':'Agree with AI option 1: '+esc(f.rec.why)}</textarea>
+    <p class="approver-note">${needsApproval?`Your proposal goes to OCC for approval. Recorded as ${role} · ${esc(DATA.user[S.lens])}.`:`You are an approver. This decision is recorded and executed immediately as OCC · ${esc(DATA.user.occ)}.`}</p>
+  </div>
+  <div class="sheet-f"><button class="btn ghost" id="cx">Cancel</button><button class="btn primary" id="ok" ${override?'disabled':''}>${needsApproval?'Propose decision':'Decide and execute'}</button></div>`);
+  if(override){ $('#rc').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ $('#rc').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); $('#ok').disabled=false; })); }
+  $('#cx').onclick=closeSheet;
+  $('#ok').onclick=()=>{
+    closeSheet();
+    if(needsApproval){
+      f.pending={by:DATA.user[S.lens], role, at:fmtZ(now()).slice(0,5), option:rk, rationale:$('#rat')?.value||''};
+      f.timeline.push([f.pending.at, DATA.user[S.lens], 'Proposed '+o.what+(override?' (override of AI)':'')]);
+      toast('Proposed: '+o.what+' — sent to OCC for approval');
+    } else {
+      S.decided[f.id]={final:true,label:'Decided: '+o.what,note:'Decided by OCC Duty Manager at '+fmtZ(now())+' and executed. '+(rk===1?'Followed AI.':'Override of AI recorded with reason.')};
+      f.timeline.push([fmtZ(now()).slice(0,5), DATA.user.occ, 'Decided and executed: '+o.what]);
+      toast('Decided and executed: '+o.what);
+    }
+    rerender();
+  };
+}
+function openApprove(f){
+  const o=f.options[f.pending.option-1];
+  openSheet(`<div class="sheet-h"><h2>Approve: ${esc(o.what)} — ${f.id}</h2><p>Proposed by ${esc(f.pending.by)} (${esc(f.pending.role)}) at ${f.pending.at}Z. ${f.pending.option===1?'Matches the AI recommendation.':'Differs from the AI recommendation.'}</p></div>
+  <div class="sheet-b"><div class="state-note" style="margin-top:0">“${esc(f.pending.rationale)}”</div><div class="field-l">What will happen</div>${conseqList(f,f.pending.option)}
+  <div class="field-l">Comment (optional)</div><textarea id="ac" placeholder="e.g. Crew Control to plan the FJR return crew"></textarea></div>
+  <div class="sheet-f"><button class="btn ghost" id="cx">Cancel</button><button class="btn danger" id="rj">Reject</button><button class="btn primary" id="ok">Approve and execute</button></div>`);
+  $('#cx').onclick=closeSheet;
+  $('#rj').onclick=()=>{ closeSheet(); openReject(f,true); };
+  $('#ok').onclick=()=>{ closeSheet(); approve(f); };
+}
+function approve(f){
+  const o=f.options[f.pending.option-1];
+  S.decided[f.id]={final:false,label:'Approved · executing',note:'Approved by OCC Duty Manager at '+fmtZ(now())+'. Executing…'};
+  f.timeline.push([fmtZ(now()).slice(0,5), DATA.user.occ, 'Approved '+o.what]);
+  rerender(); toast('Approved: '+f.id+' '+o.what);
+  setTimeout(()=>{
+    S.decided[f.id]={final:true,label:o.what.replace('Divert to','Diverting to'),note:o.what+' executed. '+f.id+'D recovery flight created; crew legality recalculated (+1 sector).'};
+    f.where = o.what.startsWith('Divert') ? 'Diverting to '+o.what.slice(-3) : f.where;
+    f.timeline.push([fmtZ(now()).slice(0,5),'FogOps engine','Executed: '+f.id+'D created, legality recalculated']);
+    delete f.pending; rerender(); toast(f.id+': '+o.what+' executed');
+  },1500);
+}
+function openReject(f,isProposal){
+  openSheet(`<div class="sheet-h"><h2>${isProposal?'Reject the proposal':'Reject the AI recommendation'} — ${f.id}</h2><p>Pick a reason. It is stored with the decision record.</p></div>
+  <div class="sheet-b"><div class="reason-chips" id="rc">${REASONS.map(r=>`<button aria-pressed="false">${r}</button>`).join('')}</div><textarea id="rr" placeholder="Optional detail"></textarea></div>
+  <div class="sheet-f"><button class="btn ghost" id="cx">Cancel</button><button class="btn danger" id="ok" disabled>Reject</button></div>`);
+  $('#rc').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ $('#rc').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); $('#ok').disabled=false; }));
+  $('#cx').onclick=closeSheet;
+  $('#ok').onclick=()=>{ closeSheet(); const r=$('#rc')?.querySelector('[aria-pressed="true"]')?.textContent||'';
+    if(isProposal){ f.timeline.push([fmtZ(now()).slice(0,5),DATA.user.occ,'Rejected proposal']); delete f.pending; toast('Proposal rejected — Dispatch notified'); }
+    else { f.timeline.push([fmtZ(now()).slice(0,5),DATA.user[S.lens],'Rejected AI recommendation']); toast('Recommendation rejected — the AI will re-evaluate on the next change'); }
+    rerender(); };
+}
+function openFuel(f){
+  openSheet(`<div class="sheet-h"><h2>Enter fuel estimate — ${f.id}</h2><p>Stored with a quality label so everyone knows how reliable it is.</p></div>
+  <div class="sheet-b"><div class="field-l">Holding endurance (minutes above final reserve)</div><input id="fe" type="number" value="55" style="background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);border-radius:8px;padding:8px;font:inherit;width:140px">
+  <div class="field-l">Source</div><div class="reason-chips" id="rc"><button aria-pressed="true">Reported by crew</button><button aria-pressed="false">Dispatch estimate</button></div></div>
+  <div class="sheet-f"><button class="btn ghost" id="cx">Cancel</button><button class="btn primary" id="ok">Save and re-rank options</button></div>`);
+  $('#rc').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ $('#rc').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); }));
+  $('#cx').onclick=closeSheet;
+  $('#ok').onclick=()=>{ const m=Number($('#fe').value)||55; closeSheet();
+    f.fuel={state:'air', end:now()+m*60000, quality:'measured'};
+    f.deadline={at:now()+(m-19)*60000, reason:'Last moment to divert to RKT on fuel', why:['Endurance '+m+' min reported by crew','19 min to RKT']};
+    f.rec={type:'Keep holding', short:'Hold — fuel verified', conf:.78, tone:'legal', why:'Fuel now verified: holding covers reopening with spare above the 15 min buffer.', assumptions:[['Fuel endurance','measured'],['SHJ reopens 02:45Z','forecast']]};
+    f.options=[{rk:1,what:'Keep holding',why:['Lands about 02:55Z, fuel spare '+(m-25)+' min'],exec:true,score:1.5},{rk:2,what:'Divert to RKT',why:['Fuel margin '+(m-19)+' min'],exec:true,score:.7}];
+    f.conseq={1:[['✓','Stays in the SHJ arrival sequence']]};
+    f.timeline.push([fmtZ(now()).slice(0,5),DATA.user[S.lens]||'Dispatch','Entered fuel endurance '+m+' min (measured) — options re-ranked']);
+    rerender(); toast('Fuel saved — AI re-ranked options for '+f.id); };
+}
+function openCrewFinder(f){
+  const c=DATA.crewCandidates[f.id]||[];
+  openSheet(`<div class="sheet-h"><h2>Replacement crew at RKT — ${f.id}</h2><p>Standby crew who are legal for the remaining sector, LVP-qualified (LVP in force at SHJ) and don't break tomorrow's roster.</p></div>
+  <div class="sheet-b" data-src="standby_candidates(scn, duty, position, 'RKT', leg)">${c.map(x=>`<div class="cand ${x.tone!=='legal'?'bad':''}"><div><b>${x.pos} ${x.id}</b> <span class="k">${x.pattern} · 60 min by road</span><div style="font-size:13px;margin-top:2px">Legal until ${x.legal} · ${x.lvp?'<span class="pill t-legal">LVP ✓</span>':'<span class="pill t-exceeded">Not LVP</span>'}</div></div>
+    <div style="text-align:right"><span class="pill t-${x.tone}">${esc(x.verdict)}</span>${x.tone==='legal'?`<div style="margin-top:6px"><button class="btn" data-pick="${x.id}">Select</button></div>`:''}</div></div>`).join('')}
+  </div><div class="sheet-f"><button class="btn ghost" id="cx">Close</button><button class="btn primary" id="ok" disabled>Propose replacement</button></div>`);
+  const picked=new Set();
+  $('#sheet').querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',()=>{ const id=b.dataset.pick; if(picked.has(id)){picked.delete(id);b.textContent='Select';}else{picked.add(id);b.textContent='Selected ✓';} $('#ok').disabled=!picked.size; }));
+  $('#cx').onclick=closeSheet;
+  $('#ok').onclick=()=>{ closeSheet(); f.timeline.push([fmtZ(now()).slice(0,5),DATA.user[S.lens]||'Crew Control','Proposed crew replacement: '+[...picked].join(', ')]);
+    toast('Replacement proposed ('+[...picked].join(', ')+') — waiting for approval'); S.decided[f.id]={final:false,label:'Crew replacement proposed',note:'Crew replacement proposed: '+[...picked].join(', ')+'. Waiting for approval; option "Depart under discretion" still available.'}; rerender(); };
+}
+
+/* =====================================================================
+   APPROVALS DRAWER
+   ===================================================================== */
+function openDrawer(){
+  const items=pending();
+  $('#drawer').innerHTML=`<div class="sheet-h" style="display:flex;align-items:center"><div><h2>Approvals</h2><p>${items.length?'Decisions proposed by your teams.':'Nothing is waiting for approval.'}</p></div><button class="btn ghost" id="dx" style="margin-left:auto">Close</button></div>
+  <div class="sheet-b">${items.map(f=>{const o=f.options[f.pending.option-1];return `<div class="appr"><h4>${f.id} · ${esc(o.what)}</h4><div class="k">${esc(f.pending.by)} · ${f.pending.at}Z · ${f.pending.option===1?'matches AI':'differs from AI'}</div><p style="margin:6px 0">“${esc(f.pending.rationale)}”</p><div class="ai-buttons"><button class="btn primary" data-ap="${f.id}">Review</button><button class="btn ghost" data-open="${f.id}">Open flight</button></div></div>`;}).join('')}</div>`;
+  $('#drawer').classList.add('open');
+  $('#dx').onclick=()=>$('#drawer').classList.remove('open');
+  $('#drawer').querySelectorAll('[data-ap]').forEach(b=>b.onclick=()=>{ $('#drawer').classList.remove('open'); setLens('occ'); select(b.dataset.ap); openApprove(flight(b.dataset.ap)); });
+  $('#drawer').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ $('#drawer').classList.remove('open'); select(b.dataset.open); });
+}
+
+/* =====================================================================
+   CREW CONTROL LENS — legality runway (Q1)
+   ===================================================================== */
+function renderCrew(){
+  const fl=DATA.flights.filter(f=>!f.recovered).sort((a,b)=>a.crew.legal-b.crew.legal);
+  $('#view').innerHTML=`<div class="crew-view" data-src="v_crew_legality_ranking ORDER BY minutes_until_legal_end">
+   <h2 class="lane-h" style="margin-top:4px">Who runs out of legality next <span class="k">operating crew, sorted by time to legal end</span></h2>
+   <div class="runway"><div class="rw-row rw-head"><span>Flight · crew</span><span>Legal end</span><span>Duty (sign-in → legal end → +3 h discretion)</span><span>Margin at landing</span><span></span></div>
+   ${fl.map(f=>{const m=Math.floor((f.crew.legal-f.crew.proj)/60000), tone=m<0?'disc':m<60?'risk':'legal';
+     return `<div class="rw-row"><span><b>${f.id}</b> <span class="k">${f.from}→${f.to}</span><span class="k" style="display:block">${f.crew.legs} sectors · ${f.crew.max} ${f.crew.lvp?'':'· <span class="c-exceeded">CP not LVP</span>'}</span></span>
+       <span><b class="c-${minsTo(f.crew.legal)<60?'risk':'legal'}">${cd(f.crew.legal)}</b><span class="k" style="display:block">${fmtZ(f.crew.legal)} / ${fmtL(f.crew.legal)}</span></span>
+       ${ribbon(f.crew,true)}
+       <span class="pill t-${tone}">${m<0?'Needs discretion':m+' min'}</span>
+       <span>${DATA.crewCandidates[f.id]?`<button class="btn" data-fc="${f.id}">Find replacement</button>`:`<button class="btn ghost" data-sel="${f.id}">Open</button>`}</span></div>`;}).join('')}
+   </div>
+   <p class="k" style="margin-top:10px">Bars run from sign-in to the end of commander discretion. Green = time used, red line = legal end, blue line = projected landing, hatched = discretion zone (captain decision). SO crew without approved FDP rules appear as “Verify”.</p></div>`;
+  $('#view').querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>{ S.sel=b.dataset.fc; renderPanel(); openCrewFinder(flight(b.dataset.fc)); });
+  $('#view').querySelectorAll('[data-sel]').forEach(b=>b.onclick=()=>select(b.dataset.sel));
+}
+
+/* =====================================================================
+   STATION LENS — tablet
+   ===================================================================== */
+function renderStation(){
+  const here=[flight('G9588'),flight('G9464')];
+  const btns=['Landed','On blocks','Refuel done','Passengers on board','Passengers disembarked','Crew arrived','Ready to depart'];
+  $('#view').innerHTML=`<div class="station" data-src="UPDATE diversion · INSERT case_comment · ingest_flight_event()">
+   <h2 class="lane-h" style="margin:0 0 12px;font-size:18px">RKT station · 2 diverted aircraft</h2>
+   ${here.map(f=>{const st=S.station[f.id]||{}; const need=f.id==='G9464'?'OCC needs: confirm the aircraft is ready — it must leave by 02:38Z':'OCC needs: tell us when the replacement crew arrives (expected 03:20Z)';
+     return `<div class="st-card"><div class="st-top"><h3>${f.reg}</h3><span>${f.id} ${f.from}→${f.to}, diverted</span><span class="pill t-disc">${esc(f.whereSub)}</span></div>
+      <div class="need">${esc(need)}</div>
+      <div class="big-btns">${btns.map(b=>`<button class="big ${st[b]?'done':''}" data-st="${f.id}" data-b="${b}">${st[b]?'✓ ':''}${b}</button>`).join('')}<button class="big" data-st="${f.id}" data-b="note">Add a note</button></div></div>`;}).join('')}
+   <p class="k">Each tap is sent to OCC immediately with the time and your name. Wrong tap? Tap again to undo within 30 seconds.</p></div>`;
+  $('#view').querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.st, k=b.dataset.b; S.station[id]=S.station[id]||{};
+    if(k==='note'){ const v=prompt('Note for OCC about '+id); if(v){ flight(id).timeline.push([fmtZ(now()).slice(0,5),'RKT Station',v]); toast('Note sent to OCC'); } return; }
+    S.station[id][k]=!S.station[id][k];
+    if(S.station[id][k]){ flight(id).timeline.push([fmtZ(now()).slice(0,5),'RKT Station',k]); toast(id+': “'+k+'” sent to OCC'); }
+    renderStation();
+  });
+}
+
+/* =====================================================================
+   RECOVERY LENS — slot planner with drag-and-drop feasibility check
+   ===================================================================== */
+function renderRecovery(){
+  const R=DATA.recovery; const times=[]; for(let i=0;i<12;i++){ times.push(fmtZ(R.reopen+i*5*60000).slice(0,5)); }
+  const inWin=Object.values(R.slots).reduce((a,b)=>a+b.length,0);
+  $('#view').innerHTML=`<div class="recovery" data-src="build_recovery_plan() / v_recovery_plan_current">
+   <h2 class="lane-h" style="margin-top:4px">SHJ arrival plan after reopening <span class="k">from ${times[0]}Z · ${R.cap} arrivals per hour · ${inWin} of ${R.cap} slots used in the first hour</span></h2>
+   <p class="k" style="margin:0 0 10px">Drag a flight to another slot. The plan checks fuel, crew legality and LVP before accepting the move.</p>
+   <div class="slots-wrap"><div class="slots">${times.map(t=>`<div class="slot" data-slot="${t}"><span class="st">${t}Z · ${fmtL(T(t))}</span>${(R.slots[t]||[]).map(id=>{const b=R.blocks[id];return `<div class="blk ${b.tone}" draggable="true" data-blk="${id}" tabindex="0"><b>${b.label}</b>${b.sub}</div>`;}).join('')}</div>`).join('')}</div></div>
+   <div class="parking"><b>Cannot be sequenced now</b> <span class="k">resolve the reason first</span><div>${R.parked.map(p=>`<span class="blk"><b>${p.label}</b>${esc(p.why)}</span>`).join('')}</div></div>
+   <div class="ai-buttons" style="margin-top:14px"><button class="btn primary" id="apPlan">Approve plan</button><button class="btn" id="rePlan">Ask AI to re-sequence</button></div></div>`;
+  let drag=null;
+  $('#view').querySelectorAll('.blk[draggable]').forEach(b=>{ b.addEventListener('dragstart',e=>{drag=b.dataset.blk; e.dataTransfer.setData('text/plain',drag);}); });
+  $('#view').querySelectorAll('.slot').forEach(s=>{
+    s.addEventListener('dragover',e=>{e.preventDefault(); s.classList.add('over');});
+    s.addEventListener('dragleave',()=>s.classList.remove('over'));
+    s.addEventListener('drop',e=>{e.preventDefault(); s.classList.remove('over'); const id=drag||e.dataTransfer.getData('text/plain'); moveBlock(id,s.dataset.slot);});
+  });
+  $('#apPlan').onclick=()=>toast('Recovery plan approved by '+(DATA.user[S.lens])+' — stations and Dispatch notified');
+  $('#rePlan').onclick=()=>{ R.slots={'02:45':['G9621'],'02:55':['G9472'],'03:00':['G9108'],'03:20':['G9588D'],'03:30':['G9464D']}; renderRecovery(); toast('AI re-sequenced: G9472 first (lowest fuel), G9108 after (fuel unverified)'); };
+}
+function moveBlock(id,slot){
+  const R=DATA.recovery, b=R.blocks[id], t=T(slot);
+  if(t<b.earliest){ toast('Not possible: '+id+' cannot arrive before '+fmtZ(b.earliest)); return; }
+  if(b.latest && t>b.latest){ toast('Not possible: '+id+(id==='G9472'?' runs out of holding fuel after ':' crew not legal after ')+fmtZ(b.latest)); return; }
+  if((R.slots[slot]||[]).length){ toast('Slot '+slot+'Z is taken — one arrival per slot'); return; }
+  for(const k in R.slots){ R.slots[k]=R.slots[k].filter(x=>x!==id); if(!R.slots[k].length) delete R.slots[k]; }
+  R.slots[slot]=[id]; renderRecovery(); toast(id+' moved to '+slot+'Z — checks passed');
+}
+
+/* =====================================================================
+   ASK (Ctrl/Cmd+K) — natural-language questions answered from the views
+   ===================================================================== */
+const QA=[
+  {q:'Which crew runs out of legality next?', k:['crew','legal','next','time out','times out','run out'], a:()=>{const f=DATA.flights.filter(x=>!x.recovered).sort((a,b)=>a.crew.legal-b.crew.legal)[0]; return `<b>${f.id} ${f.from}→${f.to}</b> — captain and F/O legal until <b>${fmtZ(f.crew.legal)}</b> (${fmtL(f.crew.legal)} SHJ), ${cd(f.crew.legal)} from now. ${f.crew.legs} sectors after the diversion, limit ${f.crew.max}.`;}, src:'v_crew_legality_ranking ORDER BY minutes_until_legal_end'},
+  {q:'Where is A6-ARJ and what is it waiting for?', k:['where','a6-arj','arj','waiting','g9588'], a:()=>`<b>A6-ARJ</b> (G9588) is on the ground at <b>RKT</b> since 01:52Z. Waiting for: <b>replacement crew</b>, expected 03:20Z by road. Next flight G9588D RKT→SHJ, latest legal departure 14:28Z.`, src:'v_aircraft_whereabouts'},
+  {q:'What time must G9464 leave RKT to land legal?', k:['g9464','leave','must','latest','depart'], a:()=>`<b>G9464</b> must be off-blocks at RKT by <b>02:38Z</b> (06:38 SHJ) — ${cd(T('02:38'))}. Operational target was 02:08Z. With commander discretion: 05:38Z.`, src:'v_flight_watch.latest_legal_offblocks_utc'},
+  {q:'Who can replace the G9464 captain without breaking rosters?', k:['replace','replacement','standby','alternate crew'], a:()=>`<b>Capt. #110252</b> (standby SBY 1, LVP ✓, legal until about 15:30Z, no roster conflict). Also roster-safe: F/O #780119. Excluded: #102161 (breaks tomorrow's SHJ-DOH), #100046 (not LVP-qualified).`, src:"standby_candidates(scn, duty, 'CP', 'RKT', leg)"},
+  {q:'What if SHJ reopens at 03:30Z instead?', k:['what if','03:30','reopen','later'], a:()=>{ setTimeout(openWhatIf,50); return 'Opening the what-if comparison…'; }, src:'clone_scenario() + propose_hold_or_divert()'},
+  {q:'Draft a message to RKT station about G9464', k:['draft','message','rkt station'], a:()=>`<i>“RKT ops: G9464 A6-AOK must be off-blocks by 02:38Z for crew legality. Please confirm doors closed and pushback ready by 02:30Z, or advise immediately. — OCC”</i>`, src:'LLM over v_flight_watch (human sends)'},
+];
+function openAsk(){
+  openSheet(`<div class="palette"><label class="sr" for="pq">Ask a question</label><input id="pq" placeholder="Ask about flights, crew, aircraft… e.g. who times out next" autocomplete="off"><div class="pal-list" id="pl"></div><div class="pal-ans" id="pa" hidden></div></div>`);
+  $('#sheet').style.background='var(--surface)';
+  const draw=(v='')=>{ const m=QA.filter(x=>!v||x.k.some(k=>v.toLowerCase().includes(k))||x.q.toLowerCase().includes(v.toLowerCase()));
+    $('#pl').innerHTML=(m.length?m:QA).map((x,i)=>`<button class="pal-item ${i===0?'on':''}" data-q="${QA.indexOf(x)}">${esc(x.q)}</button>`).join('');
+    $('#pl').querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>answer(QA[b.dataset.q])); };
+  const answer=x=>{ $('#pa').hidden=false; $('#pa').innerHTML=x.a()+`<div class="src">Answered from ${esc(x.src)}</div>`; };
+  draw(); $('#pq').addEventListener('input',e=>draw(e.target.value));
+  $('#pq').addEventListener('keydown',e=>{ if(e.key==='Enter'){ const b=$('#pl .pal-item'); b&&b.click(); } });
+}
+
+/* =====================================================================
+   WHAT-IF
+   ===================================================================== */
+function openWhatIf(){
+  const rows=[['G9472','Divert FJR','Divert FJR',false],['G9621','Hold (50 min spare)','Divert FJR (spare 5 min < buffer)',true],['G9455','Divert FJR','Divert FJR',false],['G9161','Delay departure to 03:05Z','Delay departure to 03:50Z',true],['G9464','Depart RKT by 02:38Z','Replace crew (cannot arrive before 03:30Z reopening… legal end 03:30Z)',true],['Recovery first hour','5 arrivals from 02:45Z','4 arrivals from 03:30Z',true]];
+  openSheet(`<div class="sheet-h"><h2>What if SHJ reopens at 03:30Z?</h2><p>Runs in a separate what-if scenario. Live operations are not changed.</p></div>
+  <div class="sheet-b" data-src="clone_scenario('WHATIF') + re-run engine"><div class="replay-banner" style="display:block;border-radius:6px;margin-bottom:10px">What-if scenario · reopening 03:30Z instead of 02:45Z</div>
+  <table class="cmp"><thead><tr><th>Flight</th><th>Live (02:45Z)</th><th>What-if (03:30Z)</th></tr></thead><tbody>${rows.map(([a,b,c,d])=>`<tr class="${d?'diff':''}"><td><b>${a}</b></td><td>${b}</td><td>${d?'↻ ':''}${c}</td></tr>`).join('')}</tbody></table>
+  <p class="k">Highlighted rows change. 3 more diversions and 1 crew replacement would be needed.</p></div>
+  <div class="sheet-f"><button class="btn ghost" id="cx">Close</button><button class="btn" id="ok">Save as scenario</button></div>`);
+  $('#cx').onclick=closeSheet; $('#ok').onclick=()=>{closeSheet(); toast('What-if saved as scenario “Reopen 03:30Z”');};
+}
+
+/* =====================================================================
+   LENS / ROUTING / KEYBOARD
+   ===================================================================== */
+function setLens(l){
+  S.lens=l; document.querySelectorAll('.lens').forEach(b=>b.setAttribute('aria-pressed', b.dataset.lens===l));
+  $('#whoAmI').textContent=DATA.user[l];
+  rerender();
+}
+function rerender(){
+  const showPanel = S.lens==='occ'||S.lens==='dispatch'||S.lens==='crew';
+  $('#main').style.gridTemplateColumns = showPanel? '' : '1fr';
+  $('#panel').style.display = showPanel? '' : 'none';
+  if(S.lens==='occ'||S.lens==='dispatch') renderBoard();
+  else if(S.lens==='crew') renderCrew();
+  else if(S.lens==='station') renderStation();
+  else renderRecovery();
+  if(showPanel) renderPanel();
+  tick();
+}
+document.querySelectorAll('.lens').forEach(b=>b.addEventListener('click',()=>setLens(b.dataset.lens)));
+$('#apprBtn').onclick=openDrawer;
+$('#askBtn').onclick=openAsk;
+$('#whatifBtn').onclick=openWhatIf;
+$('#reportBtn').onclick=()=>toast('Disruption report generated (PDF + JSON) — 7 flights, 5 decisions, 31 timeline events');
+$('#briefBtn').onclick=()=>{ S.briefing=!S.briefing; const b=$('#briefing'); if(b) b.hidden=!S.briefing; };
+$('#srcBtn').onclick=()=>{ S.showSrc=!S.showSrc; document.body.classList.toggle('show-src',S.showSrc); $('#srcBtn').setAttribute('aria-pressed',S.showSrc); };
+$('#themeBtn').onclick=()=>{ const h=document.documentElement; h.dataset.theme = h.dataset.theme==='dark'?'light':'dark'; };
+$('#scnSel').onchange=e=>{ $('#app').classList.toggle('scenario-replay', e.target.value==='replay'); toast(e.target.value==='replay'?'Switched to the replay scenario — magenta frame means not live':'Back to live operations'); };
+$('#scrim').addEventListener('click',e=>{ if(e.target.id==='scrim') closeSheet(); });
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); openAsk(); return; }
+  if(e.key==='Escape'){ closeSheet(); $('#drawer').classList.remove('open'); return; }
+  if($('#scrim').classList.contains('open')||['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if(S.lens!=='occ'&&S.lens!=='dispatch') return;
+  const rows=[...document.querySelectorAll('.row')]; const i=rows.findIndex(r=>r.dataset.id===S.sel);
+  if(e.key==='j'&&rows[i+1]){ select(rows[i+1].dataset.id); rows[i+1].focus(); }
+  if(e.key==='k'&&rows[i-1]){ select(rows[i-1].dataset.id); rows[i-1].focus(); }
+  if(e.key==='a'){ const f=flight(S.sel); if(f.pending&&S.lens==='occ') openApprove(f); else if(f.options.length&&f.rec.tone!=='verify'&&!f.accepted&&!f.pending&&!S.decided[f.id]) openDecision(f,1); }
+});
+
+renderAlts(); rerender(); setInterval(tick,1000);
+</script>
+</body>
+</html>
