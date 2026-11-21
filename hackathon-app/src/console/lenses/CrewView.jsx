@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useAppDispatch } from '@/app/hooks';
+import { useGetLegOutlookQuery, useGetNextDutyLegalQuery } from '@/features/ops/opsApi';
 import { selectFlight } from '@/features/ops/opsSlice';
+import { fmtDur, fmtZD, fmtZLD } from '@/features/ops/time';
 import { useNow } from '@/hooks/useNow';
 import { Cd, Pill } from '../ui/ui';
-import { crewTone, fmtTime, fmtZ, ms, verdictPill } from '../lib';
+import { crewTone, fmtZ, ms, verdictPill } from '../lib';
 import CrewFinderSheet from '../sheets/CrewFinderSheet';
 import './lenses.css';
 
@@ -30,10 +32,101 @@ function Ribbon({ signIn, legal, disc, proj }) {
   );
 }
 
+// Legality of the duty's crew for the current legs (N) and one more sector (N+1), straight from the approved FDP rules.
+function Outlook({ dutyId, scenarioId }) {
+  const { data = [] } = useGetLegOutlookQuery({ scenario_id: scenarioId, duty_id: dutyId });
+  if (!data.length) return null;
+  const rank = ['LEGAL', 'AT_RISK', 'DISCRETION_REQUIRED', 'VERIFICATION_REQUIRED', 'EXCEEDED'];
+  const worst = (key) => data.reduce((a, c) => (rank.indexOf(c[key]) > rank.indexOf(a) ? c[key] : a), 'LEGAL');
+  const min = (key) => data.reduce((a, c) => (c[key] == null ? a : a == null ? c[key] : Math.min(a, c[key])), null);
+  const n = worst('status_n');
+  const n1 = worst('status_n1');
+  const label = (st, m) => `${String(st).replaceAll('_', ' ').toLowerCase()}${m == null ? '' : ` · ${m} min`}`;
+  return (
+    <span className="outlook">
+      <Pill tone={verdictPill[n]?.slice(2) ?? 'verify'}>N={data[0].legs_n} {label(n, min('margin_n_min'))}</Pill>
+      <Pill tone={verdictPill[n1]?.slice(2) ?? 'verify'}>N+1={data[0].legs_n1} {label(n1, min('margin_n1_min'))}</Pill>
+    </span>
+  );
+}
+
+
+// Duty end + minimum rest. The rest is ASSUMED in the supplied rules and is shown as such.
+function NextLegal({ n }) {
+  const t = n?.next_legal_from_utc ? ms(n.next_legal_from_utc) : null;
+  if (t == null) return <span className="k">needs verification</span>;
+  return (
+    <span>
+      <b>{fmtZLD(t)}</b>
+      <span className="k" style={{ display: 'block' }}>
+        <Cd at={t} /> · duty ends {fmtZD(ms(n.duty_end_utc))} + {fmtDur(n.rest_min)} rest{n.rest_quality === 'ASSUMED' ? ' (assumed)' : ''}
+      </span>
+    </span>
+  );
+}
+
+const tn = (st) => verdictPill[st]?.slice(2) ?? 'verify';
+// Time against the approved limit: negative margin = how far the crew lags behind the legality required.
+const lagText = (st, m) =>
+  st === 'VERIFICATION_REQUIRED' || m == null ? 'needs verification' : m < 0 ? `short by ${fmtDur(-m)}` : `${fmtDur(m)} to spare`;
+const SEV = ['LEGAL', 'AT_RISK', 'DISCRETION_REQUIRED', 'VERIFICATION_REQUIRED', 'EXCEEDED'];
+
+// Every crew member of the duty with legality for the current legs (N) and one more sector (N+1); worst case highlighted.
+function CrewDetail({ dutyId, scenarioId, crew }) {
+  const { data = [], isFetching } = useGetLegOutlookQuery({ scenario_id: scenarioId, duty_id: dutyId });
+  const { data: nl = [] } = useGetNextDutyLegalQuery({ scenario_id: scenarioId, duty_id: dutyId });
+  const next = (id) => nl.find((x) => x.crew_id === id);
+  const lvp = (id) => crew.find((c) => c.crew_id === id)?.lvp_qualified;
+  const rows = [...data].sort(
+    (a, b) => Math.max(SEV.indexOf(b.status_n), SEV.indexOf(b.status_n1)) - Math.max(SEV.indexOf(a.status_n), SEV.indexOf(a.status_n1)),
+  );
+  if (isFetching && !rows.length) return <div className="k crew-detail">Checking legality for N and N+1…</div>;
+  if (!rows.length) return <div className="k crew-detail">No crew legality calculated for this duty.</div>;
+  return (
+    <div className="crew-detail" role="table" aria-label="Crew legality for N and N+1 legs">
+      <div className="cd-row cd-head" role="row">
+        <span>Crew</span>
+        <span>Current N legs</span>
+        <span>N+1 legs (one more sector)</span>
+        <span>Legal for next flight from</span>
+      </div>
+      {rows.map((c) => {
+        const worst = SEV[Math.max(SEV.indexOf(c.status_n), SEV.indexOf(c.status_n1))];
+        return (
+          <div className="cd-row" role="row" key={c.crew_id} style={{ background: `var(--${tn(worst)}-bg)`, borderLeft: `3px solid var(--${tn(worst)})` }}>
+            <span>
+              <b>{c.position_code}</b> {c.full_name}
+              <span className="k" style={{ display: 'block' }}>
+                #{c.crew_id}
+                {['CP', 'FO'].includes(c.position_code) && lvp(c.crew_id) === false ? ' · not LVP' : ''}
+              </span>
+            </span>
+            <span>
+              <Pill tone={tn(c.status_n)}>{String(c.status_n).replaceAll('_', ' ')}</Pill>
+              <span className="k" style={{ display: 'block' }}>
+                {c.legs_n} leg{c.legs_n > 1 ? 's' : ''} · max {fmtDur(c.max_fdp_n_min)} · {lagText(c.status_n, c.margin_n_min)}
+              </span>
+            </span>
+            <span>
+              <Pill tone={tn(c.status_n1)}>{String(c.status_n1).replaceAll('_', ' ')}</Pill>
+              <span className="k" style={{ display: 'block' }}>
+                {c.legs_n1} legs · max {fmtDur(c.max_fdp_n1_min)} · {lagText(c.status_n1, c.margin_n1_min)}
+              </span>
+            </span>
+            <NextLegal n={next(c.crew_id)} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // Crew Control: who runs out of legality next. One row per duty, worst crew member first, soonest legal end on top.
 export default function CrewView({ d }) {
   const dispatch = useAppDispatch();
   const [pick, setPick] = useState(null); // flight to find a replacement for
+  const [open, setOpen] = useState(() => new Set()); // duties whose crew list is expanded
+  const toggle = (id) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const { crew, flights } = d;
   const rows = useMemo(() => {
@@ -45,8 +138,12 @@ export default function CrewView({ d }) {
         !cur ||
         cm < (cur.margin_min ?? 1e9) ||
         (cm === (cur.margin_min ?? 1e9) && ORDER.indexOf(c.position_code) < ORDER.indexOf(cur.position_code));
-      if (worse) byDuty.set(c.duty_id, { ...c, crewCount: (cur?.crewCount ?? 0) + 1 });
-      else cur.crewCount += 1;
+      const needs = (cur?.needsHelp ?? false) || c.status !== 'LEGAL';
+      if (worse) byDuty.set(c.duty_id, { ...c, crewCount: (cur?.crewCount ?? 0) + 1, needsHelp: needs });
+      else {
+        cur.crewCount += 1;
+        cur.needsHelp = needs;
+      }
     }
     return [...byDuty.values()]
       .filter((c) => c.legal_end_utc)
@@ -82,7 +179,8 @@ export default function CrewView({ d }) {
                 const legalAt = ms(c.legal_end_utc);
                 const tone = crewTone(m);
                 return (
-                  <div className="rw-row" key={c.duty_id}>
+                  <Fragment key={c.duty_id}>
+                  <div className="rw-row">
                     <span>
                       <b>{c.flight?.flight_no ?? c.duty_legs}</b>{' '}
                       <span className="k">{c.flight ? `${c.flight.dep_iata}→${c.flight.planned_arr_iata ?? c.flight.arr_iata}` : c.duty_legs}</span>
@@ -100,7 +198,7 @@ export default function CrewView({ d }) {
                     <span>
                       <Cd at={legalAt} />
                       <span className="k" style={{ display: 'block' }}>
-                        {fmtZ(legalAt)} / {fmtTime(legalAt)} SHJ
+                        {fmtZLD(legalAt)}
                       </span>
                     </span>
                     <Ribbon signIn={ms(c.sign_in_utc)} legal={legalAt} disc={ms(c.discretion_end_utc)} proj={ms(c.projected_end_utc)} />
@@ -110,13 +208,18 @@ export default function CrewView({ d }) {
                       ) : (
                         <Pill tone={tone}>{m < 0 ? `${-m} min over` : `${m} min`}</Pill>
                       )}
+                      <Outlook dutyId={c.duty_id} scenarioId={d.ctx.scenario_id} />
                     </span>
                     <span className="rw-actions">
-                      {c.flight && (m == null || m < 60) && (
+                      {c.flight && !c.needsHelp && <span className="k">Legal for this route</span>}
+                      {c.flight && c.needsHelp && (
                         <button type="button" className="btn" onClick={() => setPick(c.flight)}>
                           Find replacement
                         </button>
                       )}
+                      <button type="button" className="btn ghost" aria-expanded={open.has(c.duty_id)} onClick={() => toggle(c.duty_id)}>
+                        {open.has(c.duty_id) ? 'Hide crew' : 'Crew'}
+                      </button>
                       {c.flight && (
                         <button type="button" className="btn ghost" onClick={() => dispatch(selectFlight(c.flight.flight_id))}>
                           Open
@@ -124,6 +227,10 @@ export default function CrewView({ d }) {
                       )}
                     </span>
                   </div>
+                  {open.has(c.duty_id) && (
+                    <CrewDetail dutyId={c.duty_id} scenarioId={d.ctx.scenario_id} crew={crew.filter((x) => x.duty_id === c.duty_id)} />
+                  )}
+                  </Fragment>
                 );
               })}
             </div>

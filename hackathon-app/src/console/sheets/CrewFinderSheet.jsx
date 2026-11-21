@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAppDispatch } from '@/app/hooks';
-import { useAddRecordMutation, useGetStandbyQuery } from '@/features/ops/opsApi';
+import { useAddRecordMutation, useGetReplacementOptionsQuery } from '@/features/ops/opsApi';
 import { selectFlight } from '@/features/ops/opsSlice';
 import { fmtDur, fmtZL } from '@/features/ops/time';
 import { getErrorMessage } from '@/utils/getErrorMessage';
@@ -9,6 +9,9 @@ import { ms } from '../lib';
 import { Pill, Sheet } from '../ui/ui';
 import '../lenses/lenses.css';
 
+const tone = (ok) => (ok == null ? 'verify' : ok ? 'legal' : 'exceeded');
+const POS = { CANDIDATE_BASE_IS_DESTINATION: 'based at destination', DESTINATION_IS_HUB: 'at hub', ROAD_FROM_HUB: 'road from hub' };
+const posText = (c, dest) => (c.positioning_min == null ? `positioning to ${dest} not configured` : `${c.positioning_min} min positioning (${POS[c.positioning_basis] ?? c.positioning_basis})`);
 const T = (iso) => (iso ? fmtZL(ms(iso)) : '-');
 
 // Who can replace a crew member of this flight's duty without breaking legality or the roster.
@@ -25,9 +28,11 @@ export default function CrewFinderSheet({ d, f, onClose }) {
   const [note, setNote] = useState('');
   const row = duty.find((c) => c.crew_id === outId) ?? duty[0];
 
-  const { data = [], isFetching } = useGetStandbyQuery(
-    { scenario_id: d.ctx.scenario_id, duty_id: f.duty_id, position: row?.position_code, station: 'SHJ', from_leg: 1 },
-    { skip: !row },
+  // Where this flight lands now: the diversion airport when diverted, else the planned arrival.
+  const destination = f.diverted_to ?? f.planned_arr_iata ?? f.arr_iata;
+  const { data = [], isFetching } = useGetReplacementOptionsQuery(
+    { scenario_id: d.ctx.scenario_id, duty_id: f.duty_id, position: row?.position_code, destination, from_leg: 1 },
+    { skip: !row || !destination },
   );
   const cand = data.find((c) => c.crew_id === picked);
 
@@ -67,7 +72,7 @@ export default function CrewFinderSheet({ d, f, onClose }) {
   return (
     <Sheet
       title={`Replacement crew for ${f.flight_no}`}
-      sub="Standby crew legal for the remaining sectors, LVP-qualified and roster-safe."
+      sub={`Standby crew for the flight's destination (${destination ?? '?'}): legal for the current legs (N) and one more sector (N+1), LVP-qualified and roster-safe.`}
       onClose={onClose}
       wide
       footer={
@@ -79,7 +84,7 @@ export default function CrewFinderSheet({ d, f, onClose }) {
         </>
       }
     >
-      <div data-src="standby_candidates()">
+      <div data-src="crew_replacement_options()">
         {duty.length > 1 && (
           <>
             <label className="field-l" htmlFor="cf-out" style={{ marginTop: 0 }}>Replace</label>
@@ -105,7 +110,7 @@ export default function CrewFinderSheet({ d, f, onClose }) {
             Replacing {row.position_code} {row.full_name} on {row.duty_legs}
           </p>
         )}
-        {isFetching && <p className="k" aria-live="polite">Checking rest, roster conflicts, LVP and positioning…</p>}
+        {isFetching && <p className="k" aria-live="polite">Checking rest, roster conflicts, LVP, positioning to {destination} and the extra sector…</p>}
         {data.map((c) => {
           const ok = c.verdict === 'CANDIDATE';
           return (
@@ -113,13 +118,20 @@ export default function CrewFinderSheet({ d, f, onClose }) {
               <div>
                 <b>{row?.position_code} {c.full_name}</b>{' '}
                 <span className="k">
-                  {c.pattern_name} · {c.positioning_min} min positioning · sign-in {T(c.new_sign_in_utc)} · FDP margin {fmtDur(c.margin_min)}
+                  {c.pattern_name} · base {c.base_iata ?? '-'} · {posText(c, destination)} · sign-in {T(c.new_sign_in_utc)}
                 </span>
                 <div style={{ fontSize: 13, marginTop: 2 }}>
-                  <Pill tone={c.lvp_qualified ? 'legal' : 'exceeded'}>{c.lvp_qualified ? 'LVP ✓' : 'Not LVP'}</Pill>
+                  <Pill tone={c.lvp_qualified ? 'legal' : 'exceeded'}>{c.lvp_qualified ? 'LVP ✓' : 'Not LVP'}</Pill>{' '}
+                  <Pill tone={tone(c.ok_n)}>N={c.legs_n}: {c.margin_n_min == null ? 'verify' : `${fmtDur(c.margin_n_min)} margin`}</Pill>{' '}
+                  <Pill tone={tone(c.ok_n1)}>N+1={c.legs_n1}: {c.margin_n1_min == null ? 'verify' : `${fmtDur(c.margin_n1_min)} margin`}</Pill>
+                </div>
+                <div className="k" style={{ marginTop: 2 }}>
+                  Week: {fmtDur(c.week_duty_min)} duty, {fmtDur(c.week_flying_min)} flying (pool avg {fmtDur(c.pool_avg_duty_min)} duty)
+                  {c.below_avg ? ' · at or below average' : ' · above average'}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
+                {c.is_suggested && <Pill tone="legal">Suggested</Pill>}{' '}
                 <Pill tone={ok ? 'legal' : c.roster_conflict ? 'risk' : 'exceeded'}>{String(c.verdict).replaceAll('_', ' ')}</Pill>
                 {ok && (
                   <div style={{ marginTop: 6 }}>
@@ -137,6 +149,10 @@ export default function CrewFinderSheet({ d, f, onClose }) {
             </div>
           );
         })}
+        <p className="k">
+          N = remaining legs of this duty, N+1 = one more sector (its own flying time is not included). Weekly workload is the roster in the
+          last 7 days (the loaded roster may cover less); it ranks crew and is not a legal limit.
+        </p>
         {!isFetching && data.length === 0 && <p className="k">No standby candidates for this position.</p>}
         <label className="field-l" htmlFor="cf-note">Note for the approvers (optional)</label>
         <textarea id="cf-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. crew will time out before an arrival slot" />

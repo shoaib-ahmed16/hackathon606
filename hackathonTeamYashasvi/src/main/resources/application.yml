@@ -18,7 +18,9 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       # the fogops views/functions live in schema "fogops"; users_details (V1) stays in "public"
-      connection-init-sql: SET search_path = fogops, public
+      # UTC session: the JDBC driver would otherwise use the JVM's zone, and the database renders timestamptz into JSON/text in the
+      # session zone (e.g. flight_state.field_ts). Keep one representation, as the original API does.
+      connection-init-sql: SET search_path = fogops, public; SET TIME ZONE 'UTC'
   data:
     jdbc:
       repositories:
