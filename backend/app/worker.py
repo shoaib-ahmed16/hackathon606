@@ -55,13 +55,15 @@ def _reassess(conn, job):
                 """SELECT cf.case_id FROM case_flight cf
                      JOIN disruption_case dc ON dc.case_id = cf.case_id
                      JOIN flight_state s ON s.flight_id = cf.flight_id AND s.scenario_id = dc.scenario_id
-                    WHERE dc.scenario_id = %s AND cf.flight_id = %s AND s.status IN ('AIRBORNE','HOLDING')
+                    WHERE dc.scenario_id = %s AND cf.flight_id = %s
+                      AND s.status IN ('AIRBORNE','HOLDING','DIVERTING','LANDED','ON_BLOCKS','SCHEDULED','TAXI_OUT')
+                      -- do not re-recommend while a decision is waiting for approval or approved but not yet executed
                       AND NOT EXISTS (SELECT 1 FROM decision d WHERE d.scenario_id = dc.scenario_id AND d.flight_id = cf.flight_id
-                                       AND d.status IN ('PROPOSED','APPROVED','EXECUTED'))""",
+                                       AND d.status IN ('PROPOSED','APPROVED'))""",
                 (scn, fid),
             ).fetchall()
             for c in cases:
-                conn.execute("SELECT propose_hold_or_divert(%s,%s,%s)", (scn, c["case_id"], fid))
+                conn.execute("SELECT recommend_for_flight(%s,%s,%s)", (scn, c["case_id"], fid))
 
 
 def process_pending() -> int:

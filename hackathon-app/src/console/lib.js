@@ -1,6 +1,6 @@
 // Domain helpers for the FOO console: labels, tones and the "what is happening to this flight" wording.
 // Pure functions over the rows the API returns (v_flight_watch + severity + tags); no React in here.
-import { fmtZ, fmtTime, MIN } from '@/features/ops/time';
+import { fmtDay, fmtZ, fmtTime, MIN } from '@/features/ops/time';
 import { ms } from '@/features/ops/helpers';
 
 export { fmtZ, fmtTime, MIN, ms };
@@ -85,8 +85,23 @@ export function recWhat(f) {
   if (!r) return null;
   if (r === 'HOLD') return 'Keep holding';
   if (r === 'DIVERT') return f.recommended_alternate ? `Divert to ${f.recommended_alternate}` : 'Divert';
-  return human(r).replace(/^./, (c) => c.toUpperCase());
+  return REC_LABEL[r] ?? human(r).replace(/^./, (c) => c.toUpperCase());
 }
+// the engine's seven recommendation types in plain words
+export const REC_LABEL = {
+  NO_ACTION: 'Continue as planned',
+  MONITOR: 'Watch, no action yet',
+  HOLD: 'Keep holding',
+  DIVERT: 'Divert',
+  DELAY_DEPARTURE: 'Delay departure',
+  RECOVER: 'Depart the alternate',
+  CREW_REPLACE: 'Replace the crew',
+};
+export const REC_TONE = { NO_ACTION: 'legal', MONITOR: 'verify', HOLD: 'risk', DIVERT: 'exceeded', DELAY_DEPARTURE: 'risk', RECOVER: 'ai', CREW_REPLACE: 'disc' };
+
+// "03:23Z", or "22 Nov 03:23Z" when that moment is not on the same UTC day as `now` (live cases span several days)
+const dayOf = (t) => new Date(t).toISOString().slice(0, 10);
+export const fmtZday = (t, now) => (t == null ? '-' : dayOf(t) === dayOf(now) ? fmtZ(t) : `${fmtDay(t)} ${fmtZ(t)}`);
 
 export const sevClass = (v) => (v >= 50 ? 'sev-h' : v >= 30 ? 'sev-m' : 'sev-l');
 export const sevWord = (v) => (v >= 50 ? 'High' : v >= 30 ? 'Medium' : 'Low');

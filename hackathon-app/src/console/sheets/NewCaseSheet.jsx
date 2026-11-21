@@ -10,6 +10,8 @@ import '../lenses/lenses.css';
 
 const dubaiDay = (t) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(t); // YYYY-MM-DD
 const toUtc = (local) => new Date(`${local}:00+04:00`).toISOString(); // inputs are Dubai time (UTC+4, no DST)
+const dubaiLocal = (t) => new Date(t + 4 * 3600e3).toISOString().slice(0, 16); // 'YYYY-MM-DDTHH:mm' in Dubai time
+const nowText = (t) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dubai', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(t);
 
 // New disruption case: pick scenario, airport and a time window; the watch list is filled with the real flights.
 export default function NewCaseSheet({ d, onClose }) {
@@ -30,7 +32,15 @@ export default function NewCaseSheet({ d, onClose }) {
     };
   });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
-  const valid = f.hub_iata.trim().length === 3 && f.from && f.to && f.from < f.to;
+  // A LIVE case starts NOW (current local time): nobody types a start. Only the end is asked. Replay and what-if cases are
+  // about another moment, so they keep a start and an end.
+  const live = (scenarios.data ?? []).find((s) => s.scenario_id === Number(f.scenario_id))?.kind === 'LIVE';
+  const [opened] = useState(() => Date.now());
+  const [liveEnd, setLiveEnd] = useState(() => dubaiLocal(Date.now() + 12 * 3600e3));
+  const nowLocal = dubaiLocal(opened);
+  const from = live ? nowLocal : f.from;
+  const to = live ? liveEnd : f.to;
+  const valid = f.hub_iata.trim().length === 3 && from && to && from < to;
 
   const submit = async () => {
     try {
@@ -38,9 +48,9 @@ export default function NewCaseSheet({ d, onClose }) {
       const res = await create({
         scenario_id: Number(f.scenario_id),
         hub_iata: hub,
-        from_utc: toUtc(f.from),
-        to_utc: toUtc(f.to),
-        title: f.title.trim() || `${hub} arrivals ${f.from.slice(0, 10)}`,
+        from_utc: live ? new Date().toISOString() : toUtc(f.from),
+        to_utc: toUtc(to),
+        title: f.title.trim() || `${hub} ${live ? 'live' : 'arrivals'} ${from.slice(0, 10)}`,
         simulate_fog: f.simulate_fog,
         reopen_after_min: Number(f.reopen_after_min),
         cause: f.simulate_fog ? 'FOG' : 'OPS',
@@ -56,7 +66,7 @@ export default function NewCaseSheet({ d, onClose }) {
   return (
     <Sheet
       title="New case"
-      sub="The watch list is every scheduled flight arriving at the airport in the window, with its real crew and legality."
+      sub={live ? 'A live case starts now. Choose when it ends; the watch list is every flight arriving at the airport until then, with its real crew and legality.' : 'The watch list is every scheduled flight arriving at the airport in the window, with its real crew and legality.'}
       onClose={onClose}
       footer={
         <>
@@ -91,13 +101,27 @@ export default function NewCaseSheet({ d, onClose }) {
             <label className="field-l" htmlFor="nc-hub">Airport (arrivals)</label>
             <input id="nc-hub" className="field-in" value={f.hub_iata} maxLength={3} onChange={set('hub_iata')} />
           </div>
+          {live ? (
+            <div>
+              <label className="field-l" htmlFor="nc-now">Starts</label>
+              <input id="nc-now" className="field-in" value={`Now · ${nowText(opened)} (Dubai time)`} readOnly />
+            </div>
+          ) : (
+            <div>
+              <label className="field-l" htmlFor="nc-from">From (Dubai time)</label>
+              <input id="nc-from" className="field-in" type="datetime-local" value={f.from} onChange={set('from')} />
+            </div>
+          )}
           <div>
-            <label className="field-l" htmlFor="nc-from">From (Dubai time)</label>
-            <input id="nc-from" className="field-in" type="datetime-local" value={f.from} onChange={set('from')} />
-          </div>
-          <div>
-            <label className="field-l" htmlFor="nc-to">To (Dubai time)</label>
-            <input id="nc-to" className="field-in" type="datetime-local" value={f.to} onChange={set('to')} />
+            <label className="field-l" htmlFor="nc-to">{live ? 'Ends (Dubai time)' : 'To (Dubai time)'}</label>
+            <input
+              id="nc-to"
+              className="field-in"
+              type="datetime-local"
+              min={live ? nowLocal : undefined}
+              value={live ? liveEnd : f.to}
+              onChange={live ? (e) => setLiveEnd(e.target.value) : set('to')}
+            />
           </div>
         </div>
         <label className="check-row" htmlFor="nc-fog">

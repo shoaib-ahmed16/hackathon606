@@ -332,7 +332,7 @@ def answer_request(request_id: int, b: Answer, user=Depends(actor)):
             for scn_id, case_id, flight_id in refresh:
                 with conn.transaction():
                     conn.execute("SELECT compute_flight_legality(%s,%s,'data_request')", (scn_id, flight_id))
-                    conn.execute("SELECT propose_hold_or_divert(%s,%s,%s)", (scn_id, case_id, flight_id))
+                    conn.execute("SELECT recommend_for_flight(%s,%s,%s)", (scn_id, case_id, flight_id))
     return {"answered": request_id, "applied_to": applied, "reranked": len(refresh)}
 
 
@@ -449,6 +449,9 @@ def execute_decision(decision_id: int, turnaround_min: int | None = None, user=D
             raise HTTPException(409, f"Decision is {d['status']}: every required role must approve before it can be executed")
         kind = str(d["decision_type"])
         if kind == "DIVERT":
+            done = conn.execute("SELECT alternate_iata FROM diversion WHERE scenario_id = %s AND original_flight_id = %s", (d["scenario_id"], d["flight_id"])).fetchone()
+            if done:  # a flight diverts once per scenario: say so instead of failing on a duplicate key
+                raise HTTPException(409, f"Already diverted: this flight is already diverted to {done['alternate_iata']} and cannot be diverted again.")
             conn.execute("SELECT execute_diversion(%s,%s)", (decision_id, turnaround_min))
         elif kind != "CREW_REPLACE":
             conn.execute("UPDATE decision SET status = 'EXECUTED', executed_at = scenario_stamp(scenario_id) WHERE decision_id = %s", (decision_id,))

@@ -221,7 +221,7 @@ def whatif(b: WhatIf, user=Depends(actor)):
         ).fetchall():
             with conn.transaction():
                 conn.execute("SELECT compute_flight_legality(%s,%s,'whatif')", (new_scn, row["flight_id"]))
-                conn.execute("SELECT propose_hold_or_divert(%s,%s,%s)", (new_scn, new_case, row["flight_id"]))
+                conn.execute("SELECT recommend_for_flight(%s,%s,%s)", (new_scn, new_case, row["flight_id"]))
     top = lambda sc: {x["flight_id"]: x for x in fetch(  # noqa: E731
         "SELECT flight_id, flight_no, action, alternate_iata, is_executable FROM v_recommendation_options WHERE scenario_id = %s AND rank = 1", (sc,))}
     live, alt = top(s), top(new_scn)

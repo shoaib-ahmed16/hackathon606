@@ -482,3 +482,11 @@ body{min-width:1024px}
 /* pages (rules, integrations, audit ...) scroll INSIDE the layout row instead of overflowing the frame */
 .app > .page{overflow:auto;min-height:0;max-width:none;padding-right:20px}
 .app > .page > *{max-width:1280px}
+
+.clock{gap:0}
+.clock-d{font-size:11.5px;color:var(--muted);line-height:1.2}
+button.alt,.hub-btn{font:inherit;color:inherit;text-align:left;cursor:pointer}
+button.alt:hover,.hub-btn:hover{border-color:var(--ai)}
+.hub-btn{background:none;border:none;border-right:1px solid var(--line);padding:8px 14px;display:flex;flex-direction:column;justify-content:center;white-space:nowrap;flex-shrink:0}
+.hub-btn:hover{background:var(--surface-2)}
+.check-row{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-top:12px}

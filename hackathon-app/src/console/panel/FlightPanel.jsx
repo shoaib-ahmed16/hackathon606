@@ -18,24 +18,26 @@ import { Cd, Pill, Ribbon } from '../ui/ui';
 import { AnswerSheet, ApproveSheet, ExecuteSheet, LinkSheet, ProposeSheet, RejectSheet, TagSheet } from '../sheets/DecisionSheets';
 import CrewFinderSheet from '../sheets/CrewFinderSheet';
 import {
-  MIN, TAG_LABEL, currentDecision, decisionWhat, fmtTime, fmtZ, gapsOf, human, isAirborne, isRecovered, liveLabel, ms, roleLabel,
+  MIN, REC_LABEL, REC_TONE, fmtZday, TAG_LABEL, currentDecision, decisionWhat, fmtTime, fmtZ, gapsOf, human, isAirborne, isRecovered, liveLabel, ms, roleLabel,
   sevClass, typeLabel, verdictPill,
 } from '../lib';
-import { useNow } from '@/hooks/useNow';
+import { useMinuteNow, useNow } from '@/hooks/useNow';
 
 const QCLS = { FORECAST: 'q-forecast', ESTIMATED: 'q-estimated', MISSING: 'q-estimated', MEASURED: 'q-measured', SIMULATED: 'q-estimated', MANUAL: 'q-measured' };
 const hhmm = (iso) => fmtZ(ms(iso));
 const shortName = (l) => (l.code === 'CREW_SYSTEM' ? 'Crew system' : l.name);
 
 // engine option row -> what the panel shows
+const ACTION_TYPE = { HOLD: 'HOLD', DIVERT: 'DIVERT', DELAY_DEPARTURE: 'DELAY', RECOVER: 'RECOVER', CREW_REPLACE: 'CREW_REPLACE' };
+const ACTION_WHAT = { HOLD: 'Keep holding', DELAY_DEPARTURE: 'Delay the departure', RECOVER: 'Depart the alternate now', CREW_REPLACE: 'Replace the crew' };
 const optView = (o) => {
   const blockedWhy = (o.blocking_constraints ?? []).map((c) => human(c.code) + (c.margin_min != null ? ` (${c.margin_min} min)` : ''));
   return {
     rank: o.rank,
     option_id: o.option_id,
-    type: o.action === 'HOLD' ? 'HOLD' : 'DIVERT',
+    type: ACTION_TYPE[o.action] ?? 'OTHER',
     alt: o.alternate_iata,
-    what: o.action === 'HOLD' ? 'Keep holding' : `Divert to ${o.alternate_iata}${o.alternate_name ? ` (${o.alternate_name})` : ''}`,
+    what: o.action === 'DIVERT' ? `Divert to ${o.alternate_iata}${o.alternate_name ? ` (${o.alternate_name})` : ''}` : (ACTION_WHAT[o.action] ?? o.action),
     exec: o.is_executable,
     verify: o.needs_verification,
     score: o.score,
@@ -142,7 +144,7 @@ function Recs({ d, f, detail, opts, locked, openSheet }) {
       <h3>AI recommendations <span className="k">ranked · humans decide</span></h3>
       <div className="ai-card">
         <div className="ai-top">
-          <span>Rationale</span>
+          <span>Rationale {rec?.rec_type && <Pill tone={REC_TONE[rec.rec_type] ?? 'ai'}>{REC_LABEL[rec.rec_type] ?? rec.rec_type}</Pill>}</span>
           {rec?.confidence != null && (
             <span className="conf">Confidence {Math.round(rec.confidence * 100)}% <span className="conf-bar"><i style={{ width: `${rec.confidence * 100}%` }} /></span></span>
           )}
@@ -333,6 +335,7 @@ export default function FlightPanel({ d, onClose }) {
 }
 
 function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
+  const minuteNow = useMinuteNow();
   const detail = useGetFlightDetailQuery({ flightId: f.flight_id, ...d.ctx }).data;
   const links = useGetFlightLinksQuery({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id }).data ?? [];
   const timeline = useGetFlightTimelineQuery({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id, limit: 60 }, { pollingInterval: 15000 }).data ?? [];
@@ -364,6 +367,8 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
     }
   };
   const close = () => setSheet(null);
+  // a crew-replacement suggestion needs real crew details, so it goes through the replacement finder, not a plain proposal
+  const openSheet = (x) => (x.kind === 'propose' && x.opt?.type === 'CREW_REPLACE' ? setSheet({ kind: 'crew' }) : setSheet(x));
   const watch = () => (watching ? run(() => unsub({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id }).unwrap(), `Stopped watching ${f.flight_no}`) : run(() => sub({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id }).unwrap(), `Watching ${f.flight_no}: you'll be alerted on every update`));
   const toggleTeams = () => run(() => sub({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id, teams: !teams }).unwrap(), teams ? `Teams alerts off for ${f.flight_no}` : `Alerts for ${f.flight_no} will also go to Teams`);
 
@@ -410,8 +415,8 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
         </div>
       ))}
 
-      <div className="sec"><h3>Decision</h3><Decision d={d} f={f} list={list} cur={cur} topOpt={topOpt} gaps={gaps} openSheet={setSheet} /></div>
-      <Recs d={d} f={f} detail={detail} opts={opts} locked={Boolean(cur) || d.actor.role_code === 'STATION'} openSheet={setSheet} />
+      <div className="sec"><h3>Decision</h3><Decision d={d} f={f} list={list} cur={cur} topOpt={topOpt} gaps={gaps} openSheet={openSheet} /></div>
+      <Recs d={d} f={f} detail={detail} opts={opts} locked={Boolean(cur) || d.actor.role_code === 'STATION'} openSheet={openSheet} />
       <Gaps d={d} f={f} gaps={gaps} openSheet={setSheet} />
 
       {dlAt != null && (
@@ -419,7 +424,7 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
           <h3>Deadline <button className="why-btn" onClick={() => setWhy(!why)}>Why this time?</button></h3>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
             <Cd at={dlAt} big />
-            <span>{dl.reason}: <b>{fmtZ(dlAt)}</b> / {fmtTime(dlAt)} SHJ</span>
+            <span>{dl.reason}: <b>{fmtZday(dlAt, minuteNow)}</b> / {fmtTime(dlAt)} SHJ</span>
           </div>
           {why && (
             <div data-src="fdp_calculation.inputs · latest_departure_calc">

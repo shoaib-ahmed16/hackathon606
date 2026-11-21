@@ -14,17 +14,18 @@ import { selectCase, setLens, toggleBriefing, toggleSources } from '@/features/o
 import { useOps } from '@/features/ops/useOps';
 import { iso, ms, stampMs } from '@/features/ops/helpers';
 import { toggleMode } from '@/features/ui/uiSlice';
-import { NowProvider, useNow, useWall } from '@/hooks/useNow';
+import { NowProvider, useMinuteNow, useNow, useWall } from '@/hooks/useNow';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 import { ConsoleProvider } from './ConsoleContext';
 import ApprovalsDrawer from './drawers/ApprovalsDrawer';
 import NotesDrawer from './drawers/NotesDrawer';
+import AirportSheet from './sheets/AirportSheet';
 import AskSheet from './sheets/AskSheet';
 import NewCaseSheet from './sheets/NewCaseSheet';
 import ReportSheet from './sheets/ReportSheet';
 import WhatIfSheet from './sheets/WhatIfSheet';
 import { Cd, Pill, Sheet } from './ui/ui';
-import { fmtTime, fmtZ, roleLabel } from './lib';
+import { fmtTime, fmtZ, fmtZday, roleLabel } from './lib';
 
 const LENSES = [
   ['occ', 'OCC'],
@@ -41,8 +42,10 @@ function Clock({ refreshedAt }) {
   const d = new Date(now);
   const z = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')}Z`;
   const age = refreshedAt ? Math.max(0, Math.floor((wall - refreshedAt) / 1000)) : null;
+  const date = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(now);
   return (
     <div className="clock" data-src="scenario_now()">
+      <span className="clock-d">{date}</span>
       <span className="clock-z">{z}</span>
       <span className="clock-l">
         {fmtTime(now)} SHJ{age != null ? ` · data ${age} s ago` : ''}
@@ -59,8 +62,9 @@ function altChip(code, airport) {
   return { cls: '', mark: '✓', text: a.parking_available != null ? `${a.parking_available} stands` : 'Open' };
 }
 
-function Strip({ d, onSheet }) {
+function Strip({ d, onSheet, onAirport }) {
   const dispatch = useAppDispatch();
+  const now = useMinuteNow(); // the strip only needs the day, so it does not re-render every second
   const { kase, cases, airport, options, ops } = d;
   const hub = airport.find((a) => a.iata === kase?.hub_iata) ?? airport[0];
   const reopen = hub?.expected_reopen_utc ? ms(hub.expected_reopen_utc) : null;
@@ -108,8 +112,17 @@ function Strip({ d, onSheet }) {
           </select>
         </span>
       </div>
+      {!hub && kase?.hub_iata && (
+        <button type="button" className="hub hub-btn" data-src="v_airport_status_current (hub)" onClick={() => onAirport(kase.hub_iata)} title="Nobody has confirmed this airport yet. Click to verify it.">
+          <div className="hub-line">
+            <span className="hub-code">{kase.hub_iata}</span>
+            <Pill tone="verify">Not verified</Pill>
+          </div>
+          <div className="hub-line k">No status on record. Click to verify</div>
+        </button>
+      )}
       {hub && (
-        <div className="hub" data-src="v_airport_status_current (hub)">
+        <div className="hub hub-btn" role="button" tabIndex={0} data-src="v_airport_status_current (hub)" onClick={() => onAirport(hub.iata)} onKeyDown={(e) => e.key === 'Enter' && onAirport(hub.iata)} title="Click to update the hub status">
           <div className="hub-line">
             <span className="hub-code">{hub.iata}</span>
             <Pill tone={hub.op_status === 'OPEN' ? 'legal' : hub.op_status === 'CLOSED' ? 'exceeded' : 'risk'}>{human(hub.op_status)}</Pill>
@@ -119,7 +132,7 @@ function Strip({ d, onSheet }) {
           <div className="hub-line k">
             {reopen ? (
               <>
-                <span title={`forecast quality: ${String(hub.quality ?? '').toLowerCase()}`}>Reopens ~{fmtZ(reopen)}</span> · <Cd at={reopen} />
+                <span title={`forecast quality: ${String(hub.quality ?? '').toLowerCase()}`}>Reopens ~{fmtZday(reopen, now)}</span> · <Cd at={reopen} />
               </>
             ) : (
               'No reopening forecast'
@@ -135,12 +148,12 @@ function Strip({ d, onSheet }) {
           {altCodes.map((c) => {
             const a = altChip(c, airport);
             return (
-              <span key={c} className={`alt ${a.cls}`}>
+              <button type="button" key={c} className={`alt ${a.cls}`} onClick={() => onAirport(c)} title={a.cls === 'verify' ? `${c} is not confirmed. Click to verify it.` : `Click to update ${c}`}>
                 <b>
                   {c} {a.mark}
                 </b>
                 {a.text}
-              </span>
+              </button>
             );
           })}
         </div>
@@ -184,7 +197,7 @@ function Bar({ d, onSheet }) {
         <Pill tone="exceeded">Next deadline</Pill>
         {next ? (
           <span>
-            <Cd at={nextAt} className="cd" /> {next.flight_no}: {next.reason} ({fmtZ(nextAt)} / {fmtTime(nextAt)} SHJ)
+            <Cd at={nextAt} className="cd" /> {next.flight_no}: {next.reason} ({fmtZday(nextAt, now)} / {fmtTime(nextAt)} SHJ)
           </span>
         ) : (
           <span className="k">No deadline is running right now.</span>
@@ -302,6 +315,7 @@ function CaseSheet({ d, onClose }) {
 export default function ConsoleLayout() {
   const d = useOps();
   const [sheet, setSheet] = useState(null);
+  const [airportIata, setAirportIata] = useState(null);
   const { ops } = d;
 
   useEffect(() => {
@@ -344,7 +358,7 @@ export default function ConsoleLayout() {
             <div className="replay-banner">
               {d.kase?.scenario_kind} scenario. Nothing here affects live operations.
             </div>
-            <Strip d={d} onSheet={setSheet} />
+            <Strip d={d} onSheet={setSheet} onAirport={setAirportIata} />
           </div>
           <Bar d={d} onSheet={setSheet} />
           {d.noCase ? (
@@ -368,6 +382,7 @@ export default function ConsoleLayout() {
         {sheet === 'report' && <ReportSheet d={d} onClose={close} />}
         {sheet === 'newcase' && <NewCaseSheet d={d} onClose={close} />}
         {sheet === 'case' && <CaseSheet d={d} onClose={close} />}
+        {airportIata && <AirportSheet d={d} iata={airportIata} onClose={() => setAirportIata(null)} />}
       </NowProvider>
     </ConsoleProvider>
   );

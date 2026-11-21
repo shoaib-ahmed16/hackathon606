@@ -91,7 +91,7 @@ def recommend(flight_id: int, case_id: int, scenario_id: int | None = None, user
     s = scenario_id or live_scenario_id()
     with tx(agent_user_id()) as conn:
         conn.execute("SELECT compute_flight_legality(%s,%s,'ui')", (s, flight_id))
-        return conn.execute("SELECT propose_hold_or_divert(%s,%s,%s) AS rec_id", (s, case_id, flight_id)).fetchall()
+        return conn.execute("SELECT recommend_for_flight(%s,%s,%s) AS rec_id", (s, case_id, flight_id)).fetchall()
 
 
 DIVERSION_FIELDS = {"status", "refuel_status", "handling_status", "waiting_for", "pax_onboard", "landed_alt_utc", "on_blocks_alt_utc", "planned_departure_utc", "actual_departure_utc", "turnaround_min_assumed"}
@@ -226,12 +226,12 @@ def create_case(b: NewCase, user=Depends(actor)):
     recommended = 0
     with tx(agent_user_id()) as conn:
         airborne = conn.execute(
-            "SELECT cf.flight_id FROM case_flight cf JOIN flight_state s ON s.flight_id = cf.flight_id AND s.scenario_id = %s WHERE cf.case_id = %s AND s.status IN ('AIRBORNE','HOLDING')",
+            "SELECT cf.flight_id FROM case_flight cf JOIN flight_state s ON s.flight_id = cf.flight_id AND s.scenario_id = %s WHERE cf.case_id = %s AND s.status IN ('AIRBORNE','HOLDING','DIVERTING','LANDED','ON_BLOCKS','SCHEDULED','TAXI_OUT')",
             (scn_id, case["case_id"]),
         ).fetchall()
         for row in airborne:
             with conn.transaction():
-                conn.execute("SELECT propose_hold_or_divert(%s,%s,%s)", (scn_id, case["case_id"], row["flight_id"]))
+                conn.execute("SELECT recommend_for_flight(%s,%s,%s)", (scn_id, case["case_id"], row["flight_id"]))
                 recommended += 1
     return {**case, "flights": n, "recommended": recommended}
 
@@ -283,7 +283,7 @@ def delete_case(case_id: int, user=Depends(actor)):
                  JOIN disruption_case dc ON dc.case_id = cf.case_id
                  JOIN case_flight other ON other.flight_id = cf.flight_id AND other.case_id <> cf.case_id
                  JOIN disruption_case odc ON odc.case_id = other.case_id AND odc.scenario_id = dc.scenario_id
-                 JOIN flight_state s ON s.flight_id = cf.flight_id AND s.scenario_id = dc.scenario_id AND s.status IN ('AIRBORNE','HOLDING')
+                 JOIN flight_state s ON s.flight_id = cf.flight_id AND s.scenario_id = dc.scenario_id AND s.status IN ('AIRBORNE','HOLDING','DIVERTING','LANDED','ON_BLOCKS','SCHEDULED','TAXI_OUT')
                 WHERE cf.case_id = %s""",
             (case_id,),
         ).fetchall()
@@ -294,5 +294,5 @@ def delete_case(case_id: int, user=Depends(actor)):
         with tx(agent_user_id()) as conn:
             for row in refresh:
                 with conn.transaction():
-                    conn.execute("SELECT propose_hold_or_divert(%s,%s,%s)", (row["scenario_id"], row["case_id"], row["flight_id"]))
+                    conn.execute("SELECT recommend_for_flight(%s,%s,%s)", (row["scenario_id"], row["case_id"], row["flight_id"]))
     return {"deleted": case_id}

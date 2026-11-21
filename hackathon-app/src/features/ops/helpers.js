@@ -45,10 +45,19 @@ export const ms = (iso) => (iso ? Date.parse(iso) : null);
 
 // Scenario clock: replays run on a fixed simulated time, LIVE on the wall clock. The UI ticks the replay
 // clock forward from page load so event timestamps stay unique and ordered.
-const T0 = Date.now();
+let T0 = Date.now();
+let lastBase = null;
 export const simBase = (kase) => (kase?.sim_clock_utc ? Date.parse(kase.sim_clock_utc) : null);
-export const scenarioNowMs = (kase) =>
-  simBase(kase) != null ? simBase(kase) + (Date.now() - T0) : Date.now();
+// When the server moves the scenario clock (a feed push), count the elapsed time from the moment we saw the new value.
+export const scenarioNowMs = (kase) => {
+  const base = simBase(kase);
+  if (base == null) return Date.now();
+  if (base !== lastBase) {
+    lastBase = base;
+    T0 = Date.now();
+  }
+  return base + (Date.now() - T0);
+};
 // DB view filters use the FIXED scenario clock (effective_from <= scenario_now), so status/fuel rows use this one.
 export const stampMs = (kase) => simBase(kase) ?? Date.now();
 export const iso = (msv) => new Date(msv).toISOString();

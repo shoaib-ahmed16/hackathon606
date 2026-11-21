@@ -7,6 +7,8 @@ protection, status derivation, legality reassessment and audit all behave exactl
 Safe to press repeatedly: message ids are fixed per flight and stage (`PUSH-<flight>-<stage>`), so a stage that
 was already pushed comes back as DUPLICATE. Fields a real source already filled are never overwritten.
 Flights that are cancelled, holding or diverted are left alone.
+The LIVE scenario clock (when it has a stored one) is moved forward to the push time in the same transaction, so data and
+deadlines stay on one clock.
 
 Beyond flights, the same push moves the rest of the operational picture forward:
   - passengers on board (in the OUT event, from the planned load)
@@ -79,6 +81,14 @@ def push(body: PushBody | None = None, user=Depends(actor)):
     flights_touched = 0
 
     with tx(user) as conn:
+        # The LIVE scenario may run on a stored clock (the snapshot time). Events, fuel and deadlines are all judged against
+        # THAT clock, so pushing wall-clock data without moving it makes flights "airborne in the future" and every fuel
+        # figure look wrong. Move the clock forward to the push time, together with the data (never backwards).
+        clock = conn.execute("SELECT sim_clock_utc FROM scenario WHERE scenario_id = %s FOR UPDATE", (scn,)).fetchone()
+        clock_to = None
+        if clock and clock["sim_clock_utc"] is not None and clock["sim_clock_utc"] < as_of:
+            conn.execute("UPDATE scenario SET sim_clock_utc = %s WHERE scenario_id = %s", (as_of, scn))
+            clock_to = as_of
         rows = conn.execute(
             """SELECT f.flight_id, f.std_utc, f.sta_utc, f.pax_planned, s.pax,
                       s.atd_utc, s.toff_utc, s.tdown_utc, s.ata_utc
@@ -130,12 +140,13 @@ def push(body: PushBody | None = None, user=Depends(actor)):
         fuel_rows = conn.execute(
             """INSERT INTO flight_fuel_estimate (scenario_id, flight_id, as_of_utc, fuel_on_board_kg, min_diversion_fuel_kg,
                                                  burn_rate_hold_kg_per_hr, est_holding_endurance_min, quality, basis)
-               SELECT s.scenario_id, s.flight_id, %(as_of)s, fob.kg, 2300, 2400,
-                      GREATEST(0, ((fob.kg - 2300) * 60 / 2400)), 'SIMULATED',
-                      jsonb_build_object('from', 'simulated live feed: planned fuel less cruise burn since take-off')
+               SELECT s.scenario_id, s.flight_id, %(as_of)s, fob.kg, 2300, 2400, fob.endurance, 'SIMULATED',
+                      jsonb_build_object('from', 'simulated live feed: planned contingency fuel, 45 to 84 min of holding above final reserve')
                  FROM flight_state s
-                 CROSS JOIN LATERAL (SELECT GREATEST(2500, 6500 + (s.flight_id %% 20) * 100
-                                          - (2400 * EXTRACT(EPOCH FROM (%(as_of)s - s.toff_utc)) / 3600)::int) AS kg) fob
+                 -- holding endurance = the contingency fuel a normal plan carries beyond the arrival; it does not depend on how
+                 -- long the flight has been airborne (the old burn-down formula hit its floor on every long-haul flight)
+                 CROSS JOIN LATERAL (SELECT 45 + (s.flight_id %% 40) AS endurance,
+                                            2300 + (45 + (s.flight_id %% 40)) * 40 AS kg) fob
                 WHERE s.scenario_id = %(scn)s AND s.toff_utc IS NOT NULL AND s.tdown_utc IS NULL
                   AND NOT EXISTS (SELECT 1 FROM flight_fuel_estimate e
                                    WHERE e.scenario_id = s.scenario_id AND e.flight_id = s.flight_id
@@ -152,4 +163,5 @@ def push(body: PushBody | None = None, user=Depends(actor)):
         "crew_duties_completed": duties_done,
         "standby_released": standby_released,
         "fuel_estimates": fuel_rows,
+        "clock_moved_to": clock_to.isoformat() if clock_to else None,
     }

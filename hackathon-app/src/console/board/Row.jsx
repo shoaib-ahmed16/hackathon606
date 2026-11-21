@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { ms, fmtZ, human, isRecovered, isAirborne, recWhat, sevClass, sevWord, whereText, TAG_LABEL, decisionWhat } from '../lib';
+import { ms, fmtZday, human, isRecovered, isAirborne, recWhat, sevClass, sevWord, whereText, TAG_LABEL, decisionWhat, REC_TONE } from '../lib';
 import { Cd, Pill } from '../ui/ui';
 import { MIN } from '@/features/ops/time';
 
@@ -79,8 +79,8 @@ function RecCell({ f, cur, last, verifyFuel }) {
     );
   if (verifyFuel) return <Pill tone="verify">? Verify fuel before deciding</Pill>;
   const what = recWhat(f);
-  if (!what || f.recommendation === 'NO_ACTION') return <Pill tone="neutral">No decision needed</Pill>;
-  return <Pill tone="ai">Engine: {what}</Pill>;
+  if (!what) return <Pill tone="neutral">No decision needed</Pill>;
+  return <Pill tone={REC_TONE[f.recommendation] ?? 'ai'}>Engine: {what}</Pill>;
 }
 
 // One board row. memo: it only re-renders when ITS flight, decision, deadline, fuel, rules or selection changes
@@ -114,7 +114,7 @@ const Row = memo(function Row({ f, cur, last, dl, fuelEnd, rules, selected, watc
       </div>
       <div className="rec"><RecCell f={f} cur={cur} last={last} verifyFuel={verifyFuel} /></div>
       <div className="cd-cell">
-        {recovered ? <span className="k">Done</span> : at ? <><Cd at={at} big /><span className="k">{fmtZ(at)}</span></> : <><span className="cd-big c-verify">?</span><span className="k">{human(dl?.reason ?? 'verify')}</span></>}
+        {recovered ? <span className="k">Done</span> : at ? <><Cd at={at} big /><span className="k">{fmtZday(at, now)}</span></> : <><span className="cd-big c-verify">?</span><span className="k">{human(dl?.reason ?? 'verify')}</span></>}
       </div>
     </div>
   );
