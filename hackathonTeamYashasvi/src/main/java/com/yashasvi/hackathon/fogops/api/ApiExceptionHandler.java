@@ -56,7 +56,7 @@ public class ApiExceptionHandler {
                 boolean forbidden = msg.startsWith("Guardrail") || msg.contains("not authorised") || msg.toLowerCase().contains("human");
                 return of(forbidden ? HttpStatus.FORBIDDEN : HttpStatus.CONFLICT, msg);
             }
-            if (state.startsWith("23") || state.startsWith("22")) {
+            if (state.startsWith("23") || state.startsWith("22") || state.equals("42804")) {   // 42804: value of the wrong type for its column
                 return of(HttpStatus.UNPROCESSABLE_ENTITY, msg);
             }
         }
