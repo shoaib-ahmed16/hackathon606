@@ -30,6 +30,7 @@ const HEAD = [
     'Aircraft on the ground, derived from Air Arabia movements only. Not verified real-time occupancy.',
   ],
   ['Available', 'Free stands now. A dash means unknown, never zero.'],
+  ['Diverted in', 'Flights diverted to this airport that have not landed yet (approved or executed diversions). Each will need a stand; the second number is stands left after they land.'],
   ['Arrivals / hr', 'Arrivals the airport can handle in one hour'],
   ['Projected arrivals', 'Arrivals scheduled in the current hour'],
   ['Remaining', 'Arrivals per hour minus projected arrivals'],
@@ -112,6 +113,18 @@ export default function CapacityTable({ rows, canEdit, selected, onSelect, onEdi
                 </TableCell>
                 <TableCell sx={{ color: r.available_stands < 0 ? 'error.main' : undefined }}>
                   {dash(r.available_stands)}
+                </TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  {r.diverted_inbound > 0 ? (
+                    <Tooltip title={`${r.diverted_inbound_flights}${r.diverted_inbound_first_eta ? `, first due ${String(r.diverted_inbound_first_eta).slice(11, 16)}Z` : ''}`}>
+                      <span>
+                        <b>{r.diverted_inbound}</b>
+                        {r.available_after_diverted != null && (
+                          <span style={{ color: r.available_after_diverted < 0 ? 'var(--exceeded)' : undefined }}> → {r.available_after_diverted} free</span>
+                        )}
+                      </span>
+                    </Tooltip>
+                  ) : '–'}
                 </TableCell>
                 <TableCell>{lowerBound(r.arrivals_per_hr, r.arrivals_source)}</TableCell>
                 <TableCell>{dash(r.projected_arrivals)}</TableCell>

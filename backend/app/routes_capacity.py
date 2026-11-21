@@ -34,10 +34,10 @@ def _airports(s: int):
             ORDER BY ap.is_hub DESC, aa.priority NULLS FIRST, ap.iata""")
 
 
-# The hub alone takes about 2 s to assess and the screen refreshes every 10 s, so an assessment is reused for 20 s.
+# The hub alone takes about 2 s to assess and the screen refreshes every 10 s, so an assessment is reused for a few seconds (and dropped at once by any saved change).
 # (The list and the compare table use the same default assessment, so one pass serves both.)
 _CACHE: dict = {}
-TTL = 20
+TTL = 8
 
 
 def _assess(s, iata, flight_id=None, extra=0, delay_min=0, window_h=12, arrival_utc=None):
@@ -62,8 +62,25 @@ def _latest(*ts):
     return max(ts) if ts else None
 
 
-def _row(ap, a):
+def _diverted_in(s, iata):
+    """Flights diverted TO this airport that have not landed yet (executed or approved diversions): they will need a stand and an arrival slot."""
+    row = fetch(
+        """SELECT count(*)::int AS n, min(eta) AS first_eta, string_agg(flight_no, ', ' ORDER BY flight_no) AS flights FROM (
+           SELECT coalesce(fs.eta_utc, f.sta_utc) AS eta, f.flight_no
+             FROM diversion d JOIN flight f ON f.flight_id = d.original_flight_id
+             LEFT JOIN flight_state fs ON fs.flight_id = f.flight_id AND fs.scenario_id = d.scenario_id
+            WHERE d.scenario_id = %s AND d.alternate_iata = %s AND d.status <> 'CANCELLED' AND d.landed_alt_utc IS NULL
+           UNION ALL   -- an APPROVED diversion not yet executed already claims the stand (the OCC executes it next)
+           SELECT coalesce(fs.eta_utc, f.sta_utc), f.flight_no
+             FROM decision x JOIN flight f ON f.flight_id = x.flight_id
+             LEFT JOIN flight_state fs ON fs.flight_id = f.flight_id AND fs.scenario_id = x.scenario_id
+            WHERE x.scenario_id = %s AND x.alternate_iata = %s AND x.decision_type = 'DIVERT' AND x.status = 'APPROVED') u""", (s, iata, s, iata))
+    return row[0] if row else {"n": 0, "first_eta": None, "flights": None}
+
+
+def _row(ap, a, s=None):
     st, ar, oc, h = a["stands"], a["arrivals_per_hr"], a["occupancy"], a["history"]
+    dv = _diverted_in(s, ap["iata"]) if s is not None else {"n": 0, "first_eta": None, "flights": None}
     cfg = _cfg(ap["iata"])
     now_known, now_unknown = oc["on_ground_now_known_departure"], oc["on_ground_now_no_known_departure"]
     return {
@@ -78,6 +95,8 @@ def _row(ap, a):
         "history_peak_arrivals_per_hr": h["peak_arrivals_per_hr"], "history_peak_ground": h["peak_ground"],
         "last_updated_utc": _latest(st.get("as_of_utc"), ar.get("as_of_utc")), "computed_at_utc": a["scenario_now_utc"],
         "outcome": a["outcome"],
+        "diverted_inbound": dv["n"], "diverted_inbound_flights": dv["flights"], "diverted_inbound_first_eta_utc": dv["first_eta"],
+        "available_after_diverted": (st["free_before"] - dv["n"]) if st["free_before"] is not None else None,
         "configured_stands": cfg.get("stands_assumed"), "configured_arrivals_per_hr": cfg.get("arrivals_per_hr_assumed"), "configured_basis": cfg.get("basis"),
     }
 
@@ -85,7 +104,7 @@ def _row(ap, a):
 @r.get("/capacity", dependencies=[Depends(current_user)])
 def capacity(scenario_id: int | None = None):
     s = scn(scenario_id)
-    return [_row(ap, _assess(s, ap["iata"])) for ap in _airports(s)]
+    return [_row(ap, _assess(s, ap["iata"]), s) for ap in _airports(s)]
 
 
 def _first_tight(hourly, margin=1):
@@ -151,7 +170,7 @@ def detail(iata: str, scenario_id: int | None = None, window_h: int = Query(24, 
               AND coalesce(fs.etd_utc, f.std_utc) BETWEEN %s::timestamptz AND %s::timestamptz + make_interval(hours => %s)
             ORDER BY 5 LIMIT 60""", (s, iata, now, now, window_h))
     profile = fetch("SELECT airport_history_profile(%s) AS p", (iata,))[0]["p"]
-    return {**_row(ap[0], _assess(s, iata)), "assessment": a, "reasons": a["reasons"], "history": a["history"], "history_profile": profile,
+    return {**_row(ap[0], _assess(s, iata), s), "assessment": a, "reasons": a["reasons"], "history": a["history"], "history_profile": profile,
             "on_ground": on_ground, "inbound": inbound, "outbound": outbound}
 
 

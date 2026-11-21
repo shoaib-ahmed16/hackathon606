@@ -6,6 +6,19 @@ import { OPS_API_URL } from '@/config/env';
 const u = (path) => `${OPS_API_URL}${path}`;
 const TAG = 'Ops';
 
+const isObj = (x) => x != null && typeof x === 'object' && !Array.isArray(x);
+const capList = (r) => {
+  if (!Array.isArray(r)) throw new Error('Unexpected reply from the capacity service');
+  return r;
+};
+// an assessment: stands / arrivals / occupancy / history objects and an hourly array (detail replies carry it under "assessment")
+const capAssessment = (r, assessOnly) => {
+  const a = assessOnly ? r.assessment : r?.assessment;
+  const ok = isObj(a) && isObj(a.stands) && isObj(a.arrivals_per_hr) && isObj(a.occupancy) && isObj(a.history) && Array.isArray(a.hourly);
+  if (!ok) throw new Error('Unexpected reply from the capacity service');
+  return r;
+};
+
 export const opsApi = api.enhanceEndpoints({ addTagTypes: [TAG] }).injectEndpoints({
   endpoints: (build) => {
     const q = (path) =>
@@ -84,11 +97,14 @@ export const opsApi = api.enhanceEndpoints({ addTagTypes: [TAG] }).injectEndpoin
         }),
         providesTags: [TAG],
       }),
-      getAirportCapacity: q('/api/airports/capacity'),
-      getCapacityCompare: q('/api/airports/capacity/compare'),
+      // The capacity screens read nested fields; an unexpected reply (null, {}, an old server's shape, a proxy error page) must become an
+      // ordinary query error ("could not load") and never reach the components, where it would crash the page.
+      getAirportCapacity: build.query({ query: (params) => ({ url: u('/api/airports/capacity'), params }), providesTags: [TAG], transformResponse: capList }),
+      getCapacityCompare: build.query({ query: (params) => ({ url: u('/api/airports/capacity/compare'), params }), providesTags: [TAG], transformResponse: capList }),
       getAirportCapacityDetail: build.query({
         query: ({ iata, ...params }) => ({ url: u(`/api/airports/${iata}/capacity`), params }),
         providesTags: [TAG],
+        transformResponse: capAssessment,
       }),
       getCapacityAssess: build.query({
         query: ({ iata, ...params }) => ({
@@ -96,6 +112,7 @@ export const opsApi = api.enhanceEndpoints({ addTagTypes: [TAG] }).injectEndpoin
           params,
         }),
         providesTags: [TAG],
+        transformResponse: (r) => capAssessment({ assessment: r }, true) && r,
       }),
       getAskQuestions: q('/api/ask/questions'),
       getAudit: q('/api/audit'),
