@@ -11,7 +11,7 @@ function FuelMeter({ f, fuelEnd, now }) {
     return (
       <div className="meter">
         <div className="lbl"><span>Fuel</span><b>In flight</b></div>
-        <div className="track"><div className="fill" style={{ width: '100%', background: 'var(--faint)' }} /></div>
+        <div className="track"><div className="fill" style={{ width: '100%', background: 'color-mix(in srgb, var(--ai) 75%, transparent)' }} /></div>
       </div>
     );
   if (isAirborne(f) && !f.diverted_to) {
@@ -34,7 +34,7 @@ function FuelMeter({ f, fuelEnd, now }) {
   return (
     <div className="meter">
       <div className="lbl"><span>Fuel</span><b>On ground</b></div>
-      <div className="track"><div className="fill" style={{ width: '100%', background: 'var(--faint)' }} /></div>
+      <div className="track"><div className="fill" style={{ width: '100%', background: 'color-mix(in srgb, var(--ai) 75%, transparent)' }} /></div>
     </div>
   );
 }

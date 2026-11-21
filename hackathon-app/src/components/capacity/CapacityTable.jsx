@@ -64,11 +64,11 @@ export default function CapacityTable({ rows, canEdit, selected, onSelect, onEdi
   return (
     <Paper>
       <TableContainer>
-        <Table size="small" stickyHeader>
+        <Table size="small" stickyHeader sx={{ tableLayout: 'auto', '& th, & td': { px: 1, py: 0.75, fontSize: 13 }, '& th': { lineHeight: 1.2, verticalAlign: 'bottom' }, '& td:nth-of-type(2)': { minWidth: 110, maxWidth: 170 } }}>
           <TableHead>
             <TableRow>
               {HEAD.map(([h, tip]) => (
-                <TableCell key={h} sx={{ whiteSpace: 'nowrap' }}>
+                <TableCell key={h} sx={{ whiteSpace: 'normal' }}>
                   {tip ? (
                     <Tooltip title={tip}>
                       <span>{h}</span>

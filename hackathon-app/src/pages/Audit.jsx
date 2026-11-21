@@ -85,7 +85,7 @@ function Body() {
   const rows = data.filter((r) => who === 'ALL' || String(r.actor_user_id) === who);
 
   return (
-    <Box className="page" sx={{ display: 'grid', gap: 2, alignContent: 'start' }}>
+    <Box className="page page-wide" sx={{ display: 'grid', gap: 2, alignContent: 'start' }}>
       <div>
         <h2>Audit trail</h2>
         <p className="lead">

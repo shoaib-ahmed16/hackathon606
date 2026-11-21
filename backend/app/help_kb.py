@@ -36,10 +36,9 @@ Each row shows the flight and route, severity and tags, where the aircraft is, a
         "keys": ["kpi", "kpis", "cards", "card", "top cards", "tiles", "flights affected", "pax affected", "decisions pending", "diverted / holding", "needs verification"],
         "text": """The eight cards at the top count flights live, and each one is a filter: click it and the board shows exactly those flights (click again to clear).
 - Flights affected: flights not yet recovered or cancelled.
-- Connecting pax: connecting passengers on those flights, each connection counted once (on-board counts are not in the supplied data). The smaller figure under it is how many are AT RISK: their onward flight leaves less than 45 minutes after the projected arrival (the minimum connection time is 30 minutes: under it the connection is missed, 30 to 45 minutes is tight, and a connection of more than 24 hours is no longer a connection), or their flight diverted or was cancelled.
+- Pax at risk: the big number is the connecting passengers AT RISK: their onward flight leaves less than 45 minutes after the projected arrival, is missed, or one of the two flights is diverted or cancelled. The line under it is all connecting passengers on those flights, each connection counted once (on-board counts are not in the supplied data).
 - High severity: severity 50 or more (the card also shows how many are medium).
 - Decisions pending: flights with a decision waiting for approval.
-- Next deadline: the most urgent deadline; click to open that flight.
 - Diverted / holding: aircraft at an alternate / aircraft in a hold.
 - Crew at risk: flights whose own leg has a crew margin under 60 minutes, needs discretion, or is over the limit. The margin is the duty's legal end minus that leg's own projected arrival, so each leg is counted on its own.
 - Needs verification: missing or conflicting data (see "Needs verification").""",
