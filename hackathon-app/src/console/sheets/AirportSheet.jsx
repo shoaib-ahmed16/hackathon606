@@ -75,7 +75,7 @@ export default function AirportSheet({ d, iata, onClose }) {
   return (
     <Sheet
       title={`${cur ? 'Update' : 'Verify'} ${iata}${isHub ? ' (hub)' : ''}`}
-      sub={cur ? `Now: ${cur.op_status.toLowerCase()}${cur.parking_available != null ? `, ${cur.parking_available} stands` : ''}${cur.expected_reopen_utc ? `, reopening ${fmtZ(ms(cur.expected_reopen_utc))}` : ''} (${String(cur.quality ?? '').toLowerCase()}).` : 'No status is on record for this airport, so the engine will not treat it as usable. Confirm it here.'}
+      sub={cur ? `Now: ${cur.op_status.toLowerCase()}${cur.parking_available != null ? `, ${cur.parking_available} stands reported${cur.stands_diverted > 0 ? ` (${cur.stands_free} free: ${cur.stands_diverted} used by diverted aircraft)` : ''}` : ''}${cur.expected_reopen_utc ? `, reopening ${fmtZ(ms(cur.expected_reopen_utc))}` : ''} (${String(cur.quality ?? '').toLowerCase()}).` : 'No live status is on record for this airport. For an alternate the engine uses the flight history (past fog days it took diverted aircraft on) until you confirm it here; the hub, or an alternate with little history, is not treated as usable. A status entered here replaces history and re-ranks the options straight away.'}
       onClose={onClose}
       footer={
         <>

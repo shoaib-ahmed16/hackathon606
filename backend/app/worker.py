@@ -15,16 +15,26 @@ import time
 import psycopg
 
 from . import config, routes_integrations, rules
-from .db import fetch, tx
+from .db import fetch, live_scenario_id, tx
 
 log = logging.getLogger("fogops.worker")
 LISTEN = "fogops_reassess"
 ALERT_EVERY_SEC = 15
+FUEL_EVERY_SEC = 60
 
 
 def _agent():
     rows = fetch("SELECT user_id FROM app_user WHERE role_code = 'AGENT' AND is_active ORDER BY user_id LIMIT 1")
     return str(rows[0]["user_id"]) if rows else None
+
+
+def _estimate_fuel() -> int:
+    """Give every airborne flight of the live scenario an ESTIMATED fuel figure (from route history) when it has none."""
+    scn = live_scenario_id()
+    if scn is None:
+        return 0
+    with tx() as conn:
+        return conn.execute("SELECT estimate_airborne_fuel(%s) AS n", (scn,)).fetchone()["n"] or 0
 
 
 def _flights_for(conn, job) -> list[int]:
@@ -106,6 +116,7 @@ async def run():
                 await conn.execute(f"LISTEN {LISTEN}")
                 last_alert = 0.0
                 last_tick = 0.0
+                last_fuel = 0.0
                 while True:
                     await asyncio.to_thread(process_pending)  # also drains anything queued while we were away
                     try:  # entries for switched-off systems become manual tasks
@@ -126,6 +137,12 @@ async def run():
                             await asyncio.to_thread(_tick_running_clocks)
                         except Exception:  # noqa: BLE001
                             log.exception("clock tick failed")
+                    if time.monotonic() - last_fuel >= FUEL_EVERY_SEC:  # airborne flights without a fuel figure get an estimate
+                        last_fuel = time.monotonic()
+                        try:
+                            await asyncio.to_thread(_estimate_fuel)
+                        except Exception:  # noqa: BLE001 - must never stop the reassessment loop
+                            log.exception("fuel estimate failed")
                     async for _ in conn.notifies(timeout=5):
                         break
         except asyncio.CancelledError:

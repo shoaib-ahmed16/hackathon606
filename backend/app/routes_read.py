@@ -223,6 +223,17 @@ def comments(case_id: int, flight_id: int | None = None):
     )
 
 
+@r.get("/airport-pairs")
+def airport_pairs(frm: str = Query(..., alias="from"), to: str | None = None):
+    """Distance and travel time between airports: flying and block time, trip fuel (kg), and road time for hub-alternate pairs.
+    Every measure has a basis (HISTORICAL, MIRRORED, COMPUTED, ESTIMATED or SYNTHETIC) so generated values are never mistaken for real ones."""
+    to = to.upper() if to else None
+    return fetch(
+        """SELECT * FROM airport_pair_travel WHERE from_iata = %s AND (%s::text IS NULL OR to_iata = %s) ORDER BY to_iata LIMIT 500""",
+        (frm.upper(), to, to),
+    )
+
+
 @r.get("/fuel")
 def fuel(scenario_id: int | None = None):
     """Latest holding-endurance estimate per flight, with its quality label."""

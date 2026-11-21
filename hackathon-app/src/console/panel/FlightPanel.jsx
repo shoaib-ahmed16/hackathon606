@@ -305,7 +305,7 @@ function Alternates({ d, f }) {
       </dl>
       <div className="tbl-wrap">
         <table className="altt">
-          <thead><tr><th>Alternate</th><th>Stands</th><th>Fuel margin</th><th>Lands with</th><th>Uplift for return</th><th>Return to hub</th><th /></tr></thead>
+          <thead><tr><th>Alternate</th><th>Distance / flight</th><th>Stands</th><th>Fuel margin</th><th>Lands with</th><th>Uplift for return</th><th>Return to hub</th><th /></tr></thead>
           <tbody>
             {(q.data ?? []).map((a) => {
               const verify = (a.blocking_constraints ?? []).some((c) => c.verify);
@@ -313,8 +313,11 @@ function Alternates({ d, f }) {
               return (
                 <tr key={a.alt_iata} className={`${a.is_executable ? '' : 'blocked'} ${verify ? 'verify' : ''}`}>
                   <td><b>{a.alt_iata}</b></td>
-                  <td>{a.stands_left ?? '?'}</td>
-                  <td>{a.fuel_margin_min == null ? '?' : `${a.fuel_margin_min} min`}{kgBy[a.alt_iata]?.above_reserve_kg != null && <div className="k">{kg(kgBy[a.alt_iata].above_reserve_kg)} above reserve</div>}</td>
+                  <td title={a.flight_time_basis ?? undefined}>{a.distance_km == null ? '?' : `${Math.round(a.distance_km)} km`} · {a.est_flight_min == null ? '?' : `${a.est_flight_min} min`}</td>
+                  <td title={a.score_breakdown?.stand_source === 'HISTORY' ? 'From history: the most aircraft seen on the ground there at once on past fog days. A station entry replaces it.' : undefined}>
+                    {a.stands_left == null ? '?' : a.score_breakdown?.stand_source === 'HISTORY' ? `~${a.stands_left}` : a.stands_left}
+                  </td>
+                                    <td>{a.fuel_margin_min == null ? '?' : `${a.fuel_margin_min} min`}{kgBy[a.alt_iata]?.above_reserve_kg != null && <div className="k">{kg(kgBy[a.alt_iata].above_reserve_kg)} above reserve</div>}</td>
                   <td>{kg(kgBy[a.alt_iata]?.lands_with_kg)}</td>
                   <td>{kgBy[a.alt_iata]?.uplift_needed_kg == null ? '?' : kgBy[a.alt_iata].uplift_needed_kg === 0 ? <span className="c-legal">none needed</span> : kg(kgBy[a.alt_iata].uplift_needed_kg)}</td>
                   <td>{a.return_block_min ? `${a.return_block_min} min` : '?'}</td>
@@ -322,7 +325,7 @@ function Alternates({ d, f }) {
                 </tr>
               );
             })}
-            {q.data?.length === 0 && <tr><td colSpan={7} className="k">No alternates ranked.</td></tr>}
+            {q.data?.length === 0 && <tr><td colSpan={8} className="k">No alternates ranked.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -440,8 +443,8 @@ function ReturnChecklist({ d, f }) {
 }
 
 // Passengers on this flight who connect onward, worst first, with an export for Customer Service.
-const CONN_TONE = { OK: 'legal', AT_RISK: 'risk', MISSED: 'exceeded', INBOUND_DIVERTED: 'exceeded', CANCELLED: 'exceeded' };
-const CONN_WORD = { OK: 'Makes it', AT_RISK: 'At risk', MISSED: 'Will miss it', INBOUND_DIVERTED: 'Flight diverted', CANCELLED: 'Cancelled' };
+const CONN_TONE = { OK: 'legal', AT_RISK: 'risk', MISSED: 'exceeded', TOO_LONG: 'exceeded', INBOUND_DIVERTED: 'exceeded', CANCELLED: 'exceeded' };
+const CONN_WORD = { OK: 'Makes it', AT_RISK: 'Tight', MISSED: 'Will miss it', TOO_LONG: 'No longer a connection (over 24 h)', INBOUND_DIVERTED: 'Flight diverted', CANCELLED: 'Cancelled' };
 function Connections({ d, f }) {
   const q = useGetConnectionsQuery({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id });
   const rows = q.data ?? [];
@@ -468,7 +471,7 @@ function Connections({ d, f }) {
               <tr key={x.outbound_flight_id} className={x.connection_status === 'OK' ? '' : 'verify'}>
                 <td><b>{x.outbound_flight}</b> <span className="k">to {x.outbound_to}</span><div className="k">leaves {fmtZ(ms(x.outbound_departure_utc))}</div></td>
                 <td>{x.pax_count}</td>
-                <td>{x.projected_connection_min == null ? '?' : `${x.projected_connection_min} min`}<div className="k">planned {x.sched_connection_min ?? '?'} · minimum 40</div></td>
+                <td>{x.projected_connection_min == null ? '?' : `${x.projected_connection_min} min`}<div className="k">planned {x.sched_connection_min ?? '?'} · minimum 30</div></td>
                 <td><Pill tone={CONN_TONE[x.connection_status] ?? 'verify'}>{CONN_WORD[x.connection_status] ?? x.connection_status}</Pill></td>
               </tr>
             ))}

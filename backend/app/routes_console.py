@@ -120,7 +120,7 @@ def flight_detail(flight_id: int, case_id: int, scenario_id: int | None = None):
             WHERE fc.scenario_id = %s AND fc.duty_id = %s AND fc.is_current AND fc.crew_id IS NULL LIMIT 1""",
         (s, f["duty_id"]),
     ) if f["duty_id"] else []
-    pax = fetch("SELECT coalesce(sum(pax_count),0) AS n FROM pax_connection WHERE inbound_flight_id = %s", (flight_id,))[0]["n"]
+    pax = fetch("SELECT coalesce(sum(pax_count),0) AS n FROM pax_connection_valid WHERE inbound_flight_id = %s", (flight_id,))[0]["n"]
     ld = fetch("SELECT assumptions, block_time_min, block_time_basis FROM latest_departure_calc WHERE scenario_id=%s AND is_current AND flight_id=%s ORDER BY calculated_at DESC LIMIT 1", (s, f["recovery_flight_id"] or flight_id))
     # what each option would do, from the engine's own ranking
     conseq = {}
