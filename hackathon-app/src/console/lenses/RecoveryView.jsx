@@ -7,6 +7,7 @@ import { iso } from '@/features/ops/helpers';
 import { flightDay } from '@/features/ops/time';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 import { Cd, Empty } from '../ui/ui';
+import DiversionRecovery from './DiversionRecovery';
 import { fmtTime, fmtZ, human, MIN, ms } from '../lib';
 import './lenses.css';
 
@@ -62,6 +63,7 @@ export default function RecoveryView({ d }) {
   if (!head) {
     return (
       <div className="recovery" data-src="build_recovery_plan()">
+        <DiversionRecovery d={d} />
         <Empty>No recovery plan for this case yet.</Empty>
         <button type="button" className="btn primary" disabled={building} onClick={() => run(() => build({ ...d.ctx, window_min: 60 }), 'Recovery plan built')}>
           {building ? 'Building…' : 'Build recovery plan'}
@@ -73,6 +75,7 @@ export default function RecoveryView({ d }) {
 
   return (
     <div className="recovery" data-src="build_recovery_plan() · v_recovery_plan_current">
+      <DiversionRecovery d={d} />
       <h2 className="lane-h" style={{ marginTop: 4 }}>
         {d.kase?.hub_iata ?? 'Hub'} arrival plan after reopening{' '}
         <span className="k">

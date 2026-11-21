@@ -50,3 +50,18 @@
 .crew-view .rw-actions{flex-direction:column;align-items:stretch}
 .crew-view .rw-actions .k{text-align:center}
 .cd-row{grid-template-columns:minmax(150px,1fr) minmax(190px,1fr) minmax(200px,1fr) minmax(210px,1fr)}
+/* diverted flights: return, crew and connections */
+.divrec{margin:0 0 22px}
+.dr-card{border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--surface);padding:12px 14px;margin:0 0 12px}
+.dr-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px}
+.dr-head .btn{margin-left:auto}
+.dr-steps{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px}
+.dr-step{display:flex;flex-direction:column;min-width:96px;padding:6px 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+.dr-step.strong{border-color:var(--ai);background:var(--ai-bg)}
+.dr-action{margin:6px 0 10px;font-size:13px}
+.dr-standby,.dr-pax{margin:8px 0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.dr-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dr-table{border-collapse:collapse;font-size:12px;width:100%}
+.dr-table th,.dr-table td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)}
+.dr-table th{color:var(--muted);font-weight:600}
+.dr-basis{margin:8px 0 0}

@@ -270,3 +270,11 @@ def move_slot(plan_id: int, flight_id: int, b: SlotMove, user=Depends(actor)):
             raise HTTPException(409, "That slot is already taken (one arrival per slot)")
         rows = conn.execute("UPDATE recovery_plan_item SET proposed_slot_utc = %s WHERE plan_id = %s AND flight_id = %s RETURNING *", (b.proposed_slot_utc, plan_id, flight_id)).fetchall()
     return rows[0]
+
+
+# ------------------------------------------------------------------ diversion recovery plan (read-only)
+@r.get("/recovery/diversions")
+def diversion_recovery(case_id: int | None = None, scenario_id: int | None = None, min_connection_min: int = Query(30, ge=0, le=240)):
+    """Per diverted flight: when the aircraft can return, whether the crew can legally fly it (standby options when not), and the
+    connecting passengers who would miss their onward flight at the projected hub arrival. Read-only: the humans decide."""
+    return fetch("SELECT * FROM diversion_recovery_plan(%s,%s,%s)", (scn(scenario_id), case_id, min_connection_min))
