@@ -1,6 +1,6 @@
-import FlightTakeoffIcon from '@mui/icons-material/RocketLaunch';
-
-// 🏷️ App name + logo icon. Change here and the sidebar, top menu and tab title all follow.
-// Any icon from https://mui.com/material-ui/material-icons/ works (import it and set `Icon`).
-export const APP_NAME = 'Fog Ops';
-export const BrandIcon = FlightTakeoffIcon;
+// Brand: one place for the product name, tagline and colours. The logo itself is components/Logo.jsx (LogoMark)
+// and public/favicon.svg (same drawing: a runway coming out of fog = a clear way through disruption).
+export const APP_NAME = 'FOO';
+export const APP_TAGLINE = 'Disruption control for airline operations';
+export const APP_DESCRIPTION =
+  'FOO turns fog disruption into one shared decision room for OCC, Dispatch, Crew Control and Stations: crew legality, alternates and recovery, with humans deciding.';

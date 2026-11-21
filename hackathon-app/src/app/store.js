@@ -4,7 +4,6 @@ import { api } from './api';
 import authReducer from '@/features/auth/authSlice';
 import uiReducer from '@/features/ui/uiSlice';
 import opsReducer from '@/features/ops/opsSlice';
-import socketReducer from '@/features/socket/socketSlice';
 
 // Factory so tests can create a fresh store. The app uses the `store` singleton below.
 export const makeStore = (preloadedState) =>
@@ -13,7 +12,6 @@ export const makeStore = (preloadedState) =>
       [api.reducerPath]: api.reducer,
       auth: authReducer,
       ui: uiReducer,
-      socket: socketReducer,
       ops: opsReducer,
       // add new slices here
     },

@@ -10,14 +10,16 @@ recommend but never decide.
 import asyncio
 import json
 import logging
+import time
 
 import psycopg
 
-from . import config
+from . import config, routes_integrations, rules
 from .db import fetch, tx
 
 log = logging.getLogger("fogops.worker")
 LISTEN = "fogops_reassess"
+ALERT_EVERY_SEC = 15
 
 
 def _agent():
@@ -94,8 +96,21 @@ async def run():
         try:
             async with await psycopg.AsyncConnection.connect(config.DSN, autocommit=True) as conn:
                 await conn.execute(f"LISTEN {LISTEN}")
+                last_alert = 0.0
                 while True:
                     await asyncio.to_thread(process_pending)  # also drains anything queued while we were away
+                    try:  # entries for switched-off systems become manual tasks
+                        await asyncio.to_thread(routes_integrations.settle)
+                    except Exception:  # noqa: BLE001
+                        log.exception("integration outbox settle failed")
+                    if time.monotonic() - last_alert >= ALERT_EVERY_SEC:  # custom ALERT rules: fire when a flight starts matching
+                        last_alert = time.monotonic()
+                        try:
+                            agent = _agent()
+                            if agent:
+                                await asyncio.to_thread(rules.evaluate_alerts, agent)
+                        except Exception:  # noqa: BLE001 - alerts must never stop the reassessment loop
+                            log.exception("alert rule evaluation failed")
                     async for _ in conn.notifies(timeout=5):
                         break
         except asyncio.CancelledError:

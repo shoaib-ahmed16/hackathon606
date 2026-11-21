@@ -103,6 +103,21 @@ low effort, server-side refusal fallback on. The key never leaves the server. Wi
 | POST | `/api/recovery/{plan}/approve`, PATCH `/api/recovery/{plan}/items/{flight}` | approve the plan / move a flight to another slot (refused if impossible) |
 | POST | `/api/auth/logout` | records the sign-out |
 | POST | `/api/records/{table}` | INSERT into decision, decision_approval, recommendation(_option), case_comment, airport_status_event, disruption_case, case_flight, flight_fuel_estimate, crew_replacement |
+| POST | `/api/feed/push {as_of?}` | simulated live feed up to now through `ingest_flight_event` (flight movements, pax, crew duty status, standby release, SIMULATED fuel); idempotent |
+| GET | `/api/kpis?case_id` | KPI bar: `v_disruption_kpis` + count of high-severity flights (`v_flight_severity`). `/api/flights` rows also carry `severity_score`, `connecting_pax` |
+| GET | `/api/approvals?case_id&flight_id&status&mine` | decisions with required / approved / waiting roles and `can_approve` for the signed-in user (`approval_policy`) |
+| POST | `/api/decisions/{id}/approvals {verdict, comment}` | one role's verdict; the DB trigger flips the decision when every required role approved (any rejection rejects; a reason is required) |
+| GET | `/api/approval-policy` | who must approve which decision type |
+| GET, POST, DELETE | `/api/me/subscriptions`, `/api/flights/{id}/subscriptions` | watch a flight (in-app) |
+| GET, POST | `/api/me/notifications`, `/api/notifications/{id}/read`, `/api/me/notifications/read-all` | in-app inbox (PENDING = unread); filled by DB triggers for subscribers (the author is not notified); the SSE stream emits `notify` |
+| GET, POST | `/api/data-requests`, `/api/flights/{id}/data-requests`, `/api/data-requests/{id}/answer` | the "?" flow: ask the right role for missing fuel / alternate status; an answer is applied (fuel estimate, airport status, with its quality label) and the options are re-ranked |
+| GET | `/api/flights/{id}/links` | "Open in aeroOps / crew system / aeroMart" deep links from `external_system` templates (`configured=false` while a template still has the placeholder host) |
+| GET | `/api/flights/{id}/timeline` | per-flight briefing: feed events, decisions, approvals, comments, data requests on one clock |
+| POST | `/api/decisions/{id}/execute` | OCC executes an APPROVED decision of any type (DIVERT creates the recovery leg and queues the aeroMart entry; CREW_REPLACE performs the swap) |
+| GET | `/api/flights/{id}/alternates` | `rank_alternates()`: stands, fuel margin, return block, crew outcome, why blocked |
+| POST, DELETE | `/api/flights/{id}/tags`, `/api/flights/{id}/tags/{tag}` | tag a flight MEDICAL / VIP / HIGH_IMPACT; shown on the board, usable in rules (`tag`), announced to watchers and OCC |
+| POST | `/api/flights/{id}/subscriptions {teams}` | also mirror alerts to the Teams channel (`teams: true/false`); `/api/me/subscriptions` returns `teams` per flight |
+| GET, PATCH, POST | `/api/integrations`, `/api/integrations/systems/{code}`, `/api/integrations/outbox/{id}/entered` | systems and deep-link templates, the aeroMart outbox, manual tasks while an integration is off |
 
 Database guardrails come back as readable errors (e.g. 403 "decisions must be made by a human user").
 

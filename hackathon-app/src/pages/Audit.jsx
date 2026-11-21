@@ -24,8 +24,7 @@ import { ms } from '@/features/ops/helpers';
 import { fmtDate, fmtZ, fmtTime } from '@/features/ops/time';
 import { useDebounce } from '@/hooks/useDebounce';
 import EmptyState from '@/components/EmptyState';
-import PageHeader from '@/components/PageHeader';
-import OpsPage from '@/components/ops/OpsPage';
+import { useConsole } from '@/console/ConsoleContext';
 
 const q = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`;
 const exportCsv = (rows) => {
@@ -55,7 +54,8 @@ const exportCsv = (rows) => {
   URL.revokeObjectURL(url);
 };
 
-function Body({ d }) {
+function Body() {
+  const d = useConsole();
   const [kind, setKind] = useState('all');
   const [thisCase, setThisCase] = useState(true);
   const [system, setSystem] = useState(false);
@@ -85,16 +85,17 @@ function Body({ d }) {
   const rows = data.filter((r) => who === 'ALL' || String(r.actor_user_id) === who);
 
   return (
-    <Box sx={{ display: 'grid', gap: 2 }}>
-      <PageHeader
-        title="Audit trail"
-        subtitle="Everything people did (actions, refused attempts included) and everything that changed in the data, with who and when. It cannot be edited or deleted."
-        actions={
-          <Button variant="outlined" disabled={!rows.length} onClick={() => exportCsv(rows)}>
-            Export CSV
-          </Button>
-        }
-      />
+    <Box className="page" sx={{ display: 'grid', gap: 2, alignContent: 'start' }}>
+      <div>
+        <h2>Audit trail</h2>
+        <p className="lead">
+          Everything people did (actions, refused attempts included) and everything that changed in the data, with who and when. It
+          cannot be edited or deleted.
+        </p>
+        <Button variant="outlined" disabled={!rows.length} onClick={() => exportCsv(rows)}>
+          Export CSV
+        </Button>
+      </div>
       <Paper sx={{ p: 1.5 }} data-src="audit_log (append-only) + API action log">
         <Stack
           direction={{ xs: 'column', lg: 'row' }}
@@ -269,5 +270,5 @@ function Body({ d }) {
 }
 
 export default function Audit() {
-  return <OpsPage>{(d) => <Body d={d} />}</OpsPage>;
+  return <Body />;
 }

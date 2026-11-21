@@ -18,13 +18,14 @@ async def stream():
         async with await psycopg.AsyncConnection.connect(config.DSN, autocommit=True) as conn:
             await conn.execute("LISTEN fogops_reassess")
             await conn.execute("LISTEN fogops_updated")
+            await conn.execute("LISTEN fogops_notify")
             yield "event: ready\ndata: {}\n\n"
             notifies = conn.notifies(timeout=15)
             while True:
                 got = False
                 async for n in notifies:
                     got = True
-                    name = 'updated' if n.channel == 'fogops_updated' else 'reassess'
+                    name = {'fogops_updated': 'updated', 'fogops_notify': 'notify'}.get(n.channel, 'reassess')
                     yield f"event: {name}\ndata: {json.dumps({'payload': n.payload})}\n\n"
                 if not got:
                     yield ": keep-alive\n\n"  # keeps proxies from closing an idle stream

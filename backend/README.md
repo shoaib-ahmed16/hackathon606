@@ -1,6 +1,6 @@
-# FogOps PostgreSQL database
+# FOO database (schema `fogops`)
 
-Backing store for the **Fog Operations & Crew Duty Recovery Agent**.
+Backing store for **FOO**, the disruption control room for airline operations (fog operations and crew duty recovery). The schema keeps its internal name `fogops`; renaming it would break existing databases.
 
 The database holds:
 
@@ -83,6 +83,11 @@ Applied so far:
 |---|---|
 | `001_diversion_leg_times.sql` | `divert_policy` (constants), `leg_time_reference` (hub to alternate airborne times), `refresh_leg_time_reference()` |
 | `002_rank_alternates_fuel_policy.sql` | New `rank_alternates()`: historical flight times, final-reserve fuel check, bingo time, return-to-base arrival |
+| `003_mvp_extensions.sql` | New Plan appendices A and B: `flight_subscription`, `notification_outbox`, `data_request`, `ops_rule`, `approval_policy` (multi-role approval trigger), `external_system` + `integration_outbox` + `deep_link()`, `case_comment.kind`, `v_flight_severity`, `v_disruption_kpis`, notification fan-out and aeroMart outbox triggers |
+| `004_connections_and_diversion_fix.sql` | `pax_connection` normalised to one row per connection (5,061 connections, 31,548 pax), `connection_iata` / `sched_connection_min`, `v_connection_risk`, `execute_diversion()` safe when a recovery leg already exists in another scenario |
+| `005_approval_policy_hold_cancel.sql` | HOLD and CANCEL need OCC approval (without a policy row any approver could approve) |
+| `006_ops_rule_matches.sql` | custom rules: remembers which flights an ALERT rule already matched; audit on `ops_rule` |
+| `007_clearway_v2.sql` | v2 mockup: approval policy as agreed (DIVERT needs OCC and Crew Control), `flight_tag`, role-based notifications (approval needed, approved, rejected, data requested) |
 
 If `hist.flight` is ever reloaded, or alternates change, run `SELECT fogops.refresh_leg_time_reference();`.
 

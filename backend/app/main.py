@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import logging
 
-from . import audit, auth, config, migrate, routes_ask, routes_audit, routes_auth, routes_console, routes_feed, routes_read, routes_write, stream, worker
+from . import audit, auth, config, migrate, routes_ask, routes_audit, routes_auth, routes_collab, routes_console, routes_feed, routes_integrations, routes_read, routes_rules, routes_write, stream, worker
 from .deps import current_user
 from .db import fetch, pool
 
@@ -45,7 +45,7 @@ async def lifespan(_):
     pool.close()
 
 
-app = FastAPI(title="FogOps API", description="Fog Operations & Crew Duty Recovery Agent", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="FOO API", description="FOO: disruption control for airline operations (fog operations and crew duty recovery)", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(audit.AuditMiddleware)
 app.include_router(routes_auth.r)  # login is open; everything else needs a signed-in user
@@ -53,6 +53,9 @@ app.include_router(routes_read.r, dependencies=[Depends(current_user)])
 app.include_router(routes_audit.r, dependencies=[Depends(current_user)])
 app.include_router(routes_console.r, dependencies=[Depends(current_user)])
 app.include_router(routes_ask.r, dependencies=[Depends(current_user)])
+app.include_router(routes_integrations.r)  # integrations page (actor())
+app.include_router(routes_rules.r)  # custom rules (actor())
+app.include_router(routes_collab.r)  # KPIs, approvals, subscriptions, data requests (actor())
 app.include_router(routes_feed.r)  # simulated live feed push (resolves the user through actor())
 app.include_router(routes_write.r)  # actions resolve the user through actor()
 app.include_router(stream.r, dependencies=[Depends(current_user)])

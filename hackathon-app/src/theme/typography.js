@@ -1,6 +1,6 @@
 // 🔤 ALL FONT SETTINGS LIVE HERE (family, sizes, weights). Sizes are in px.
 // Use variants in code: <Typography variant="h4">, "body1", "body2", "caption"... never hardcode fontSize.
-export const fontFamily = '"Inter Variable", "Inter", "Roboto", "Helvetica", "Arial", sans-serif';
+export const fontFamily = '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif';
 
 const h = (size, lineHeight, weight = 600) => ({
   fontSize: `${size / 16}rem`,

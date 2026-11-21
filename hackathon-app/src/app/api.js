@@ -20,7 +20,7 @@ const baseQueryWithAuth = async (args, api, extra) => {
 
 /**
  * ONE api for the whole app. Feature files add endpoints with api.injectEndpoints().
- * Tag types are registered automatically by createCrudApi (see app/createCrudApi.js).
+ * Tags are added in features/ops/opsApi.js (enhanceEndpoints).
  */
 export const api = createApi({
   reducerPath: 'api',

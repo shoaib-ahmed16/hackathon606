@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Wipe the FogOps database and restore it from backend/db/init (clean data + the daily cases).
+# Wipe the FOO database and restore it from backend/db/init (clean data + the daily cases).
 # Run from the project folder on the server:   ./reset-db.sh        (add --yes to skip the question)
 # WARNING: this deletes every decision, comment and case created since the last reset.
 set -euo pipefail
 cd "$(dirname "$0")"
 if [ "${1:-}" != "--yes" ]; then
-  read -r -p "This deletes ALL FogOps data (decisions, comments, cases you created). Type RESET to continue: " a
+  read -r -p "This deletes ALL FOO data (decisions, comments, cases you created). Type RESET to continue: " a
   [ "$a" = "RESET" ] || { echo "aborted"; exit 1; }
 fi
 test -f backend/db/init/10_fogops.sql.gz || { echo "backend/db/init/10_fogops.sql.gz is missing: copy the project again"; exit 1; }

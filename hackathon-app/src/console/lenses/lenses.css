@@ -1,0 +1,39 @@
+/* Extra rules for the crew / station / recovery views and the sheets. console.css stays untouched. */
+.rw-scroll{overflow-x:auto}
+@media (min-width:901px){ .rw-scroll > .rw-inner{min-width:860px} }
+.rw-row .pill{justify-self:start}
+.rw-actions{display:flex;gap:6px;flex-wrap:wrap}
+.lens-note{margin:12px 0 0}
+.st-bar{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
+.st-bar h2{margin:0;font-size:18px}
+.st-bar select{min-height:36px}
+.big[disabled]{opacity:.55;cursor:wait}
+.rec-stats{display:flex;gap:18px;flex-wrap:wrap;margin:0 0 10px;font-size:13px}
+.rec-stats b{font-size:15px}
+.slot[role="button"]{cursor:pointer}
+.slot[role="button"]:hover,.slot[role="button"]:focus-visible{background:var(--ai-bg);outline:none}
+.blk.picked{outline:2px solid var(--ai);outline-offset:1px}
+.blk.blk-btn{text-align:left;color:var(--text);width:100%}
+.pick-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:8px 12px;border:1px solid var(--ai);border-radius:var(--r-md);background:var(--ai-bg);font-size:13px}
+.parking .blk{border:1px solid var(--line-2);border-left:4px solid var(--exceeded);background:var(--surface-3);color:var(--text);text-align:left;cursor:pointer}
+.sheet-scroll{overflow-x:auto}
+.field-in{width:100%}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:560px){ .form-grid{grid-template-columns:1fr} }
+.range{width:100%;margin-top:8px;accent-color:var(--ai)}
+.check-row{display:flex;gap:8px;align-items:flex-start;margin-top:14px;font-size:13px}
+.check-row input{margin-top:3px}
+.sheet .palette{margin-top:0;width:100%}
+.pal-q{font-weight:600;margin-bottom:4px}
+.pal-ans + .pal-ans{border-top:1px solid var(--line)}
+.pal-ans .answer{white-space:pre-wrap}
+.pal-log{max-height:46vh;overflow:auto}
+.pal-row{display:flex;align-items:center}
+.pal-row input{flex:1}
+.pal-row .btn{margin-right:12px}
+.cand-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.cand.picked{border-color:var(--ai);box-shadow:inset 0 0 0 1px var(--ai)}
+.sum-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin:0 0 14px}
+.sum-grid > div{border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2);padding:8px 10px}
+.sum-grid b{display:block;font-size:20px}
+.sum-grid span{font-size:12px;color:var(--muted)}

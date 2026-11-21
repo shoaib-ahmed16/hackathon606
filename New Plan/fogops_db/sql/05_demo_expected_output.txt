@@ -1,0 +1,430 @@
+SET
+Pager usage is off.
+=== 1. Replay scenario cloned from LIVE, clock 21 Nov 01:15Z (05:15 SHJ local)
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+UPDATE 1
+INSERT 0 1
+COMMIT
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+INSERT 0 5
+COMMIT
+=== 2. Simulated live feed: airborne + ETAs (incl. a duplicate and an out-of-order message)
+   r1    |   r2    |   r3    |   r4    |   r5    
+---------+---------+---------+---------+---------
+ APPLIED | APPLIED | APPLIED | APPLIED | APPLIED
+(1 row)
+
+ duplicate_resend 
+------------------
+ DUPLICATE
+(1 row)
+
+ older_eta_arrives_late 
+------------------------
+ IGNORED_STALE
+(1 row)
+
+=== 3. SHJ fog: restricted then closed (forecast reopening 02:30Z); alternates open
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+INSERT 0 2
+INSERT 0 3
+INSERT 0 5
+COMMIT
+ hold_464 
+----------
+ APPLIED
+(1 row)
+
+=== 4. Crew legality + LVP qualification for the watched flights (LVP in force at SHJ)
+ compute_flight_legality 
+-------------------------
+                       1
+                       1
+                       1
+                       1
+                       1
+(5 rows)
+
+ flight_no |  status  |  eta   | crew_status | crew_margin_hhmm | legal_end | legs_counted | lvp_required | lvp_crew_ok | non_lvp_position 
+-----------+----------+--------+-------------+------------------+-----------+--------------+--------------+-------------+------------------
+ G9588     | AIRBORNE | 01:55Z | AT_RISK     | 00:15            | 02:10Z    |            2 | t            | t           | 
+ G9464     | HOLDING  | 01:55Z | LEGAL       | 02:20            | 04:15Z    |            2 | t            | t           | 
+ G9455     | AIRBORNE | 02:10Z | LEGAL       | 01:50            | 04:00Z    |            2 | t            | f           | CP
+ G9621     | AIRBORNE | 02:15Z | LEGAL       | 01:50            | 04:05Z    |            2 | t            | t           | 
+ G9472     | AIRBORNE | 02:30Z | LEGAL       | 01:20            | 03:50Z    |            2 | t            | t           | 
+(5 rows)
+
+=== 5. Engine-generated hold/divert recommendations (HOLD + every alternate, ranked)
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+ propose_hold_or_divert 
+------------------------
+                      1
+                      2
+                      3
+                      4
+                      5
+(5 rows)
+
+COMMIT
+ flight_no | rec_type | confidence |                                                   rationale                                                    
+-----------+----------+------------+----------------------------------------------------------------------------------------------------------------
+ G9455     | DIVERT   |       0.65 | DIVERT RKT. Hold not feasible: CREW_NOT_LVP_QUALIFIED_FOR_HUB. Fuel margin on arrival 102 min; Crew can fly RK
+ G9464     | DIVERT   |       0.65 | DIVERT RKT. Hold not feasible: ENDURANCE_ENDS_BEFORE_REOPENING. Fuel margin on arrival 27 min; Crew can fly RK
+ G9472     | HOLD     |       0.65 | HOLD: fuel and crew cover the forecast reopening (02:30Z). Landing at 02:40Z after forecast reopening (FORECAS
+ G9588     | DIVERT   |       0.65 | DIVERT RKT. Hold not feasible: ENDURANCE_ENDS_BEFORE_REOPENING. Fuel margin on arrival 7 min; Return needs com
+ G9621     | HOLD     |       0.65 | HOLD: fuel and crew cover the forecast reopening (02:30Z). Landing at 02:40Z after forecast reopening (FORECAS
+(5 rows)
+
+--- Ranked alternates for G9588 (CMB-SHJ): constraints, fuel, crew return legality
+ rank | alt_iata | exec | score | op_status | stands_left | km  | fl_min | fuel_m | ret_blk |        crew_outcome        |                    blocking                     
+------+----------+------+-------+-----------+-------------+-----+--------+--------+---------+----------------------------+-------------------------------------------------
+    1 | RKT      | t    | 0.525 | OPEN      |           4 |  53 |     18 |      7 |      52 | NEEDS_COMMANDER_DISCRETION | 
+    2 | FJR      | t    | 0.524 | OPEN      |           6 |  85 |     23 |      2 |      61 | NEEDS_COMMANDER_DISCRETION | 
+    3 | AAN      | f    | 0.376 | OPEN      |           3 | 119 |     27 |     -2 |      59 | NEEDS_COMMANDER_DISCRETION | NO_FUEL_AT_ALTERNATE,CANNOT_REACH_WITH_FUEL
+    4 | DWC      | f    | 0.338 |           |             |  60 |     19 |      6 |      50 | NEEDS_COMMANDER_DISCRETION | ALTERNATE_STATUS_UNKNOWN
+    5 | MCT      | f    | 0.320 |           |             | 340 |     59 |    -34 |      68 | NEEDS_COMMANDER_DISCRETION | ALTERNATE_STATUS_UNKNOWN,CANNOT_REACH_WITH_FUEL
+    6 | AUH      | f    | 0.240 |           |             | 133 |     29 |     -4 |      80 | NEEDS_COMMANDER_DISCRETION | ALTERNATE_STATUS_UNKNOWN,CANNOT_REACH_WITH_FUEL
+(6 rows)
+
+--- Options panel for G9455 (captain not LVP-qualified)
+ rank | action | alt | exec | score | verify |         blocking         
+------+--------+-----+------+-------+--------+--------------------------
+    1 | DIVERT | RKT | t    | 0.875 | f      | 
+    2 | DIVERT | FJR | t    | 0.804 | f      | 
+    3 | DIVERT | DWC | f    | 0.698 | t      | ALTERNATE_STATUS_UNKNOWN
+    4 | DIVERT | AAN | f    | 0.676 | f      | NO_FUEL_AT_ALTERNATE
+(4 rows)
+
+=== 6. Guardrail check: the agent tries to record a decision (must fail)
+psql:/home/claude/fogops_db/sql/05_demo_fog_replay.sql:122: NOTICE:  Blocked as expected -> Guardrail: decisions must be made by a human user (user 5 is AGENT)
+DO
+=== 7. Dispatch accepts the engine's top option for G9588 and G9464; OCC approves; both executed
+UPDATE 1
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+COMMIT
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+INSERT 0 2
+COMMIT
+ decision_id | flight_no | decision_type | alternate_iata |  status  |  decided_by  |   approved_by    
+-------------+-----------+---------------+----------------+----------+--------------+------------------
+           2 | G9588     | DIVERT        | RKT            | EXECUTED | Dispatcher 1 | OCC Duty Manager
+           3 | G9464     | DIVERT        | RKT            | EXECUTED | Dispatcher 1 | OCC Duty Manager
+(2 rows)
+
+=== 8. Diversion adds a sector: crew limits shrink; latest legal departure from the alternates
+ position_code |                   duty_legs                    | legs_counted | max_fdp_hhmm | legal_end | with_discretion | margin_hhmm |       status        
+---------------+------------------------------------------------+--------------+--------------+-----------+-----------------+-------------+---------------------
+ CP            | G9463 SHJ-DEL / G9464 DEL-SHJ / G9464D RKT-SHJ |            3 | 10:30        | 03:30Z    | 06:30Z          | 00:20       | AT_RISK
+ CS            | G9463 SHJ-DEL / G9464 DEL-SHJ / G9464D RKT-SHJ |            3 | 11:30        | 04:30Z    | 07:30Z          | 01:20       | LEGAL
+ CP            | G9587 SHJ-CMB / G9588 CMB-SHJ / G9588D RKT-SHJ |            3 | 10:30        | 01:25Z    | 04:25Z          | -01:45      | DISCRETION_REQUIRED
+ CS            | G9587 SHJ-CMB / G9588 CMB-SHJ / G9588D RKT-SHJ |            3 | 11:30        | 02:25Z    | 05:25Z          | -00:45      | DISCRETION_REQUIRED
+(4 rows)
+
+ flight_no |   leg   | block_time_min |          block_time_basis           | latest_legal | latest_w_discretion | ops_target |       status        
+-----------+---------+----------------+-------------------------------------+--------------+---------------------+------------+---------------------
+ G9588D    | RKT-SHJ |             52 | P90 of 54 historical RKT-SHJ blocks | 00:33Z       | 03:33Z              | 00:03Z     | DISCRETION_REQUIRED
+ G9464D    | RKT-SHJ |             52 | P90 of 54 historical RKT-SHJ blocks | 02:38Z       | 05:38Z              | 02:08Z     | LEGAL
+(2 rows)
+
+=== 9. Stations report arrivals at the alternates
+UPDATE 1
+ landed_rkt | landed_fjr 
+------------+------------
+ APPLIED    | APPLIED
+(1 row)
+
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+UPDATE 1
+INSERT 0 1
+COMMIT
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+UPDATE 1
+COMMIT
+=== 10. JUDGE CHANGE #1 - one inbound ETA changes (G9472 re-sequenced)
+UPDATE 1
+ eta_change 
+------------
+ APPLIED
+(1 row)
+
+ job_id |     reason     | entity_id |        eta_before         |         eta_after         
+--------+----------------+-----------+---------------------------+---------------------------
+   6631 | FLIGHT_CHANGED | 198       | 2026-11-21T02:30:00+00:00 | 2026-11-21T02:55:00+00:00
+(1 row)
+
+ duties_recomputed 
+-------------------
+                 1
+(1 row)
+
+ flight_no |  eta   | crew_status | crew_margin_hhmm 
+-----------+--------+-------------+------------------
+ G9472     | 02:55Z | AT_RISK     | 00:55
+(1 row)
+
+=== 11. JUDGE CHANGE #2 - SHJ reopening revised 02:30Z -> 02:45Z; engine re-ranks the airborne flights
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+INSERT 0 1
+ set_actor 
+-----------
+ 
+(1 row)
+
+ propose_hold_or_divert 
+------------------------
+                      6
+                      7
+                      8
+(3 rows)
+
+COMMIT
+ flight_no | rec_id | rec_type |   status   | superseded_by |                                         rationale                                          
+-----------+--------+----------+------------+---------------+--------------------------------------------------------------------------------------------
+ G9455     |      4 | DIVERT   | SUPERSEDED |             6 | DIVERT RKT. Hold not feasible: CREW_NOT_LVP_QUALIFIED_FOR_HUB. Fuel margin on arrival 102 
+ G9455     |      6 | DIVERT   | PROPOSED   |               | DIVERT FJR. Hold not feasible: CREW_NOT_LVP_QUALIFIED_FOR_HUB. Fuel margin on arrival 42 m
+ G9472     |      3 | HOLD     | SUPERSEDED |             8 | HOLD: fuel and crew cover the forecast reopening (02:30Z). Landing at 02:40Z after forecas
+ G9472     |      8 | DIVERT   | PROPOSED   |               | DIVERT FJR. Hold possible but only 10 min fuel spare (< 15 min buffer). Fuel margin on arr
+ G9621     |      5 | HOLD     | SUPERSEDED |             7 | HOLD: fuel and crew cover the forecast reopening (02:30Z). Landing at 02:40Z after forecas
+ G9621     |      7 | HOLD     | PROPOSED   |               | HOLD: fuel and crew cover the forecast reopening (02:45Z). Landing at 02:55Z after forecas
+(6 rows)
+
+=== 12. JUDGE CHANGE #3 - crew pairing: G9588 crew time out at RKT -> standby replacements (Q4)
+UPDATE 1
+--- Q4 candidates for the captain position at RKT (G9588D lands at SHJ under LVP -> LVP required)
+ crew_id | pattern_name | lvp_qualified | positioning_min | legs_to_operate | max_fdp | legal_end | margin | roster_conflict |                     verdict                     
+---------+--------------+---------------+-----------------+-----------------+---------+-----------+--------+-----------------+-------------------------------------------------
+  105145 | SBY 1-02:00  | t             |              60 |               1 | 13:00   | 15:20Z    | 12:10  | f               | CANDIDATE
+  110252 | SBY 1-02:00  | t             |              60 |               1 | 13:00   | 15:20Z    | 12:10  | f               | CANDIDATE
+  100046 | SBY 1-02:00  | f             |              60 |               1 | 13:00   | 15:20Z    | 12:10  | f               | NOT LVP QUALIFIED (LVP in force at destination)
+(3 rows)
+
+ crew_id | pattern_name | lvp_qualified |                     verdict                     
+---------+--------------+---------------+-------------------------------------------------
+  111002 | SBY 1-02:00  | f             | NOT LVP QUALIFIED (LVP in force at destination)
+  100046 | SBY 1-02:00  | f             | NOT LVP QUALIFIED (LVP in force at destination)
+(2 rows)
+
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+DO
+UPDATE 1
+UPDATE 1
+COMMIT
+ crew_replaced 
+---------------
+             6
+(1 row)
+
+ recalculated 
+--------------
+ t
+(1 row)
+
+=== 13. The duty manager's questions at 02:30Z (from the screen views alone)
+UPDATE 1
+--- Q1 Which crew runs out of legality next?
+     full_name     | position_code |                   duty_legs                    | legal_end | minutes_until_legal_end | margin_hhmm | status  
+-------------------+---------------+------------------------------------------------+-----------+-------------------------+-------------+---------
+ Nicolas ABOURIZK  | CP            | G9463 SHJ-DEL / G9464 DEL-SHJ / G9464D RKT-SHJ | 03:30Z    |                      60 | 00:20       | AT_RISK
+ Mohammad ALJASMI  | FO            | G9463 SHJ-DEL / G9464 DEL-SHJ / G9464D RKT-SHJ | 03:30Z    |                      60 | 00:20       | AT_RISK
+ Ahmed NASEEM      | FO            | G9471 SHJ-MAA / G9472 MAA-SHJ                  | 03:50Z    |                      80 | 00:55       | AT_RISK
+ Robin Mark RIDING | CP            | G9471 SHJ-MAA / G9472 MAA-SHJ                  | 03:50Z    |                      80 | 00:55       | AT_RISK
+ Wilfred DCOSTA    | FO            | G9454 SHJ-CCJ / G9455 CCJ-SHJ                  | 04:00Z    |                      90 | 01:50       | LEGAL
+(5 rows)
+
+--- Q2 Where is the G9588 aircraft and what is it waiting for?
+ registration |  position_text   |   waiting_for    | next_flight | next_latest_legal 
+--------------+------------------+------------------+-------------+-------------------
+ A6-ARJ       | On ground at RKT | REPLACEMENT_CREW | G9588D      | 14:28Z
+(1 row)
+
+--- Q3 What time must it leave to still land legal?
+ flight_no | diverted_to | lvp_crew_ok | latest_legal_utc | latest_legal_local | ops_target | mins_left | departure_legality 
+-----------+-------------+-------------+------------------+--------------------+------------+-----------+--------------------
+ G9588     | RKT         | t           | 14:28Z           | 18:28:00           | 13:58Z     |       718 | LEGAL
+ G9464     | RKT         | t           | 02:38Z           | 06:38:00           | 02:08Z     |         8 | LEGAL
+(2 rows)
+
+=== 14. SHJ reopens 02:45Z at 12 arrivals/hr -> recovery order for the next 60 min
+UPDATE 1
+BEGIN
+ set_actor 
+-----------
+ 
+(1 row)
+
+INSERT 0 1
+UPDATE 2
+UPDATE 1
+COMMIT
+ set_actor 
+-----------
+ 
+(1 row)
+
+ rank | flight_no | current_location | earliest |  slot  | slot_local | in_window | feasible | score |                                                       reasons                                                        |                                                     infeasible_reason                                                      
+------+-----------+------------------+----------+--------+------------+-----------+----------+-------+----------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------
+    1 | G9621     | AIRBORNE         | 02:45Z   | 02:45Z | 06:45:00   | t         | t        | 0.469 | {"Low fuel endurance while airborne","Crew margin only 01:50","1 onward rotation(s) within 8h","75 connecting pax"}  | 
+    2 | G9472     | AIRBORNE_HOLDING | 02:55Z   | 02:55Z | 06:55:00   | t         | t        | 0.738 | {"Low fuel endurance while airborne","Crew margin only 00:55","1 onward rotation(s) within 8h","164 connecting pax"} | 
+    3 | G9588D    | ON_GROUND_RKT    | 03:20Z   | 03:20Z | 07:20:00   | t         | t        | 0.150 | {"1 onward rotation(s) within 8h","134 connecting pax"}                                                              | 
+    4 | G9455     | AIRBORNE         | 02:45Z   |        |            | f         | f        | 0.606 | {"Low fuel endurance while airborne","Crew margin only 01:50","1 onward rotation(s) within 8h","124 connecting pax"} | LVP in force at SHJ and cockpit crew not LVP-qualified (CP 110877): LVP-qualified crew change or wait for LVP cancellation
+    5 | G9464D    | ON_GROUND_RKT    | 03:20Z   |        |            | f         | f        | 0.444 | {"Crew margin only 00:20","1 onward rotation(s) within 8h","159 connecting pax"}                                     | Crew latest legal departure is before earliest possible departure: replacement crew or discretion needed
+(5 rows)
+
+ arrivals_in_window | capacity_per_hr |    window     
+--------------------+-----------------+---------------
+                  3 |              12 | 02:45Z-03:45Z
+(1 row)
+
+=== 15. Shared timeline (scenario clock) + report
+   t   |  stream  |       actor       |                                                 summary                                                 
+-------+----------+-------------------+---------------------------------------------------------------------------------------------------------
+ 00:50 | AIRPORT  | OCC Duty Manager  | SHJ RESTRICTED - FOG, LVP in force, arrivals 8/hr, reopen ~02:30Z
+ 01:00 | AIRPORT  | OCC Duty Manager  | RKT OPEN
+ 01:00 | AIRPORT  | OCC Duty Manager  | FJR OPEN
+ 01:00 | AIRPORT  | OCC Duty Manager  | AAN OPEN
+ 01:05 | FEED     | SIM_FEED          | G9472 POSITION:  [IGNORED_STALE]
+ 01:10 | FEED     | SIM_FEED          | G9588 POSITION: atd=2026-11-20T21:15:00Z, eta=2026-11-21T01:55:00Z, toff=2026-11-20T21:30:00Z [APPLIED]
+ 01:10 | FEED     | SIM_FEED          | G9464 POSITION: atd=2026-11-20T21:55:00Z, eta=2026-11-21T01:55:00Z, toff=2026-11-20T22:05:00Z [APPLIED]
+ 01:10 | FEED     | SIM_FEED          | G9455 POSITION: atd=2026-11-20T22:12:00Z, eta=2026-11-21T02:10:00Z, toff=2026-11-20T22:25:00Z [APPLIED]
+ 01:10 | FEED     | SIM_FEED          | G9621 POSITION: atd=2026-11-20T23:08:00Z, eta=2026-11-21T02:15:00Z, toff=2026-11-20T23:20:00Z [APPLIED]
+ 01:10 | FEED     | SIM_FEED          | G9472 POSITION: atd=2026-11-20T22:14:00Z, eta=2026-11-21T02:30:00Z, toff=2026-11-20T22:30:00Z [APPLIED]
+ 01:12 | AIRPORT  | OCC Duty Manager  | SHJ CLOSED - FOG below CAT III minima, LVP in force, arrivals 0/hr, reopen ~02:30Z
+ 01:14 | FEED     | SIM_FEED          | G9464 HOLD: holding=true [APPLIED]
+ 01:15 | AUDIT    | OCC Duty Manager  | disruption_case INSERT
+ 01:15 | AUDIT    | OCC Duty Manager  | Flight 192 added to watch (HIGH exposure)
+ 01:15 | AUDIT    | OCC Duty Manager  | Flight 197 added to watch (HIGH exposure)
+ 01:15 | AUDIT    | OCC Duty Manager  | Flight 199 added to watch (HIGH exposure)
+ 01:15 | AUDIT    | OCC Duty Manager  | Flight 209 added to watch (MEDIUM exposure)
+ 01:15 | AUDIT    | OCC Duty Manager  | Flight 198 added to watch (MEDIUM exposure)
+ 01:15 | AUDIT    | FogOps Agent      | Recommendation MONITOR for flight 192: PROPOSED
+ 01:15 | AUDIT    | FogOps Agent      | Recommendation DIVERT for flight 192: PROPOSED
+ 01:15 | AUDIT    | FogOps Agent      | Recommendation MONITOR for flight 197: PROPOSED
+ 01:15 | AUDIT    | FogOps Agent      | Recommendation DIVERT for flight 197: PROPOSED
+ 01:15 | AUDIT    | FogOps Agent      | Recommendation MONITOR for flight 198: PROPOSED
+ 01:15 | AUDIT    | FogOps Agent      | Recommendation HOLD for flight 198: PROPOSED
+ 01:15 | AUDIT    | FogOps Agent      | Recommendation MONITOR for flight 199: PROPOSED
+ 01:15 | AUDIT    | FogOps Agent      | Recommendation DIVERT for flight 199: PROPOSED
+ 01:15 | AUDIT    | FogOps Agent      | Recommendation MONITOR for flight 209: PROPOSED
+ 01:15 | AUDIT    | FogOps Agent      | Recommendation HOLD for flight 209: PROPOSED
+ 01:20 | APPROVAL | OCC Duty Manager  | APPROVED DIVERT decision 2: Approved. Crew Control: check RKT-SHJ legality.
+ 01:20 | APPROVAL | OCC Duty Manager  | APPROVED DIVERT decision 3: Approved.
+ 01:20 | FEED     | MANUAL            | G9588 DIVERT: holding=false, actual_arr_iata=RKT [APPLIED]
+ 01:20 | FEED     | MANUAL            | G9464 DIVERT: holding=false, actual_arr_iata=RKT [APPLIED]
+ 01:20 | AUDIT    | Dispatcher 1      | INSERT DIVERT decision 2 (PROPOSED)
+ 01:20 | AUDIT    | Dispatcher 1      | INSERT DIVERT decision 3 (PROPOSED)
+ 01:20 | AUDIT    | OCC Duty Manager  | UPDATE DIVERT decision 2 (APPROVED)
+ 01:20 | AUDIT    | OCC Duty Manager  | Recommendation DIVERT for flight 192: ACCEPTED
+ 01:20 | AUDIT    | OCC Duty Manager  | UPDATE DIVERT decision 3 (APPROVED)
+ 01:20 | AUDIT    | OCC Duty Manager  | Recommendation DIVERT for flight 197: ACCEPTED
+ 01:20 | AUDIT    | OCC Duty Manager  | Diversion to RKT: DIVERTING, waiting for LANDING
+ 01:20 | AUDIT    | OCC Duty Manager  | UPDATE DIVERT decision 2 (EXECUTED)
+ 01:20 | AUDIT    | OCC Duty Manager  | Diversion to RKT: DIVERTING, waiting for LANDING
+ 01:20 | AUDIT    | OCC Duty Manager  | UPDATE DIVERT decision 3 (EXECUTED)
+ 01:52 | FEED     | SIM_FEED          | G9588 IN: ata=2026-11-21T01:52:00Z, tdown=2026-11-21T01:47:00Z [APPLIED]
+ 02:04 | FEED     | SIM_FEED          | G9464 IN: ata=2026-11-21T02:04:00Z, tdown=2026-11-21T01:59:00Z, holding=false [APPLIED]
+ 02:05 | AUDIT    | RKT Station       | Diversion to RKT: ON_GROUND_ALT, waiting for FUEL
+ 02:05 | AUDIT    | RKT Station       | Comment: G9588 on blocks 01:52Z, refuelling, pax remain on board.
+ 02:05 | AUDIT    | RKT Station       | Diversion to RKT: ON_GROUND_ALT, waiting for HUB_REOPENING
+ 02:10 | AIRPORT  | OCC Duty Manager  | SHJ CLOSED - FOG, LVP in force, arrivals 0/hr, reopen ~02:45Z
+ 02:10 | FEED     | SIM_FEED          | G9472 ETA_UPDATE: eta=2026-11-21T02:55:00Z, holding=true [APPLIED]
+ 02:10 | AUDIT    | FogOps Agent      | Recommendation DIVERT for flight 199: SUPERSEDED
+ 02:10 | AUDIT    | FogOps Agent      | Recommendation MONITOR for flight 199: PROPOSED
+ 02:10 | AUDIT    | FogOps Agent      | Recommendation DIVERT for flight 199: PROPOSED
+ 02:10 | AUDIT    | FogOps Agent      | Recommendation HOLD for flight 209: SUPERSEDED
+ 02:10 | AUDIT    | FogOps Agent      | Recommendation MONITOR for flight 209: PROPOSED
+ 02:10 | AUDIT    | FogOps Agent      | Recommendation HOLD for flight 209: PROPOSED
+ 02:10 | AUDIT    | FogOps Agent      | Recommendation HOLD for flight 198: SUPERSEDED
+ 02:10 | AUDIT    | FogOps Agent      | Recommendation MONITOR for flight 198: PROPOSED
+ 02:10 | AUDIT    | FogOps Agent      | Recommendation DIVERT for flight 198: PROPOSED
+ 02:20 | APPROVAL | Crew Controller 1 | APPROVED CREW_REPLACE decision 4
+ 02:20 | AUDIT    | Crew Controller 1 | INSERT CREW_REPLACE decision 4 (PROPOSED)
+ 02:20 | AUDIT    | Crew Controller 1 | UPDATE CREW_REPLACE decision 4 (APPROVED)
+ 02:20 | CREW     | Crew Controller 1 | Crew 104832 removed on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | CREW     | Crew Controller 1 | Crew 103764 assigned on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | AUDIT    | Crew Controller 1 | Crew replacement: 104832 out, 103764 in (APPROVED)
+ 02:20 | CREW     | Crew Controller 1 | Crew 108877 removed on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | CREW     | Crew Controller 1 | Crew 109809 assigned on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | AUDIT    | Crew Controller 1 | Crew replacement: 108877 out, 109809 in (APPROVED)
+ 02:20 | CREW     | Crew Controller 1 | Crew 108944 removed on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | CREW     | Crew Controller 1 | Crew 108248 assigned on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | AUDIT    | Crew Controller 1 | Crew replacement: 108944 out, 108248 in (APPROVED)
+ 02:20 | CREW     | Crew Controller 1 | Crew 110182 removed on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | CREW     | Crew Controller 1 | Crew 108607 assigned on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | AUDIT    | Crew Controller 1 | Crew replacement: 110182 out, 108607 in (APPROVED)
+ 02:20 | CREW     | Crew Controller 1 | Crew 311613 removed on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | CREW     | Crew Controller 1 | Crew 105145 assigned on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | AUDIT    | Crew Controller 1 | Crew replacement: 311613 out, 105145 in (APPROVED)
+ 02:20 | CREW     | Crew Controller 1 | Crew 780264 removed on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | CREW     | Crew Controller 1 | Crew 780210 assigned on duty 92 - Replacement at RKT after diversion (decision 4)
+ 02:20 | AUDIT    | Crew Controller 1 | Crew replacement: 780264 out, 780210 in (APPROVED)
+ 02:20 | AUDIT    | Crew Controller 1 | Diversion to RKT: ON_GROUND_ALT, waiting for REPLACEMENT_CREW
+ 02:20 | AUDIT    | Crew Controller 1 | UPDATE CREW_REPLACE decision 4 (EXECUTED)
+ 02:45 | AIRPORT  | OCC Duty Manager  | SHJ OPEN - Fog lifting, LVP in force, arrivals 12/hr
+ 02:45 | AUDIT    | OCC Duty Manager  | Diversion to RKT: READY, waiting for ARRIVAL_SLOT
+ 02:45 | AUDIT    | OCC Duty Manager  | Diversion to RKT: READY, waiting for ARRIVAL_SLOT
+ 02:45 | AUDIT    | OCC Duty Manager  | disruption_case UPDATE
+ 02:45 | AUDIT    |                   | Recovery plan 1 PROPOSED
+(86 rows)
+
+ report_id | flights | decisions | timeline_rows |             rule_set             | audit_watermark_id 
+-----------+---------+-----------+---------------+----------------------------------+--------------------
+         1 |       5 |         3 |            86 | GCAA FDP v1 Crew_FDTL 2026-11-20 |               4823
+(1 row)
+
+=== 16. Guardrail check: approved rule set is immutable
+psql:/home/claude/fogops_db/sql/05_demo_fog_replay.sql:329: NOTICE:  Blocked as expected -> Rules of an approved rule set are immutable
+DO

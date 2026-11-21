@@ -13,11 +13,20 @@ import {
   useGetDecisionLogQuery,
   useGetExceptionsQuery,
   useGetFlightsQuery,
+  useGetKpisQuery,
+  useGetRulesQuery,
+  useGetDataRequestsQuery,
+  useGetRuleMatchesQuery,
+  useGetApprovalsQuery,
+  useGetMySubscriptionsQuery,
+  useGetMyNotificationsQuery,
   useGetRecoveryPlanQuery,
 } from './opsApi';
 import { selectUser } from '@/features/auth/authSlice';
 import { selectCase, selectOps } from './opsSlice';
 
+const EMPTY_LIST = [];
+const EMPTY_RULES = { rules: [], flights: {}, errors: [] };
 const POLL = 10000; // fallback; the SSE stream below refreshes sooner
 
 // One hook for every screen: selected case + all DB read models, kept fresh.
@@ -47,6 +56,16 @@ export function useOps() {
   const plan = useGetRecoveryPlanQuery(ctx, opt);
   const decisions = useGetDecisionLogQuery(ctx, opt);
   const exceptions = useGetExceptionsQuery({ scenario_id: ops.scenarioId }, opt);
+  const kpis = useGetKpisQuery({ case_id: ops.caseId }, opt);
+  const rules = useGetRulesQuery({ scenario_id: ops.scenarioId }, { skip: !ops.scenarioId, pollingInterval: 30000 });
+  const ruleMatches = useGetRuleMatchesQuery(ctx, opt);
+  const requests = useGetDataRequestsQuery({ scenario_id: ops.scenarioId, status: 'OPEN' }, { skip: !ops.scenarioId, pollingInterval: POLL });
+  const approvals = useGetApprovalsQuery(ctx, opt);
+  const subs = useGetMySubscriptionsQuery(
+    { scenario_id: ops.scenarioId },
+    { pollingInterval: 30000, skip: !ops.scenarioId },
+  );
+  const notifications = useGetMyNotificationsQuery(undefined, { pollingInterval: 30000 });
 
   // live push: the DB NOTIFYs when anything changes; refetch everything tagged Ops
   useEffect(() => {
@@ -54,6 +73,7 @@ export function useOps() {
     try {
       es = new EventSource(`${OPS_API_URL}/api/stream?token=${encodeURIComponent(token)}`);
       es.addEventListener('reassess', () => dispatch(api.util.invalidateTags(['Ops'])));
+      es.addEventListener('notify', () => dispatch(api.util.invalidateTags(['Ops'])));
     } catch {
       /* polling still works */
     }
@@ -68,6 +88,8 @@ export function useOps() {
     () => (user ? { user_id: user.id, role_code: user.role, display_name: user.name } : null),
     [user],
   );
+  const teams = useMemo(() => new Set((subs.data ?? []).filter((x) => x.teams).map((x) => x.flight_id)), [subs.data]);
+  const subscribed = useMemo(() => new Set((subs.data ?? []).map((x) => x.flight_id)), [subs.data]);
   const firstError = [cases, flights, crew].find((r) => r.isError);
 
   return {
@@ -87,6 +109,14 @@ export function useOps() {
     refreshedAt: flights.fulfilledTimeStamp,
     fuel: fuel.data ?? [],
     diversions: diversions.data ?? [],
+    kpis: kpis.data,
+    rules: rules.data ?? [],
+    ruleMatches: ruleMatches.data ?? EMPTY_RULES,
+    approvals: approvals.data ?? [],
+    subscribed,
+    teams,
+    openRequests: requests.data ?? EMPTY_LIST,
+    notifications: notifications.data ?? { unread: 0, items: [] },
     isLoading:
       cases.isLoading ||
       (cases.isSuccess && cases.data.length > 0 && !ops.caseId) ||

@@ -11,17 +11,17 @@ export const buildTheme = (mode = 'light') => {
   return createTheme({
     palette: {
       mode,
-      primary: { main: dark ? brandDark.primary : brand.primary },
-      secondary: { main: dark ? brandDark.secondary : brand.secondary },
-      success: { main: brand.success },
-      warning: { main: brand.warning },
-      error: { main: brand.error },
-      info: { main: brand.info },
+      primary: { main: (dark ? brandDark : brand).primary },
+      secondary: { main: (dark ? brandDark : brand).secondary },
+      success: { main: (dark ? brandDark : brand).success },
+      warning: { main: (dark ? brandDark : brand).warning },
+      error: { main: (dark ? brandDark : brand).error },
+      info: { main: (dark ? brandDark : brand).info },
       background: { default: s.background, paper: s.paper },
       text: { primary: s.text, secondary: s.textSecondary },
       divider: s.divider,
     },
-    shape: { borderRadius: 10 },
+    shape: { borderRadius: 8 },
     typography,
     components: {
       // popups never intercept clicks on the controls underneath

@@ -29,6 +29,16 @@ def _summary(row):
             elif path.endswith("/execute-diversion"): what = "Executed a diversion"
             elif path.endswith("/close"): what = "Closed a case"
             elif path.endswith("/report"): what = "Generated a report"
+            elif path.startswith("/api/rules"):
+                what = {"approve": "Approved a custom rule", "reject": "Rejected a custom rule", "retire": "Retired a custom rule", "preview": "Previewed a custom rule"}.get(path.rsplit("/", 1)[-1], "Created a custom rule")
+            elif "/integrations" in path: what = "Updated an integration" if a == "PATCH" else "Closed an integration task"
+            elif path.endswith("/tags") or "/tags/" in path: what = "Tagged a flight" if a == "POST" else "Removed a flight tag"
+            elif path.endswith("/execute"): what = "Executed a decision"
+            elif path.endswith("/approvals"): what = "Recorded an approval verdict"
+            elif path.endswith("/subscriptions"): what = "Subscribed to a flight" if a == "POST" else "Unsubscribed from a flight"
+            elif path.endswith("/data-requests"): what = "Asked for missing data"
+            elif "/data-requests/" in path and path.endswith("/answer"): what = "Answered a data request"
+            elif "/notifications" in path: what = "Read notifications"
             elif "/approve" in path: what = "Approved a recovery plan"
             elif path.startswith("/api/diversions/"): what = "Station update"
             elif path.startswith("/api/records/"): what = f"Recorded a {path.rsplit('/', 1)[-1].replace('_', ' ')}"

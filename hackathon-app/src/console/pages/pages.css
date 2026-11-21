@@ -1,0 +1,13 @@
+.page .act{display:flex;flex-wrap:wrap;gap:6px}
+.page h3.sec{margin:22px 0 6px;font-size:15px}
+.rule-form .cond{align-items:flex-start}
+.rule-form .cond .field-in{min-width:0;max-width:100%}
+.rule-form textarea.field-in{width:100%;resize:vertical}
+.rule-form .tpl{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rule-form .opt-chips{display:flex;flex-wrap:wrap;gap:4px}
+.rule-form .opt-chips .btn[aria-pressed="true"]{background:var(--surface-3);border-color:var(--ai);color:var(--text)}
+.rule-form .note{padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2);font-size:13px}
+.rule-form .note.warn{border-color:var(--risk)}
+.page .tpl-edit{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.page .tpl-edit .field-in{flex:1;min-width:200px}
+.page .sw{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}

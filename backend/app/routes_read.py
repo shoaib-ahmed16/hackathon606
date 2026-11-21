@@ -35,7 +35,15 @@ def cases(scenario_id: int | None = None):
 @r.get("/flights")
 def flights(scenario_id: int | None = None, case_id: int | None = None, limit: int = Query(1000, le=5000)):
     """Single flight watch: status, ETA, fog exposure, captain, duty margin, recommendation, decision, owner."""
-    return view("v_flight_watch", {"scenario_id": scn(scenario_id), "case_id": case_id}, "ORDER BY coalesce(eta_utc, sta_utc)", limit)
+    return fetch(
+        f"""SELECT w.*, sv.severity_score, sv.connecting_pax,
+                   COALESCE((SELECT array_agg(ft.tag ORDER BY ft.tag) FROM flight_tag ft WHERE ft.scenario_id = w.scenario_id AND ft.flight_id = w.flight_id), '{{}}'::text[]) AS tags
+              FROM v_flight_watch w
+              LEFT JOIN v_flight_severity sv ON sv.case_id = w.case_id AND sv.flight_id = w.flight_id
+             WHERE w.scenario_id = %s AND (%s::int IS NULL OR w.case_id = %s::int)
+             ORDER BY coalesce(w.eta_utc, w.sta_utc) LIMIT {int(limit)}""",
+        (scn(scenario_id), case_id, case_id),
+    )
 
 
 @r.get("/crew/legality")
@@ -110,11 +118,15 @@ def exceptions(scenario_id: int | None = None):
 @r.get("/recommendations/options")
 def recommendation_options(case_id: int, flight_id: int | None = None, scenario_id: int | None = None):
     """Options panel: every ranked option (HOLD + each alternate) of the open recommendation, with blocking constraints.
-    option_id is joined in so a decision can reference the exact option chosen."""
+    option_id is joined in so a decision can reference the exact option chosen.
+    A flight can be watched by several cases of one scenario but the engine keeps ONE open recommendation per flight and
+    scenario, so options are looked up by flight (for the flights of this case), not by the case that last refreshed them."""
     return fetch(
         """SELECT v.*, o.option_id FROM v_recommendation_options v
              JOIN recommendation_option o ON o.rec_id = v.rec_id AND o.rank = v.rank
-            WHERE v.scenario_id = %s AND v.case_id = %s AND (%s::bigint IS NULL OR v.flight_id = %s::bigint)
+            WHERE v.scenario_id = %s
+              AND EXISTS (SELECT 1 FROM case_flight cf WHERE cf.case_id = %s AND cf.flight_id = v.flight_id)
+              AND (%s::bigint IS NULL OR v.flight_id = %s::bigint)
             ORDER BY v.flight_no, v.rank LIMIT 2000""",
         (scn(scenario_id), case_id, flight_id, flight_id),
     )
@@ -129,7 +141,7 @@ def diversions(scenario_id: int | None = None, case_id: int | None = None):
 @r.get("/comments")
 def comments(case_id: int, flight_id: int | None = None):
     return fetch(
-        """SELECT c.comment_id, c.flight_id, c.body, c.author_role, c.created_at, u.display_name AS author
+        """SELECT c.comment_id, c.flight_id, c.parent_comment_id, c.kind, c.body, c.author_role, c.created_at, u.display_name AS author
              FROM case_comment c JOIN app_user u ON u.user_id = c.author_id
             WHERE c.case_id = %s AND (%s::bigint IS NULL OR c.flight_id = %s::bigint) ORDER BY c.created_at""",
         (case_id, flight_id, flight_id),

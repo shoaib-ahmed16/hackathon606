@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { Box, Paper, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { ms } from '@/features/ops/helpers';
 import { fmtDateTime } from '@/features/ops/time';
-import PageHeader from '@/components/PageHeader';
 import EmptyState from '@/components/EmptyState';
-import OpsPage from '@/components/ops/OpsPage';
-import StatusChip from '@/components/ops/StatusChip';
+import { useConsole } from '@/console/ConsoleContext';
+import StatusChip from '@/console/ui/StatusChip';
 
 // Data-quality and "verification required" items raised by the database (never hidden, never guessed).
-function Body({ d }) {
+function Body() {
+  const d = useConsole();
   const [sev, setSev] = useState('ALL');
   const [code, setCode] = useState('ALL');
   const codes = ['ALL', ...new Set(d.exceptions.map((e) => e.code))];
@@ -16,11 +16,13 @@ function Body({ d }) {
     (e) => (sev === 'ALL' || e.severity === sev) && (code === 'ALL' || e.code === code),
   );
   return (
-    <Box sx={{ display: 'grid', gap: 2 }}>
-      <PageHeader
-        title="Alerts & Exceptions"
-        subtitle={`${rows.length} of ${d.exceptions.length} open - anything unverified is shown here instead of being treated as legal`}
-      />
+    <Box className="page" sx={{ display: 'grid', gap: 2, alignContent: 'start' }}>
+      <div>
+        <h2>Alerts &amp; Exceptions</h2>
+        <p className="lead">
+          {rows.length} of {d.exceptions.length} open - anything unverified is shown here instead of being treated as legal
+        </p>
+      </div>
       <Paper sx={{ p: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <ToggleButtonGroup exclusive size="small" value={sev} onChange={(_, v) => v && setSev(v)}>
           {['ALL', 'BLOCKING', 'WARN', 'INFO'].map((s) => (
@@ -86,5 +88,5 @@ function Body({ d }) {
 }
 
 export default function Alerts() {
-  return <OpsPage>{(d) => <Body d={d} />}</OpsPage>;
+  return <Body />;
 }

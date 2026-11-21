@@ -15,11 +15,10 @@ import { useGenerateReportMutation, useGetTimelineQuery } from '@/features/ops/o
 import { ms } from '@/features/ops/helpers';
 import { fmtDateTime } from '@/features/ops/time';
 import { getErrorMessage } from '@/utils/getErrorMessage';
-import PageHeader from '@/components/PageHeader';
 import StatCard from '@/components/StatCard';
 import EmptyState from '@/components/EmptyState';
-import OpsPage from '@/components/ops/OpsPage';
-import StatusChip from '@/components/ops/StatusChip';
+import { useConsole } from '@/console/ConsoleContext';
+import StatusChip from '@/console/ui/StatusChip';
 
 const q = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`;
 const exportCsv = (rows) => {
@@ -44,7 +43,8 @@ const exportCsv = (rows) => {
   URL.revokeObjectURL(url);
 };
 
-function Body({ d }) {
+function Body() {
+  const d = useConsole();
   const [gen, { isLoading, data: report }] = useGenerateReportMutation();
   const timeline = useGetTimelineQuery(
     { case_id: d.ctx.case_id },
@@ -60,12 +60,12 @@ function Body({ d }) {
     }
   };
   return (
-    <Box sx={{ display: 'grid', gap: 2 }}>
-      <PageHeader
-        title="Reports & Audit"
-        subtitle="Decision timeline, approvals and exceptions for this case"
-        actions={
-          <>
+    <Box className="page" sx={{ display: 'grid', gap: 2, alignContent: 'start' }}>
+      <div>
+        <h2>Reports &amp; Audit</h2>
+        <p className="lead">Decision timeline, approvals and exceptions for this case</p>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+          
             <Button
               variant="outlined"
               disabled={!decisions.length}
@@ -76,9 +76,9 @@ function Body({ d }) {
             <Button variant="contained" disabled={isLoading} onClick={make}>
               Generate report
             </Button>
-          </>
-        }
-      />
+          
+        </Stack>
+      </div>
       <Box
         sx={{
           display: 'grid',
@@ -186,5 +186,5 @@ function Body({ d }) {
 }
 
 export default function ReportsAudit() {
-  return <OpsPage>{(d) => <Body d={d} />}</OpsPage>;
+  return <Body />;
 }

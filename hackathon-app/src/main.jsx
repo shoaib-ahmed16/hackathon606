@@ -6,8 +6,9 @@ import { Toaster } from 'react-hot-toast';
 import '@fontsource-variable/inter'; // self-hosted font (change in theme/typography.js)
 import { store } from '@/app/store';
 import ThemeProvider from '@/theme/ThemeProvider';
-import SocketProvider from '@/services/SocketProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import ThemeSync from '@/console/ThemeSync';
+import '@/console/console.css';
 import App from './App';
 
 createRoot(document.getElementById('root')).render(
@@ -15,12 +16,14 @@ createRoot(document.getElementById('root')).render(
     <Provider store={store}>
       <ThemeProvider>
         <BrowserRouter>
-          <SocketProvider>
-            <ErrorBoundary>
-              <App />
-            </ErrorBoundary>
-          </SocketProvider>
-          <Toaster position="top-right" />
+          <ThemeSync />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+          <Toaster
+            position="bottom-center"
+            toastOptions={{ style: { background: 'var(--surface-3)', color: 'var(--text)', border: '1px solid var(--line-2)', fontSize: 14 } }}
+          />
         </BrowserRouter>
       </ThemeProvider>
     </Provider>

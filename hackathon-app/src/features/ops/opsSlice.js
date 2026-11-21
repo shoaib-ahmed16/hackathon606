@@ -27,7 +27,7 @@ const persist = (s) => {
 };
 
 // Client-only state: which case we are looking at, who is acting, which flight is open.
-// Everything operational (flights, crew, decisions, audit) lives in the FogOps database.
+// Everything operational (flights, crew, decisions, audit) lives in the FOO database.
 const opsSlice = createSlice({
   name: 'ops',
   initialState: {
@@ -35,6 +35,7 @@ const opsSlice = createSlice({
     caseId: saved.caseId ?? null,
     selectedFlightId: null,
     lens: saved.lens ?? 'occ', // occ | dispatch | crew | station | recovery
+    briefing: true, // the 'since you last looked' box above the board
     panel: null, // 'ask' | 'approvals' | 'whatif' | null
     showSources: Boolean(saved.showSources),
     lastSeenAt: saved.lastSeenAt ?? null, // for the 'since you last looked' briefing
@@ -52,6 +53,7 @@ const opsSlice = createSlice({
     },
     openPanel: (s, { payload }) => void (s.panel = payload),
     closePanel: (s) => void (s.panel = null),
+    toggleBriefing: (s) => void (s.briefing = !s.briefing),
     toggleSources: (s) => {
       s.showSources = !s.showSources;
       persist(s);
@@ -64,7 +66,7 @@ const opsSlice = createSlice({
   },
 });
 
-export const { selectCase, selectFlight, setLens, openPanel, closePanel, toggleSources, markSeen } =
+export const { selectCase, selectFlight, setLens, openPanel, closePanel, toggleSources, toggleBriefing, markSeen } =
   opsSlice.actions;
 export const selectOps = (s) => s.ops;
 export default opsSlice.reducer;

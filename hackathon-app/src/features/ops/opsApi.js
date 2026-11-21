@@ -1,7 +1,7 @@
 import { api } from '@/app/api';
 import { OPS_API_URL } from '@/config/env';
 
-// FogOps API (FastAPI + Postgres). All reads are DB views, all actions call DB functions, so the
+// FOO API (FastAPI + Postgres). All reads are DB views, all actions call DB functions, so the
 // rules (legality, guardrails, audit) live in one place. Docs: backend/API_README.md
 const u = (path) => `${OPS_API_URL}${path}`;
 const TAG = 'Ops';
@@ -33,6 +33,31 @@ export const opsApi = api.enhanceEndpoints({ addTagTypes: [TAG] }).injectEndpoin
         providesTags: [TAG],
       }),
       getBriefing: q('/api/briefing'),
+      getKpis: q('/api/kpis'),
+      getRuleFields: q('/api/rules/fields'),
+      getIntegrations: q('/api/integrations'),
+      getAlternates: build.query({
+        query: ({ flightId, ...params }) => ({ url: u(`/api/flights/${flightId}/alternates`), params }),
+        providesTags: [TAG],
+      }),
+      getRules: q('/api/rules'),
+      getRuleMatches: q('/api/rules/matches'),
+      getApprovals: q('/api/approvals'),
+      getApprovalPolicy: q('/api/approval-policy'),
+      getMySubscriptions: q('/api/me/subscriptions'),
+      getMyNotifications: q('/api/me/notifications'),
+      getDataRequests: q('/api/data-requests'),
+      getFlightLinks: build.query({
+        query: ({ flightId, ...params }) => ({ url: u(`/api/flights/${flightId}/links`), params }),
+        providesTags: [TAG],
+      }),
+      getFlightTimeline: build.query({
+        query: ({ flightId, ...params }) => ({
+          url: u(`/api/flights/${flightId}/timeline`),
+          params,
+        }),
+        providesTags: [TAG],
+      }),
       getAskQuestions: q('/api/ask/questions'),
       getAudit: q('/api/audit'),
       getAircraft: build.query({
@@ -82,6 +107,46 @@ export const opsApi = api.enhanceEndpoints({ addTagTypes: [TAG] }).injectEndpoin
         url: u(`/api/decisions/${decisionId}/execute-diversion`),
         method: 'POST',
       })),
+      executeDecision: m(({ decisionId }) => ({ url: u(`/api/decisions/${decisionId}/execute`), method: 'POST' })),
+      patchSystem: m(({ code, ...body }) => ({ url: u(`/api/integrations/systems/${code}`), method: 'PATCH', body })),
+      markEntered: m(({ id }) => ({ url: u(`/api/integrations/outbox/${id}/entered`), method: 'POST' })),
+      addTag: m(({ flightId, ...body }) => ({ url: u(`/api/flights/${flightId}/tags`), method: 'POST', body })),
+      removeTag: m(({ flightId, tag, ...params }) => ({ url: u(`/api/flights/${flightId}/tags/${tag}`), method: 'DELETE', params })),
+      createRule: m((body) => ({ url: u('/api/rules'), method: 'POST', body })),
+      approveRule: m(({ id }) => ({ url: u(`/api/rules/${id}/approve`), method: 'POST' })),
+      rejectRule: m(({ id }) => ({ url: u(`/api/rules/${id}/reject`), method: 'POST' })),
+      retireRule: m(({ id }) => ({ url: u(`/api/rules/${id}/retire`), method: 'POST' })),
+      // preview does not change anything, so it must not refetch the whole console on every keystroke
+      previewRule: build.mutation({
+        query: (body) => ({ url: u('/api/rules/preview'), method: 'POST', body }),
+      }),
+      sendVerdict: m(({ decisionId, ...body }) => ({
+        url: u(`/api/decisions/${decisionId}/approvals`),
+        method: 'POST',
+        body,
+      })),
+      subscribe: m(({ flightId, ...body }) => ({
+        url: u(`/api/flights/${flightId}/subscriptions`),
+        method: 'POST',
+        body,
+      })),
+      unsubscribe: m(({ flightId, ...params }) => ({
+        url: u(`/api/flights/${flightId}/subscriptions`),
+        method: 'DELETE',
+        params,
+      })),
+      readNotification: m(({ id }) => ({ url: u(`/api/notifications/${id}/read`), method: 'POST' })),
+      readAllNotifications: m(() => ({ url: u('/api/me/notifications/read-all'), method: 'POST' })),
+      askForData: m(({ flightId, ...body }) => ({
+        url: u(`/api/flights/${flightId}/data-requests`),
+        method: 'POST',
+        body,
+      })),
+      answerData: m(({ requestId, ...body }) => ({
+        url: u(`/api/data-requests/${requestId}/answer`),
+        method: 'POST',
+        body,
+      })),
       swapCrew: m((body) => ({ url: u('/api/crew/swap'), method: 'POST', body })),
       recomputeFlight: m(({ flightId, scenario_id }) => ({
         url: u(`/api/flights/${flightId}/recompute`),
@@ -114,6 +179,36 @@ export const {
   useGetBriefingQuery,
   useGetAskQuestionsQuery,
   useGetAuditQuery,
+  useGetKpisQuery,
+  useGetRuleFieldsQuery,
+  useGetIntegrationsQuery,
+  useGetAlternatesQuery,
+  useExecuteDecisionMutation,
+  usePatchSystemMutation,
+  useMarkEnteredMutation,
+  useAddTagMutation,
+  useRemoveTagMutation,
+  useGetRulesQuery,
+  useGetRuleMatchesQuery,
+  useCreateRuleMutation,
+  useApproveRuleMutation,
+  useRejectRuleMutation,
+  useRetireRuleMutation,
+  usePreviewRuleMutation,
+  useGetApprovalsQuery,
+  useGetApprovalPolicyQuery,
+  useGetMySubscriptionsQuery,
+  useGetMyNotificationsQuery,
+  useGetDataRequestsQuery,
+  useGetFlightLinksQuery,
+  useGetFlightTimelineQuery,
+  useSendVerdictMutation,
+  useSubscribeMutation,
+  useUnsubscribeMutation,
+  useReadNotificationMutation,
+  useReadAllNotificationsMutation,
+  useAskForDataMutation,
+  useAnswerDataMutation,
   useAskMutation,
   usePushFeedMutation,
   useWhatIfMutation,

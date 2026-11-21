@@ -1,6 +1,6 @@
 import { Paper, Stack, Typography } from '@mui/material';
 
-// KPI tile: <StatCard label="Total posts" value={251} icon={<ArticleIcon />} />
+// KPI tile: <StatCard label="Decisions" value={12} />
 export default function StatCard({ label, value, icon }) {
   return (
     <Paper sx={{ p: 2.5 }}>
