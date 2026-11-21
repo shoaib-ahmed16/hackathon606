@@ -19,8 +19,11 @@ public final class SecurityConstants {
     public static final String NOTICE = SECURITY_BASE + "/notice";
     public static final String WRITE = SECURITY_BASE + "/write";
 
+    // ---- WebSocket ----
+    public static final String CHAT_WS = "/ws/chat";
+
     // ---- CORS ----
-    public static final List<String> ALLOWED_METHODS = List.of("GET", "POST", "PUT", "DELETE", "OPTIONS");
+    public static final List<String> ALLOWED_METHODS = List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
     public static final List<String> ALLOWED_HEADERS = List.of("Authorization", "Content-Type", "Accept");
     public static final List<String> EXPOSED_HEADERS = List.of("Authorization");
 }

@@ -1,0 +1,5 @@
+# Python packages for loader/load_data.py (airportsdata is no longer needed: see loader/airports.csv)
+pandas
+openpyxl
+xlrd
+psycopg2-binary

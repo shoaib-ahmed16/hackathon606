@@ -7,13 +7,18 @@ server:
   port: 8888
 
 spring:
+  config:
+    import: optional:file:./.env[.properties]   # load local .env (DB_*, JWT_SECRET_KEY, ANTHROPIC_API_KEY)
   application:
     name: security-micro-service
   datasource:
-    url: jdbc:postgresql://localhost:${DB_PORT:5433}/fogops
+    url: jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:hackathon_yashasvi}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # the fogops views/functions live in schema "fogops"; users_details (V1) stays in "public"
+      connection-init-sql: SET search_path = fogops, public
   data:
     jdbc:
       repositories:
@@ -21,14 +26,37 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-    # the shared fogops schema already holds the FogOps tables, so baseline it instead of failing
+    # baseline instead of failing if the target database already holds tables
     baseline-on-migrate: true
     baseline-version: 0
+    # keep Flyway's history table in "public" even though the sessions' search_path starts with "fogops"
+    default-schema: public
+    schemas: public
   jpa:
+    properties:
+      hibernate:
+        default_schema: public   # JPA entities (users_details) live in "public"; search_path starts with "fogops"
     hibernate:
       ddl-auto: validate
     open-in-view: false
 
+
+fogops:
+  auth:
+    token-ttl-hours: ${TOKEN_TTL_HOURS:12}
+    # every active FogOps user (synthetic demo data) gets this password the first time; leave blank to provision app_credential yourself
+    demo-password: ${DEMO_PASSWORD:FogOps@2026}
+
+chat:
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:set-ANTHROPIC_API_KEY-in-env}
+    model: ${ANTHROPIC_MODEL:claude-opus-5-5}
+    effort: ${ANTHROPIC_EFFORT:medium}   # low | medium | high | xhigh | max
+    max-tokens: 8000
+
+eureka:
+  client:
+    enabled: false   # enabled by the local-discovery profile
 
 jwt:
   security:

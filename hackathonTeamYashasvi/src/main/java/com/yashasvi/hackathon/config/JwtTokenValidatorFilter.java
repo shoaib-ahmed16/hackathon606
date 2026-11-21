@@ -39,6 +39,9 @@ public class JwtTokenValidatorFilter extends OncePerRequestFilter {
             try {
                 SecretKey key = Keys.hmacShaKeyFor(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
                 Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(authToken).getPayload();
+                if (claims.get(Constants.USERNAME.getValue()) == null) {
+                    throw new JwtException("Not a legacy security token");   // e.g. a FogOps API token
+                }
                 String username = String.valueOf(claims.get(Constants.USERNAME.getValue()));
                 String authorities = String.valueOf(claims.get(Constants.AUTHORITIES.getValue()));
                 Authentication auth = new UsernamePasswordAuthenticationToken(username, null,
@@ -57,6 +60,8 @@ public class JwtTokenValidatorFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         return request.getServletPath().equals(LOGIN)
-                || request.getServletPath().equals(SIGN_IN);
+                || request.getServletPath().equals(SIGN_IN)
+                || com.yashasvi.hackathon.fogops.auth.FogopsAuthFilter.isFogopsPath(request.getServletPath())
+                || request.getServletPath().equals("/health");
     }
 }
