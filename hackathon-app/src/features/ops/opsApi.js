@@ -58,6 +58,19 @@ export const opsApi = api.enhanceEndpoints({ addTagTypes: [TAG] }).injectEndpoin
         }),
         providesTags: [TAG],
       }),
+      getAirportCapacity: q('/api/airports/capacity'),
+      getCapacityCompare: q('/api/airports/capacity/compare'),
+      getAirportCapacityDetail: build.query({
+        query: ({ iata, ...params }) => ({ url: u(`/api/airports/${iata}/capacity`), params }),
+        providesTags: [TAG],
+      }),
+      getCapacityAssess: build.query({
+        query: ({ iata, ...params }) => ({
+          url: u(`/api/airports/${iata}/capacity/assess`),
+          params,
+        }),
+        providesTags: [TAG],
+      }),
       getAskQuestions: q('/api/ask/questions'),
       getAudit: q('/api/audit'),
       getAircraft: build.query({
@@ -94,6 +107,11 @@ export const opsApi = api.enhanceEndpoints({ addTagTypes: [TAG] }).injectEndpoin
       updateDiversion: m(({ id, body }) => ({
         url: u(`/api/diversions/${id}`),
         method: 'PATCH',
+        body,
+      })),
+      setAirportCapacity: m(({ iata, body }) => ({
+        url: u(`/api/airports/${iata}/capacity`),
+        method: 'PUT',
         body,
       })),
       pushFeed: m((body) => ({ url: u('/api/feed/push'), method: 'POST', body: body ?? {} })),
@@ -177,6 +195,11 @@ export const {
   useGetDeadlinesQuery,
   useGetFlightDetailQuery,
   useGetBriefingQuery,
+  useGetAirportCapacityQuery,
+  useGetAirportCapacityDetailQuery,
+  useGetCapacityAssessQuery,
+  useGetCapacityCompareQuery,
+  useSetAirportCapacityMutation,
   useGetAskQuestionsQuery,
   useGetAuditQuery,
   useGetKpisQuery,

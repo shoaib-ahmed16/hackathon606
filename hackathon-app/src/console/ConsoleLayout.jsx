@@ -208,6 +208,7 @@ function Bar({ d, onSheet }) {
         {d.kase && <button className="btn ghost" onClick={() => onSheet('case')} title="Close or delete this case, move the reopening forecast">Case…</button>}
         <NavLink to="/rules" className={nav}>Rules &amp; filters</NavLink>
         <NavLink to="/integrations" className={nav}>Integrations</NavLink>
+        <NavLink to="/capacity" className={nav}>Airport capacity</NavLink>
         <NavLink to="/audit" className={nav}>Audit</NavLink>
         <NavLink to="/data-quality" className={nav}>Data quality</NavLink>
         <button className="btn ghost" onClick={() => onSheet('whatif')}>What if…</button>

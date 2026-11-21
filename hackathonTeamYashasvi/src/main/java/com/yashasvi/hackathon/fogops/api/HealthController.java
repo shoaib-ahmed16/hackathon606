@@ -29,6 +29,17 @@ public class HealthController {
         m.put("status", "UP");
         m.put("db", ok);
         m.put("schema", Boolean.TRUE.equals(current) ? "current" : "OUTDATED: rebuild the database from fogops_db");
+        m.put("migration", migrationLevel());
         return m;
+    }
+
+    /** The last Flyway script that was applied (the original API reports its own migration file the same way). */
+    private Object migrationLevel() {
+        try {
+            var rows = db.fetch("SELECT script FROM public.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1");
+            return rows.isEmpty() ? null : rows.get(0).get("script");
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 }
