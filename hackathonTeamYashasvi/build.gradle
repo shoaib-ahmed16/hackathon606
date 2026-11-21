@@ -27,6 +27,7 @@ repositories {
 ext {
     springCloudVersion = '2025.0.3'
     jjwtVersion = '0.13.0'
+    anthropicVersion = '3.3.0'
 }
 
 dependencyManagement {
@@ -43,6 +44,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+    implementation "com.anthropic:anthropic-java:${anthropicVersion}"
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
     implementation 'io.micrometer:micrometer-tracing-bridge-brave'
     implementation 'io.zipkin.reporter2:zipkin-reporter-brave'
     implementation 'net.logstash.logback:logstash-logback-encoder:9.0'
@@ -54,7 +57,7 @@ dependencies {
     runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
     implementation 'org.flywaydb:flyway-core'
     runtimeOnly 'org.flywaydb:flyway-database-postgresql'
-    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.postgresql:postgresql'   // compile-time: SQLSTATE mapping in ApiExceptionHandler
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
@@ -67,4 +70,13 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// Terminal chat client: ./gradlew -q --console=plain chat
+tasks.register('chat', JavaExec) {
+    group = 'application'
+    description = 'Runs the terminal WebSocket chat client against a running server'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.yashasvi.hackathon.cli.TerminalChatClient'
+    standardInput = System.in
 }

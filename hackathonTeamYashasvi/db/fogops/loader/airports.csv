@@ -1,0 +1,431 @@
+iata,icao,name,country,tz,lat,lon
+AAC,HEAR,El Arish International Airport,EG,Africa/Cairo,31.0733,33.8358
+AAN,OMAL,Al Ain International Airport,AE,Asia/Dubai,24.2617,55.6092
+ABD,OIAA,Abadan Airport,IR,Asia/Tehran,30.3711,48.2283
+ABS,HEBL,Abu Simbel Airport,EG,Africa/Cairo,22.376,31.6117
+ABV,DNAA,Nnamdi Azikiwe International Airport,NG,Africa/Lagos,9.00679,7.26317
+ADB,LTBJ,Adnan Menderes International Airport,TR,Europe/Istanbul,38.2924,27.157
+ADD,HAAB,Bole International Airport,ET,Africa/Addis_Ababa,8.97789,38.7993
+ADE,OYAA,Aden International Airport,YE,Asia/Aden,12.8295,45.0288
+ADJ,OJAM,Amman-Marka International Airport,JO,Asia/Amman,31.9727,35.9916
+AER,URSS,Sochi International Airport,RU,Europe/Moscow,43.4499,39.9566
+AGA,GMAD,Al Massira Airport,MA,Africa/Casablanca,30.325,-9.41307
+AGP,LEMG,Malaga Airport,ES,Europe/Madrid,36.6749,-4.49911
+AHB,OEAB,Abha Regional Airport,SA,Asia/Riyadh,18.2404,42.6566
+AHU,GMTA,Cherif Al Idrissi Airport,MA,Africa/Casablanca,35.1771,-3.83952
+AJF,OESK,Al-Jawf Domestic Airport,SA,Asia/Riyadh,29.7851,40.1
+ALA,UAAA,Almaty International Airport,KZ,Asia/Almaty,43.3521,77.0405
+ALC,LEAL,Alicante International Airport,ES,Europe/Madrid,38.2822,-0.55816
+ALG,DAAG,Houari Boumediene Airport,DZ,Africa/Algiers,36.691,3.21541
+ALP,OSAP,Aleppo International Airport,SY,Asia/Damascus,36.1807,37.2244
+ALY,HEAX,El Nouzha Airport,EG,Africa/Cairo,31.1839008331,29.9489002228
+AMD,VAAH,Sardar Vallabhbhai Patel International Airport,IN,Asia/Kolkata,23.0772,72.6347
+AMM,OJAI,Queen Alia International Airport,JO,Asia/Amman,31.7226,35.9932
+AMS,EHAM,Amsterdam Airport Schiphol,NL,Europe/Amsterdam,52.3086,4.76389
+AQB,MGQC,Santa Cruz del Quiche Airport,GT,America/Guatemala,15.0122,-91.1506
+AQI,OEPA,Hafr Al Batin Airport,SA,Asia/Riyadh,28.3352,46.1251
+AQJ,OJAQ,Aqaba King Hussein International Airport,JO,Asia/Amman,29.6116,35.0181
+ARK,HTAR,Arusha Airport,TZ,Africa/Dar_es_Salaam,-3.36779,36.6333
+ARN,ESSA,Stockholm-Arlanda Airport,SE,Europe/Stockholm,59.6519,17.9186
+ASA,HHSB,Assab International Airport,ER,Africa/Asmara,13.0718,42.645
+ASM,HHAS,Asmara International Airport,ER,Africa/Asmara,15.2919,38.9107
+ASV,HKAM,Amboseli Airport,KE,Africa/Nairobi,-2.64505,37.2531
+ASW,HESN,Aswan International Airport,EG,Africa/Cairo,23.9644,32.82
+ATH,LGAV,Eleftherios Venizelos International Airport,GR,Europe/Athens,37.9364,23.9445
+ATQ,VIAR,Sri Guru Ram Dass Jee International Airport Amritsar,IN,Asia/Kolkata,31.7096,74.7973
+ATZ,HEAT,Assiut International Airport,EG,Africa/Cairo,27.0465,31.012
+AUH,OMAA,Abu Dhabi International Airport,AE,Asia/Dubai,24.433,54.6511
+AYT,LTAI,Antalya International Airport,TR,Europe/Istanbul,36.8987,30.8005
+AZI,OMAD,Al Bateen Executive Airport,AE,Asia/Dubai,24.4283,54.4581
+BAH,OBBI,Bahrain International Airport,BH,Asia/Bahrain,26.2708,50.6336
+BBI,VEBS,Biju Patnaik Airport,IN,Asia/Kolkata,20.2444,85.8178
+BBU,LRBS,Baneasa International Airport,RO,Europe/Bucharest,44.5032,26.1021
+BCN,LEBL,Barcelona International Airport,ES,Europe/Madrid,41.2971,2.07846
+BEG,LYBE,Belgrade Nikola Tesla Airport,RS,Europe/Belgrade,44.8184,20.3091
+BEM,GMMD,Beni Mellal Airport,MA,Africa/Casablanca,32.4,-6.33333
+BEN,HLLB,Benina International Airport,LY,Africa/Tripoli,32.0968,20.2695
+BEY,OLBA,Beirut Rafic Hariri International Airport,LB,Asia/Beirut,33.8209,35.4884
+BGR,KBGR,Bangor International Airport,US,America/New_York,44.80744,-68.82814
+BGW,ORBI,Baghdad International Airport,IQ,Asia/Baghdad,33.2625,44.2346
+BGY,LIME,Bergamo / Orio Al Serio Airport,IT,Europe/Rome,45.6739,9.70417
+BHK,UTSB,Bukhara Airport,UZ,Asia/Samarkand,39.775,64.4833
+BHX,EGBB,Birmingham International Airport,GB,Europe/London,52.4539,-1.74803
+BIA,LFKB,Bastia-Poretta Airport,FR,Europe/Paris,42.5527,9.48373
+BIO,LEBB,Bilbao Airport,ES,Europe/Madrid,43.3011,-2.91061
+BJM,HBBA,Bujumbura International Airport,BI,Africa/Bujumbura,-3.32402,29.3185
+BJV,LTFE,Milas Bodrum International Airport,TR,Europe/Istanbul,37.2506,27.6643
+BKK,VTBS,Suvarnabhumi Airport,TH,Asia/Bangkok,13.6811,100.747
+BLL,EKBI,Billund Airport,DK,Europe/Copenhagen,55.7403,9.15178
+BLQ,LIPE,Bologna / Borgo Panigale Airport,IT,Europe/Rome,44.5354,11.2887
+BLR,VOBL,Bengaluru International Airport,IN,Asia/Kolkata,13.1979,77.7063
+BMB,FZFU,Bumbar Airport,CD,Africa/Kinshasa,2.18278,22.4817
+BOD,LFBD,Bordeaux-Merignac (BA 106) Airport,FR,Europe/Paris,44.8283,-0.71556
+BOM,VABB,Chhatrapati Shivaji International Airport,IN,Asia/Kolkata,19.0887,72.8679
+BRE,EDDW,Bremen Airport,DE,Europe/Berlin,53.0475,8.78667
+BRI,LIBD,Bari / Palese International Airport,IT,Europe/Rome,41.1389,16.7606
+BRU,EBBR,Brussels Airport,BE,Europe/Brussels,50.9014,4.48444
+BSA,HCMF,Bosaso Airport,SO,Africa/Mogadishu,11.2753,49.1494
+BSL,LFSB,EuroAirport Basel-Mulhouse-Freiburg Airport,FR,Europe/Paris,47.5896,7.52991
+BSR,ORMM,Basrah International Airport,IQ,Asia/Baghdad,30.5491,47.6621
+BSZ,UCFM,Manas International Airport,KG,Asia/Bishkek,43.0613,74.4776
+BTS,LZIB,M. R. Stefanik Airport,SK,Europe/Bratislava,48.1702,17.2127
+BUD,LHBP,Budapest Ferenc Liszt International Airport,HU,Europe/Budapest,47.4369,19.2556
+BUS,UGSB,Batumi International Airport,GE,Asia/Tbilisi,41.6103,41.5997
+BUZ,OIBB,Bushehr Airport,IR,Asia/Tehran,28.9448,50.8346
+BYJ,LPBJ,Beja International Airport,PT,Europe/Lisbon,38.0789,-7.9324
+CAI,HECA,Cairo International Airport,EG,Africa/Cairo,30.1219,31.4056
+CBG,EGSC,Cambridge Airport,GB,Europe/London,52.205,0.175
+CBH,DAOR,Bechar Boudghene Ben Ali Lotfi Airport,DZ,Africa/Algiers,31.6457,-2.26986
+CBS,SVON,Oro Negro Airport,VE,America/Caracas,10.3307,-71.3225
+CCJ,VOCL,Calicut International Airport,IN,Asia/Kolkata,11.1368,75.9553
+CCU,VECC,Netaji Subhash Chandra Bose International Airport,IN,Asia/Kolkata,22.6547,88.4467
+CDG,LFPG,Charles de Gaulle International Airport,FR,Europe/Paris,49.0128,2.55
+CDT,LECH,Castellón Airport,ES,Europe/Madrid,40.214167,0.073667
+CEK,USCC,Chelyabinsk Balandino Airport,RU,Asia/Yekaterinburg,55.3058,61.5033
+CGK,WIII,Soekarno-Hatta International Airport,ID,Asia/Jakarta,-6.12557,106.656
+CGN,EDDK,Cologne Bonn Airport,DE,Europe/Berlin,50.8659,7.14274
+CGP,VGEG,Shah Amanat International Airport,BD,Asia/Dhaka,22.2496,91.8133
+CIT,UAII,Shymkent Airport,KZ,Asia/Almaty,42.3642,69.4789
+CIY,LICB,Comiso Airport Vincenzo Magliocco,IT,Europe/Rome,36.9946,14.60718
+CJB,VOCB,Coimbatore International Airport,IN,Asia/Kolkata,11.03,77.0434
+CLJ,LRCL,Cluj-Napoca International Airport,RO,Europe/Bucharest,46.7852,23.6862
+CMB,VCBI,Bandaranaike International Apt Colombo Airport,LK,Asia/Colombo,7.18076,79.8841
+CMN,GMMN,Mohammed V International Airport,MA,Africa/Casablanca,33.3675,-7.58997
+CNN,VOKN,Kannur International Airport,IN,Asia/Kolkata,11.91583,75.54583
+COK,VOCI,Cochin International Airport,IN,Asia/Kolkata,10.152,76.4019
+COO,DBBB,Cadjehoun Airport,BJ,Africa/Porto-Novo,6.35723,2.38435
+COP,KK23,Cooperstown-Westville Airport,US,America/New_York,42.62924,-74.89099
+CPH,EKCH,Copenhagen Kastrup Airport,DK,Europe/Copenhagen,55.6179,12.656
+CRL,EBCI,Brussels South Charleroi Airport,BE,Europe/Brussels,50.4592,4.45382
+CRZ,UTAV,Turkmenabat International Airport,TM,Asia/Ashgabat,39.0833,63.6133
+CTA,LICC,Catania / Fontanarossa Airport,IT,Europe/Rome,37.4668,15.0664
+CUF,LIMZ,Cuneo / Levaldigi Airport,IT,Europe/Rome,44.547,7.62322
+DAC,VGHS,Dhaka / Hazrat Shahjalal International Airport,BD,Asia/Dhaka,23.84335,90.39778
+DAM,OSDI,Damascus International Airport,SY,Asia/Damascus,33.4115,36.5156
+DAR,HTDA,Mwalimu Julius K. Nyerere International Airport,TZ,Africa/Dar_es_Salaam,-6.87811,39.2026
+DBB,HEAL,El Alamein International Airport,EG,Africa/Cairo,30.9245,28.4614
+DEB,LHDC,Debrecen International Airport,HU,Europe/Budapest,47.4889,21.6153
+DEL,VIDP,Indira Gandhi International Airport,IN,Asia/Kolkata,28.5665,77.1031
+DHA,OEDR,King Abdulaziz Air Base,SA,Asia/Riyadh,26.2653999329,50.1520004272
+DIA,OTBD,Doha International Airport,QA,Asia/Qatar,25.2611,51.5651
+DIR,HADR,Aba Tenna Dejazmach Yilma International Airport,ET,Africa/Addis_Ababa,9.6247,41.8542
+DIY,LTCC,Diyarbakir Airport,TR,Europe/Istanbul,37.8939,40.201
+DJE,DTTJ,Djerba Zarzis International Airport,TN,Africa/Tunis,33.875,10.7755
+DME,UUDD,Domodedovo International Airport,RU,Europe/Moscow,55.4088,37.9063
+DMK,VTBD,Don Mueang International Airport,TH,Asia/Bangkok,13.9126,100.607
+DMM,OEDF,King Fahd International Airport,SA,Asia/Riyadh,26.4712,49.7979
+DOH,OTHH,Hamad International Airport,QA,Asia/Qatar,25.26059,51.61377
+DOK,UKCC,Donetsk International Airport,UA,Europe/Kyiv,48.0736,37.7397
+DOL,LFRG,Deauville-Saint-Gatien Airport,FR,Europe/Paris,49.3653,0.15431
+DRS,EDDC,Dresden Airport,DE,Europe/Berlin,51.1328,13.7672
+DSS,GOBD,Blaise Diagne International Airport,SN,Africa/Dakar,14.67111,-17.06694
+DTM,EDLW,Dortmund Airport,DE,Europe/Berlin,51.5183,7.61224
+DUB,EIDW,Dublin Airport,IE,Europe/Dublin,53.4213,-6.27007
+DUS,EDDL,Dusseldorf International Airport,DE,Europe/Berlin,51.2895,6.76678
+DWC,OMDW,Al Maktoum International Airport,AE,Asia/Dubai,24.89667,55.16139
+DXB,OMDB,Dubai International Airport,AE,Asia/Dubai,25.2528,55.3644
+DYU,UTDD,Dushanbe Airport,TJ,Asia/Dushanbe,38.5433,68.825
+EAM,OENG,Nejran Airport,SA,Asia/Riyadh,17.6114,44.4192
+EBB,HUEN,Entebbe International Airport,UG,Africa/Kampala,0.04239,32.4435
+EBD,HSOB,El Obeid Airport,SD,Africa/Khartoum,13.1532,30.2327
+EBL,ORER,Erbil International Airport,IQ,Asia/Baghdad,36.2376,43.9632
+EDL,HKEL,Eldoret International Airport,KE,Africa/Nairobi,0.40446,35.2389
+EIN,EHEH,Eindhoven Airport,NL,Europe/Amsterdam,51.4501,5.37453
+ELQ,OEGS,Gassim Airport,SA,Asia/Riyadh,26.3028,43.7744
+ERF,EDDE,Erfurt Airport,DE,Europe/Berlin,50.9798,10.9581
+ERH,GMFK,Moulay Ali Cherif Airport,MA,Africa/Casablanca,31.9475,-4.39833
+ESB,LTAC,Esenboga International Airport,TR,Europe/Istanbul,40.1281,32.9951
+ESU,GMMI,Mogador Airport,MA,Africa/Casablanca,31.3975,-9.68167
+EUN,GMML,Hassan I Airport,EH,Africa/Casablanca,27.1517,-13.2192
+EVN,UDYZ,Zvartnots International Airport,AM,Asia/Yerevan,40.1473,44.3959
+FCO,LIRF,Leonardo Da Vinci (Fiumicino) International Airport,IT,Europe/Rome,41.8045,12.2508
+FDH,EDNY,Friedrichshafen Airport,DE,Europe/Berlin,47.6713,9.51149
+FEZ,GMFF,Saiss Airport,MA,Africa/Casablanca,33.9273,-4.97796
+FIH,FZAA,Ndjili International Airport,CD,Africa/Kinshasa,-4.38575,15.4446
+FJR,OMFJ,Fujairah International Airport,AE,Asia/Dubai,25.1122,56.324
+FMO,EDDG,Munster Osnabruck Airport,DE,Europe/Berlin,52.1346,7.68483
+FRA,EDDF,Frankfurt am Main International Airport,DE,Europe/Berlin,50.0264,8.54313
+FRL,LIPK,Forli Airport,IT,Europe/Rome,44.1948,12.0701
+FRU,,Manas International Airport (legacy IATA code of BSZ; ICAO left empty because icao is unique),KG,Asia/Bishkek,43.0612983704,74.4776000977
+GAY,VEGY,Gaya Airport,IN,Asia/Kolkata,24.7443,84.9512
+GBB,UBBQ,Gabala International Airport,AZ,Asia/Baku,40.82667,47.7125
+GCC,KGCC,Northeast Wyoming Regional Airport,US,America/Denver,44.34891,-105.53937
+GDN,EPGD,Gdańsk Lech Wałęsa Airport,PL,Europe/Warsaw,54.3776,18.4662
+GGM,HKKG,Kakamega Airport,KE,Africa/Nairobi,0.27134,34.7873
+GIZ,OEGN,Jizan Regional Airport,SA,Asia/Riyadh,16.9011,42.5858
+GNB,LFLS,Grenoble-Isere Airport,FR,Europe/Paris,45.3629,5.32937
+GOA,LIMJ,Genova / Sestri Cristoforo Colombo Airport,IT,Europe/Rome,44.4133,8.8375
+GOI,VOGO,Dabolim Airport,IN,Asia/Kolkata,15.3808,73.8314
+GOJ,UWGG,Nizhny Novgorod International Airport,RU,Europe/Moscow,56.2301,43.784
+GOX,VOGA,Manohar International Airport,IN,Asia/Kolkata,15.7322,73.868
+GRO,LEGE,Girona Airport,ES,Europe/Madrid,41.901,2.76055
+GRV,URMG,Grozny North Airport,RU,Europe/Moscow,43.3883,45.6986
+GRX,LEGR,Federico Garcia Lorca Airport,ES,Europe/Madrid,37.1887,-3.77736
+GRZ,LOWG,Graz Airport,AT,Europe/Vienna,46.9911,15.4396
+GVA,LSGG,Geneva Cointrin International Airport,CH,Europe/Zurich,46.2381,6.10895
+GYD,UBBB,Heydar Aliyev International Airport,AZ,Asia/Baku,40.4675,50.0467
+GYR,KGYR,Phoenix Goodyear Airport,US,America/Phoenix,33.42328,-112.37536
+HAJ,EDDV,Hannover Airport,DE,Europe/Berlin,52.4611,9.68508
+HAM,EDDH,Hamburg Airport,DE,Europe/Berlin,53.6304,9.98823
+HAS,OEHL,Hail Airport,SA,Asia/Riyadh,27.4379,41.6863
+HBE,HEBA,Borg El Arab International Airport,EG,Africa/Cairo,30.9177,29.6964
+HGA,HCMH,Egal International Airport,SO,Africa/Mogadishu,9.51817,44.0888
+HHN,EDFH,Frankfurt-Hahn Airport,DE,Europe/Berlin,49.9487,7.26389
+HKT,VTSP,Phuket International Airport,TH,Asia/Bangkok,8.1132,98.3169
+HMA,USHH,Khanty Mansiysk Airport,RU,Asia/Yekaterinburg,61.0285,69.0861
+HMB,HEMK,Sohag International Airport,EG,Africa/Cairo,26.34278,31.74278
+HOF,OEAH,Al Ahsa Airport,SA,Asia/Riyadh,25.2853,49.4852
+HRG,HEGN,Hurghada International Airport,EG,Africa/Cairo,27.1783,33.7994
+HRI,VCRI,Mattala Rajapaksa International Airport,LK,Asia/Colombo,6.2845,81.12417
+HRK,UKHH,Kharkiv International Airport,UA,Europe/Kyiv,49.9248,36.29
+HYD,VOHS,Rajiv Gandhi International Airport Shamshabad,IN,Asia/Kolkata,17.23132,78.42986
+IAM,DAUZ,In Amenas Airport,DZ,Africa/Algiers,28.0515,9.64291
+IDR,VAID,Devi Ahilyabai Holkar Airport,IN,Asia/Kolkata,22.7218,75.8011
+IFN,OIFM,Esfahan Shahid Beheshti International Airport,IR,Asia/Tehran,32.7508,51.8613
+IKA,OIIE,Imam Khomeini International Airport,IR,Asia/Tehran,35.4161,51.1522
+ISB,OPIS,Islamabad International Airport,PK,Asia/Karachi,33.54908,72.82565
+IST,LTFM,Istanbul Airport,TR,Europe/Istanbul,41.27533,28.752
+ISU,ORSU,Sulaymaniyah International Airport,IQ,Asia/Baghdad,35.56175,45.31674
+IXB,VEBD,Bagdogra Airport,IN,Asia/Kolkata,26.6812,88.3286
+IXC,VICG,Chandigarh Airport,IN,Asia/Kolkata,30.6735,76.7885
+IXE,VOML,Mangalore International Airport,IN,Asia/Kolkata,12.9613,74.8901
+IXM,VOMD,Madurai Airport,IN,Asia/Kolkata,9.83451,78.0934
+IXZ,VOPB,Vir Savarkar International Airport,IN,Asia/Kolkata,11.6412,92.7297
+JAI,VIJP,Jaipur International Airport,IN,Asia/Kolkata,26.8242,75.8122
+JED,OEJN,King Abdulaziz International Airport,SA,Asia/Riyadh,21.6796,39.1565
+JIB,HDAM,Djibouti-Ambouli Airport,DJ,Africa/Djibouti,11.5473,43.1595
+JNB,FAOR,O. R. Tambo International Airport,ZA,Africa/Johannesburg,-26.13367,28.24233
+JRO,HTKJ,Kilimanjaro International Airport,TZ,Africa/Dar_es_Salaam,-3.42941,37.0745
+JUB,HSSJ,Juba Airport,SS,Africa/Juba,4.87201,31.6011
+KBL,OAKB,Kabul International Airport,AF,Asia/Kabul,34.5659,69.2123
+KBP,UKBB,Boryspil International Airport,UA,Europe/Kyiv,50.345,30.8947
+KBV,VTSG,Krabi Airport,TH,Asia/Bangkok,8.09912,98.9862
+KEF,BIKF,Keflavik International Airport,IS,Atlantic/Reykjavik,63.985,-22.6056
+KGF,UAKK,Sary-Arka International Airport,KZ,Asia/Almaty,49.6708,73.3344
+KHG,ZWSH,Kashgar Airport,CN,Asia/Shanghai,39.5429,76.02
+KHI,OPKC,Jinnah International Airport,PK,Asia/Karachi,24.9065,67.1608
+KIS,HKKI,Kisumu Airport,KE,Africa/Nairobi,-0.08614,34.7289
+KLV,LKKV,Karlovy Vary International Airport,CZ,Europe/Prague,50.203,12.915
+KMX,OEKM,King Khaled Air Base,SA,Asia/Riyadh,18.2973,42.8035
+KRK,EPKK,John Paul II International Airport Kraków-Balice Airport,PL,Europe/Warsaw,50.0777,19.7848
+KRR,URKK,Krasnodar International Airport,RU,Europe/Moscow,45.0347,39.1705
+KRT,HSSK,Khartoum International Airport,SD,Africa/Khartoum,15.59033,32.553
+KRW,UTAK,Turkmenbashi Airport,TM,Asia/Ashgabat,40.0633,53.0072
+KSH,OICC,Shahid Ashrafi Esfahani Airport,IR,Asia/Tehran,34.3459,47.1581
+KSQ,UTSK,Karshi Airport,UZ,Asia/Samarkand,38.8025,65.77306
+KTL,HKKT,Kitale Airport,KE,Africa/Nairobi,0.97199,34.9586
+KTM,VNKT,Tribhuvan International Airport,NP,Asia/Kathmandu,27.6966,85.3591
+KTW,EPKT,Katowice International Airport,PL,Europe/Warsaw,50.4743,19.08
+KUF,UWWW,Kurumoch International Airport,RU,Europe/Samara,53.5049,50.1643
+KUL,WMKK,Kuala Lumpur International Airport,MY,Asia/Kuala_Lumpur,2.74558,101.71
+KUN,EYKA,Kaunas International Airport,LT,Europe/Vilnius,54.9639,24.0848
+KWI,OKKK,Kuwait International Airport,KW,Asia/Kuwait,29.22677,47.97995
+KZN,UWKD,Kazan International Airport,RU,Europe/Moscow,55.6062,49.2787
+LAU,HKLU,Manda Airstrip,KE,Africa/Nairobi,-2.25242,40.9131
+LBG,LFPB,Paris-Le Bourget Airport,FR,Europe/Paris,48.9694,2.44139
+LBV,FOOL,Leon M Ba Airport,GA,Africa/Libreville,0.4586,9.41228
+LCA,LCLK,Larnaca International Airport,CY,Asia/Nicosia,34.8751,33.6249
+LCJ,EPLL,Łódź Władysław Reymont Airport,PL,Europe/Warsaw,51.7219,19.3981
+LCQ,KLCQ,Lake City Gateway Airport,US,America/New_York,30.18206,-82.57686
+LED,ULLI,Pulkovo Airport,RU,Europe/Moscow,59.8003,30.2625
+LEJ,EDDP,Leipzig Halle Airport,DE,Europe/Berlin,51.4324,12.2416
+LGG,EBLG,Liege Airport,BE,Europe/Brussels,50.6374,5.44322
+LGW,EGKK,London Gatwick Airport,GB,Europe/London,51.1481,-0.19028
+LHE,OPLA,Alama Iqbal International Airport,PK,Asia/Karachi,31.5216,74.4036
+LIL,LFQQ,Lille-Lesquin Airport,FR,Europe/Paris,50.5619,3.08944
+LIN,LIML,Linate Airport,IT,Europe/Rome,45.4451,9.27674
+LIS,LPPT,Lisbon Portela Airport,PT,Europe/Lisbon,38.7813,-9.13592
+LJU,LJLJ,Ljubljana Joze Pucnik Airport,SI,Europe/Ljubljana,46.2237,14.4576
+LKO,VILK,Chaudhary Charan Singh International Airport,IN,Asia/Kolkata,26.7606,80.8893
+LNZ,LOWL,Linz Airport,AT,Europe/Vienna,48.2332,14.1875
+LOK,HKLO,Lodwar Airport,KE,Africa/Nairobi,3.12197,35.6087
+LPA,GCLP,Gran Canaria Airport,ES,Atlantic/Canary,27.9319,-15.3866
+LRR,OISL,Lar Airport,IR,Asia/Tehran,27.6747,54.3833
+LTK,OSLK,Bassel Al-Assad International Airport,SY,Asia/Damascus,35.4011,35.9487
+LTN,EGGW,London Luton Airport,GB,Europe/London,51.8747,-0.36833
+LUN,FLKK,Kenneth Kaunda International Airport,ZM,Africa/Lusaka,-15.3308,28.4526
+LUX,ELLX,Luxembourg-Findel International Airport,LU,Europe/Luxembourg,49.6266,6.21152
+LXR,HELX,Luxor International Airport,EG,Africa/Cairo,25.671,32.7066
+LYP,OPFA,Faisalabad International Airport,PK,Asia/Karachi,31.365,72.9948
+LYS,LFLL,Lyon Saint-Exupery Airport,FR,Europe/Paris,45.7264,5.09083
+MAA,VOMM,Chennai International Airport,IN,Asia/Kolkata,12.99001,80.1693
+MAD,LEMD,Madrid Barajas International Airport,ES,Europe/Madrid,40.4936,-3.56676
+MAN,EGCC,Manchester Airport,GB,Europe/London,53.3537,-2.27495
+MBA,HKMO,Mombasa Moi International Airport,KE,Africa/Nairobi,-4.03483,39.5942
+MCT,OOMS,Muscat International Airport,OM,Asia/Muscat,23.5933,58.2844
+MDL,VYMD,Mandalay International Airport,MM,Asia/Yangon,21.7022,95.9779
+MED,OEMA,Prince Mohammad Bin Abdulaziz Airport,SA,Asia/Riyadh,24.5534,39.7051
+MHD,OIMM,Mashhad International Airport,IR,Asia/Tehran,36.2352,59.641
+MIR,DTMB,Monastir Habib Bourguiba International Airport,TN,Africa/Tunis,35.7581,10.7547
+MLA,LMML,Luqa Airport,MT,Europe/Malta,35.8575,14.4775
+MLE,VRMM,Velana International Airport,MV,Indian/Maldives,4.19167,73.52917
+MLH,_MLH,EuroAirport Basel-Mulhouse-Freiburg Airport,FR,Europe/Paris,47.5896,7.52991
+MNL,RPLL,Ninoy Aquino International Airport,PH,Asia/Manila,14.5086,121.02
+MPL,LFMT,Montpellier-Mediterranee Airport,FR,Europe/Paris,43.5762,3.96301
+MRE,HKMS,Mara Serena Lodge Airstrip,KE,Africa/Nairobi,-1.40611,35.00806
+MRS,LFML,Marseille Provence Airport,FR,Europe/Paris,43.43927,5.22142
+MRV,URMM,Mineralnyye Vody Airport,RU,Europe/Moscow,44.2251,43.0819
+MSQ,UMMS,Minsk International Airport,BY,Europe/Minsk,53.8825,28.0307
+MST,EHBK,Maastricht Aachen Airport,NL,Europe/Amsterdam,50.9117,5.77014
+MUC,EDDM,Munich International Airport,DE,Europe/Berlin,48.3538,11.7861
+MUH,HEMM,Mersa Matruh Airport,EG,Africa/Cairo,31.3254,27.2217
+MUX,OPMT,Multan International Airport,PK,Asia/Karachi,30.2032,71.4191
+MWZ,HTMW,Mwanza Airport,TZ,Africa/Dar_es_Salaam,-2.44449,32.9327
+MXP,LIMC,Malpensa International Airport,IT,Europe/Rome,45.6306,8.72811
+MYD,HKML,Malindi Airport,KE,Africa/Nairobi,-3.22931,40.1017
+MYP,UTAM,Mary Airport,TM,Asia/Ashgabat,37.6194,61.8967
+NAG,VANP,Dr. Babasaheb Ambedkar International Airport,IN,Asia/Kolkata,21.0922,79.0472
+NAL,URMN,Nalchik Airport,RU,Europe/Moscow,43.5129,43.6366
+NAP,LIRN,Napoli / Capodichino International Airport,IT,Europe/Rome,40.886,14.2908
+NBE,DTNH,Enfidha-Hammamet International Airport,TN,Africa/Tunis,36.07583,10.43861
+NBO,HKJK,Jomo Kenyatta International Airport,KE,Africa/Nairobi,-1.31924,36.9278
+NCE,LFMN,Nice-Cote d'Azur Airport,FR,Europe/Paris,43.6584,7.21587
+NCU,UTNN,Nukus Airport,UZ,Asia/Samarkand,42.4884,59.6233
+NDR,GMMW,Nador International Airport,MA,Africa/Casablanca,34.9888,-3.02821
+NHD,OMDM,Al Minhad Air Base,AE,Asia/Dubai,25.0268,55.3662
+NJF,ORNI,Al Najaf International Airport,IQ,Asia/Baghdad,31.98972,44.40417
+NMA,UTKN,Namangan Airport,UZ,Asia/Samarkand,40.9846,71.5567
+NRN,EDLV,Niederrhein Airport,DE,Europe/Berlin,51.6024,6.14217
+NTE,LFRS,Nantes Atlantique Airport,FR,Europe/Paris,47.1532,-1.61073
+NUE,EDDN,Nuremberg Airport,DE,Europe/Berlin,49.4987,11.0669
+NUM,OENN,Neom Bay Airport,SA,Asia/Riyadh,27.92383,35.29383
+OAI,OAIX,Bagram Air Base,AF,Asia/Kabul,34.9461,69.265
+ODS,UKOO,Odesa International Airport,UA,Europe/Kyiv,46.4268,30.6765
+OHS,OOSH,Sohar Airport,OM,Asia/Muscat,24.46417,56.62833
+OPO,LPPR,Francisco de Sá Carneiro Airport,PT,Europe/Lisbon,41.2481,-8.68139
+ORY,LFPO,Paris-Orly Airport,FR,Europe/Paris,48.7253,2.35944
+OSL,ENGM,Oslo Gardermoen Airport,NO,Europe/Oslo,60.1939,11.1004
+OSR,LKMT,Ostrava Leos Janacek Airport,CZ,Europe/Prague,49.6963,18.1111
+OSS,UCFO,Osh Airport,KG,Asia/Bishkek,40.609,72.7933
+OST,EBOS,Ostend-Bruges International Airport,BE,Europe/Brussels,51.1989,2.86222
+OTP,LROP,Henri Coanda International Airport,RO,Europe/Bucharest,44.5722,26.1022
+OUD,GMFO,Angads Airport,MA,Africa/Casablanca,34.7872,-1.92399
+OVB,UNNT,Tolmachevo Airport,RU,Asia/Krasnoyarsk,55.0126,82.6507
+OZG,GMAZ,Zagora Airport,MA,Africa/Casablanca,30.3203,-5.86667
+OZZ,GMMZ,Ouarzazate Airport,MA,Africa/Casablanca,30.9391,-6.90943
+PAT,VEPT,Lok Nayak Jayaprakash Airport,IN,Asia/Kolkata,25.5913,85.088
+PEE,USPP,Bolshoye Savino Airport,RU,Asia/Yekaterinburg,57.9145,56.0212
+PEN,WMKP,Penang International Airport,MY,Asia/Kuala_Lumpur,5.29714,100.277
+PEW,OPPS,Peshawar International Airport,PK,Asia/Karachi,33.9939,71.5146
+PMI,LEPA,Palma De Mallorca Airport,ES,Europe/Madrid,39.5517,2.73881
+PMO,LICJ,Palermo / Punta Raisi Airport,IT,Europe/Rome,38.176,13.091
+PNQ,VAPO,Pune Airport,IN,Asia/Kolkata,18.5821,73.9197
+PPT,NTAA,Faa'a International Airport,PF,Pacific/Tahiti,-17.5537,-149.60699
+PRG,LKPR,Václav Havel Airport,CZ,Europe/Prague,50.1008,14.26
+PRN,BKPR,Pristina International Airport,XK,Europe/Belgrade,42.57283,21.03583
+PSA,LIRP,Pisa / San Giusto - Galileo Galilei International Airport,IT,Europe/Rome,43.6839,10.3927
+PUF,LFBP,Pau Pyrenees Airport,FR,Europe/Paris,43.38,-0.41861
+PZU,HSPN,Port Sudan New International Airport,SD,Africa/Khartoum,19.4336,37.2341
+QSR,LIRI,Salerno / Pontecagnano Airport,IT,Europe/Rome,40.6204,14.9113
+RAK,GMMX,Menara Airport,MA,Africa/Casablanca,31.6069,-8.0363
+RBA,GMME,Rabat-Sale Airport,MA,Africa/Casablanca,34.0515,-6.75152
+REN,UWOO,Orenburg Central Airport,RU,Asia/Yekaterinburg,51.7958,55.4567
+REU,LERS,Reus Air Base,ES,Europe/Madrid,41.1474,1.16717
+RIX,EVRA,Riga International Airport,LV,Europe/Riga,56.9236,23.9711
+RJK,LDRI,Rijeka Airport,HR,Europe/Zagreb,45.2169,14.5703
+RKT,OMRK,Ras Al Khaimah International Airport,AE,Asia/Dubai,25.6135,55.9388
+RLG,ETNL,Rostock-Laage Airport,DE,Europe/Berlin,53.9182,12.2783
+RMF,HEMA,Marsa Alam International Airport,EG,Africa/Cairo,25.5571,34.5837
+RMO,LUKK,Chișinău International Airport,MD,Europe/Chisinau,46.9277,28.931
+RMU,LEMI,Región de Murcia International Airport,ES,Europe/Madrid,37.803,-1.125
+RNS,LFRN,Rennes-Saint-Jacques Airport,FR,Europe/Paris,48.0695,-1.73479
+ROV,URRP,Platov International Airport,RU,Europe/Moscow,47.50083,39.93361
+RTM,EHRD,Rotterdam Airport,NL,Europe/Amsterdam,51.9569,4.43722
+RUH,OERK,King Khaled International Airport,SA,Asia/Riyadh,24.9576,46.6988
+RYK,OPRK,Shaikh Zaid Airport,PK,Asia/Karachi,28.3839,70.2796
+RZE,EPRZ,Rzeszow-Jasionka Airport,PL,Europe/Warsaw,50.11,22.019
+RZV,LTFO,Rize–Artvin Airport,TR,Europe/Istanbul,41.169167,40.828889
+SAH,OYSN,Sana'a International Airport,YE,Asia/Aden,15.4763,44.2197
+SAW,LTFJ,Sabiha Gokcen International Airport,TR,Europe/Istanbul,40.8986,29.3092
+SCO,UATE,Aktau International Airport,KZ,Asia/Oral,43.8601,51.092
+SCT,OYSQ,Socotra International Airport,YE,Asia/Aden,12.6307,53.9058
+SDG,OICS,Sanandaj Airport,IR,Asia/Tehran,35.2459,47.0092
+SGI,OPSR,Mushaf Air Base,PK,Asia/Karachi,32.0486,72.665
+SHA,ZSSS,Shanghai Hongqiao International Airport,CN,Asia/Shanghai,31.1979,121.336
+SHJ,OMSJ,Sharjah International Airport,AE,Asia/Dubai,25.3286,55.5172
+SHW,OESH,Sharurah Airport,SA,Asia/Riyadh,17.4669,47.1214
+SHX,PAHX,Shageluk Airport,US,America/Anchorage,62.69231,-159.56922
+SJJ,LQSA,Sarajevo International Airport,BA,Europe/Sarajevo,43.8246,18.3315
+SKD,UTSS,Samarkand Airport,UZ,Asia/Samarkand,39.7005,66.9838
+SKG,LGTS,Thessaloniki Macedonia International Airport,GR,Europe/Athens,40.5197,22.9709
+SKT,OPST,Sialkot Airport,PK,Asia/Karachi,32.53556,74.36389
+SLL,OOSA,Salalah Airport,OM,Asia/Muscat,17.0387,54.0913
+SNA,KSNA,John Wayne/Orange County Airport,US,America/Los_Angeles,33.67566,-117.86823
+SNN,EINN,Shannon Airport,IE,Europe/Dublin,52.702,-8.92482
+SOF,LBSF,Sofia Airport,BG,Europe/Sofia,42.69669,23.41144
+SON,NVSS,Santo Pekoa International Airport,VU,Pacific/Efate,-15.505,167.22
+SPX,HESX,Sphinx International Airport,EG,Africa/Cairo,30.11472,30.89333
+SSH,HESH,Sharm El Sheikh International Airport,EG,Africa/Cairo,27.9773,34.395
+STN,EGSS,London Stansted Airport,GB,Europe/London,51.885,0.235
+STR,EDDS,Stuttgart Airport,DE,Europe/Berlin,48.6899,9.22196
+SUF,LICA,Lamezia Terme Airport,IT,Europe/Rome,38.9054,16.2423
+SUH,OOSR,Sur Airport,OM,Asia/Muscat,22.533,59.483
+SUR,CJV7,Summer Beaver Airport,CA,America/Toronto,52.7086,-88.5419
+SVO,UUEE,Sheremetyevo International Airport,RU,Europe/Moscow,55.9726,37.4146
+SVQ,LEZL,Sevilla Airport,ES,Europe/Madrid,37.418,-5.89311
+SVX,USSS,Koltsovo Airport,RU,Asia/Yekaterinburg,56.7431,60.8027
+SXB,LFST,Strasbourg Airport,FR,Europe/Paris,48.5383,7.62823
+SXR,VISR,Sheikh ul Alam Airport,IN,Asia/Kolkata,33.9871,74.7742
+SYZ,OISS,Shiraz Shahid Dastghaib International Airport,IR,Asia/Tehran,29.5392,52.5898
+SZF,LTFH,Samsun Carsamba Airport,TR,Europe/Istanbul,41.2545,36.5671
+TAS,UTTT,Tashkent International Airport,UZ,Asia/Samarkand,41.2579,69.2812
+TBS,UGTB,Tbilisi International Airport,GE,Asia/Tbilisi,41.6692,44.9547
+TBZ,OITT,Tabriz International Airport,IR,Asia/Tehran,38.1339,46.235
+TDK,UAAT,Taldykorgan Airport,KZ,Asia/Almaty,45.1262,78.447
+TEQ,LTBU,Tekirdag Corlu Airport,TR,Europe/Istanbul,41.1382,27.9191
+TFN,GCXO,Tenerife Norte Airport,ES,Atlantic/Canary,28.4827,-16.3415
+TGM,LRTM,Transilvania Targu Mures International Airport,RO,Europe/Bucharest,46.4677,24.4125
+THR,OIII,Mehrabad International Airport,IR,Asia/Tehran,35.6892,51.3134
+TIA,LATI,Tirana International Airport Mother Teresa,AL,Europe/Tirane,41.4147,19.7206
+TIF,OETF,Taif Airport,SA,Asia/Riyadh,21.4834,40.5443
+TIP,HLLT,Tripoli International Airport,LY,Africa/Tripoli,32.6635,13.159
+TLL,EETN,Tallinn Airport,EE,Europe/Tallinn,59.4133,24.8328
+TLS,LFBO,Toulouse-Blagnac Airport,FR,Europe/Paris,43.6291,1.36382
+TNG,GMTT,Ibn Batouta Airport,MA,Africa/Casablanca,35.7269,-5.91689
+TNN,RCNN,Tainan Airport,TW,Asia/Taipei,22.9504,120.206
+TPS,LICT,Trapani / Birgi Airport,IT,Europe/Rome,37.9114,12.488
+TRN,LIMF,Torino / Caselle International Airport,IT,Europe/Rome,45.2008,7.64963
+TRV,VOTV,Trivandrum International Airport,IN,Asia/Kolkata,8.48212,76.9201
+TRZ,VOTR,Tiruchirapally Civil Airport Airport,IN,Asia/Kolkata,10.7654,78.7097
+TSF,LIPH,Treviso / Sant'Angelo Airport,IT,Europe/Rome,45.6484,12.1944
+TTU,GMTN,Saniat Rmel Airport,MA,Africa/Casablanca,35.5943,-5.32002
+TUK,OPTU,Turbat International Airport,PK,Asia/Karachi,25.9864,63.0302
+TUN,DTTA,Tunis Carthage International Airport,TN,Africa/Tunis,36.851,10.2272
+TUU,OETB,Tabuk Airport,SA,Asia/Riyadh,28.3654,36.6189
+TZL,LQTZ,Tuzla International Airport,BA,Europe/Sarajevo,44.4587,18.7248
+TZX,LTCG,Trabzon International Airport,TR,Europe/Istanbul,40.9951,39.7897
+UAB,LTAG,Incirlik Air Base,TR,Europe/Istanbul,37.0021,35.4259
+UET,OPQT,Quetta International Airport,PK,Asia/Karachi,30.2514,66.9378
+UFA,UWUU,Ufa International Airport,RU,Asia/Yekaterinburg,54.5575,55.8744
+UGC,UTNU,Urgench Airport,UZ,Asia/Samarkand,41.5843,60.6417
+UKA,HKUK,Ukunda Airstrip,KE,Africa/Nairobi,-4.29333,39.5711
+ULV,UWLL,Ulyanovsk Baratayevka Airport,RU,Europe/Samara,54.2683,48.2267
+URC,ZWWW,Urumqi Diwopu International Airport,CN,Asia/Shanghai,43.9071,87.4742
+URT,VTSB,Surat Thani Airport,TH,Asia/Bangkok,9.1326,99.1356
+UTP,VTBU,U-Tapao International Airport,TH,Asia/Bangkok,12.6799,101.005
+VAR,LBWN,Varna Airport,BG,Europe/Sofia,43.2321,27.8251
+VCE,LIPZ,Venezia / Tessera -  Marco Polo Airport,IT,Europe/Rome,45.5053,12.3519
+VGA,VOBZ,Vijayawada Airport,IN,Asia/Kolkata,16.5304,80.7968
+VGO,LEVX,Vigo Airport,ES,Europe/Madrid,42.2318,-8.62677
+VIE,LOWW,Vienna International Airport,AT,Europe/Vienna,48.1103,16.5697
+VIL,GMMH,Dakhla Airport,EH,Africa/Casablanca,23.7183,-15.932
+VKO,UUWW,Vnukovo International Airport,RU,Europe/Moscow,55.5915,37.2615
+VLC,LEVC,Valencia Airport,ES,Europe/Madrid,39.4893,-0.48162
+VNO,EYVI,Vilnius International Airport,LT,Europe/Vilnius,54.6341,25.2858
+VNS,VEBN,Lal Bahadur Shastri Airport,IN,Asia/Kolkata,25.45117,82.85867
+VOG,URWW,Volgograd International Airport,RU,Europe/Volgograd,48.7825,44.3455
+VRN,LIPX,Verona / Villafranca Airport,IT,Europe/Rome,45.3957,10.8885
+VSA,MMVA,Carlos Rovirosa Perez International Airport,MX,America/Mexico_City,17.997,-92.8174
+VTZ,VOVZ,Vishakhapatnam Airport,IN,Asia/Kolkata,17.7212,83.2245
+WAW,EPWA,Warsaw Chopin Airport,PL,Europe/Warsaw,52.1657,20.9671
+WMI,EPMO,Warsaw Modlin Airport,PL,Europe/Warsaw,52.4511,20.6518
+WOE,EHWO,Woensdrecht Air Base,NL,Europe/Amsterdam,51.4491,4.34203
+WRO,EPWR,Copernicus Wrocław Airport,PL,Europe/Warsaw,51.1027,16.8858
+XFW,EDHI,Hamburg-Finkenwerder Airport,DE,Europe/Berlin,53.53528,9.83556
+XSP,WSSL,Seletar Airport,SG,Asia/Singapore,1.41695,103.868
+YNB,OEYN,Yenbo Airport,SA,Asia/Riyadh,24.1442,38.0634
+YYZ,CYYZ,Toronto Pearson International Airport,CA,America/Toronto,43.6772,-79.6306
+ZAG,LDZA,Zagreb Airport,HR,Europe/Zagreb,45.7429,16.0688
+ZNZ,HTZA,Zanzibar Airport,TZ,Africa/Dar_es_Salaam,-6.22202,39.2249
+ZRH,LSZH,Zurich Airport,CH,Europe/Zurich,47.4647,8.54917
+ZYL,VGSY,Osmany International Airport,BD,Asia/Dhaka,24.9632,91.8668

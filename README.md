@@ -316,6 +316,15 @@ curl -i http://localhost:8888/api/v1/security/customers \
 - **Tracing:** Zipkin endpoint defaults to `http://localhost:9411/api/v2/spans`.
 - **Token lifetime:** `jwt.security.token.validity` (milliseconds, default `360000` = 6 min).
 
+## 7a. Chatbot (WebSocket + Anthropic Java SDK)
+
+A terminal chat talks to the app over a WebSocket (`/ws/chat`); the app forwards each message to Claude and sends the answer back. The socket needs a JWT like every other endpoint.
+
+1. Put your key in `hackathonTeamYashasvi/.env` (`ANTHROPIC_API_KEY=sk-ant-...`, create one at https://console.anthropic.com/settings/keys); the app loads `.env` itself when started from that folder. Optional: `ANTHROPIC_MODEL` (default `claude-opus-5-5`) and `ANTHROPIC_EFFORT` (`low`/`medium`/`high`/`xhigh`/`max`, default `medium`). Replies stream token by token, use adaptive thinking and prompt caching.
+2. Start Postgres and the app (`docker compose up -d --wait postgres`, then `./gradlew bootRun`).
+3. Register once: `curl -X POST localhost:8888/api/v1/signIn -H 'Content-Type: application/json' -d '{"email":"me@example.com","password":"Secret@123","firstName":"Me","lastName":"User"}'`
+4. In another terminal: `./gradlew -q --console=plain chat` (prompts for email and password, or set `CHAT_USER`, `CHAT_PASSWORD`, `CHAT_URL`). Type `/quit` to leave.
+
 ## 8. Deploy to a cloud instance (AWS EC2 / Azure VM / GCP Compute Engine / DigitalOcean)
 
 The Docker Compose setup is the recommended way to deploy: one VM runs the app and PostgreSQL containers.

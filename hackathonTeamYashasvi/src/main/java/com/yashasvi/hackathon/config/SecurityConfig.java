@@ -2,6 +2,7 @@ package com.yashasvi.hackathon.config;
 
 import static com.yashasvi.hackathon.config.SecurityConstants.*;
 import com.yashasvi.hackathon.domain.ROLE;
+import com.yashasvi.hackathon.fogops.auth.FogopsAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,13 +28,15 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtTokenValidatorFilter jwtTokenValidatorFilter;
+    private final FogopsAuthFilter fogopsAuthFilter;
 
     /** Comma separated list of allowed origins, e.g. https://shop.example.com */
     @Value("${security.cors.allowed-origins:http://localhost:3000,http://localhost:4200}")
     private List<String> allowedOrigins;
 
-    public SecurityConfig(JwtTokenValidatorFilter jwtTokenValidatorFilter) {
+    public SecurityConfig(JwtTokenValidatorFilter jwtTokenValidatorFilter, FogopsAuthFilter fogopsAuthFilter) {
         this.jwtTokenValidatorFilter = jwtTokenValidatorFilter;
+        this.fogopsAuthFilter = fogopsAuthFilter;
     }
 
     @Bean
@@ -46,6 +49,11 @@ public class SecurityConfig {
                 .requestCache(cache -> cache.requestCache(new NullRequestCache()))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, SIGN_IN, LOGIN).permitAll()
+                        // FogOps API: sign-in and health are open, everything else under /api/** needs a FogOps token
+                        .requestMatchers(HttpMethod.POST, FogopsAuthFilter.LOGIN).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/health").permitAll()
+                        // Boot's error dispatch (e.g. an unknown /api path must answer 404, not 401)
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.GET, CUSTOMERS, USER_DETAILS)
@@ -53,7 +61,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, CUSTOMER_BY_EMAIL)
                             .hasAnyRole(ROLE.ADMIN.getName(), ROLE.USER.getName())
                         .anyRequest().authenticated())
+                // FogOps API answers an unauthenticated call with a JSON 401 (not a browser Basic-auth prompt)
+                .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(
+                        (req, res, ex) -> {
+                            res.setStatus(401);
+                            res.setContentType("application/json");
+                            res.getWriter().write("{\"detail\":\"Sign in required\"}");
+                        },
+                        req -> FogopsAuthFilter.isFogopsPath(req.getServletPath())))
                 .addFilterBefore(jwtTokenValidatorFilter, BasicAuthenticationFilter.class)
+                .addFilterBefore(fogopsAuthFilter, BasicAuthenticationFilter.class)
                 .addFilterAfter(new AuthorisedUserLoggingFilter(), BasicAuthenticationFilter.class)
                 .httpBasic(Customizer.withDefaults());
         return http.build();
