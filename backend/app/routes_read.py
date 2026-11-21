@@ -236,10 +236,16 @@ def airport_pairs(frm: str = Query(..., alias="from"), to: str | None = None):
 
 @r.get("/fuel")
 def fuel(scenario_id: int | None = None):
-    """Latest holding-endurance estimate per flight, with its quality label."""
+    """Fuel now for every flight in the air, worked out on the fly: fuel at take-off minus the burn per minute (cruise, then holding)
+    since take-off, at the scenario clock. as_of_utc is that clock and est_holding_endurance_min the minutes left to final reserve, so
+    as_of_utc + est_holding_endurance_min is the moment the fuel runs down to reserve (fuel_end_utc)."""
     return fetch(
-        """SELECT DISTINCT ON (flight_id) flight_id, as_of_utc, est_holding_endurance_min, fuel_on_board_kg, quality, basis
-             FROM flight_fuel_estimate WHERE scenario_id = %s ORDER BY flight_id, as_of_utc DESC, estimate_id DESC""",
+        """SELECT s.flight_id, n.at_utc AS as_of_utc, n.endurance_min AS est_holding_endurance_min, n.fuel_kg AS fuel_on_board_kg,
+                  n.fuel_kg AS fuel_now_kg, n.endurance_until AS fuel_end_utc, n.quality, n.basis, n.anchor_kind, n.phase
+             FROM flight_state s
+             CROSS JOIN LATERAL fuel_now(s.scenario_id, s.flight_id, scenario_now(s.scenario_id)) n
+            WHERE s.scenario_id = %s AND s.status IN ('AIRBORNE', 'HOLDING', 'DIVERTING') AND n.endurance_until IS NOT NULL
+            ORDER BY s.flight_id""",
         (scn(scenario_id),),
     )
 
