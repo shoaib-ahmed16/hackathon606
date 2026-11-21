@@ -1,7 +1,7 @@
 import { api } from '@/app/api';
 import { OPS_API_URL } from '@/config/env';
 
-// FOOH API (FastAPI + Postgres). All reads are DB views, all actions call DB functions, so the
+// FOOH! API (FastAPI + Postgres). All reads are DB views, all actions call DB functions, so the
 // rules (legality, guardrails, audit) live in one place. Docs: backend/API_README.md
 const u = (path) => `${OPS_API_URL}${path}`;
 const TAG = 'Ops';
@@ -44,6 +44,19 @@ export const opsApi = api.enhanceEndpoints({ addTagTypes: [TAG] }).injectEndpoin
         query: ({ flightId, ...params }) => ({ url: u(`/api/flights/${flightId}/downstream`), params }),
         providesTags: [TAG],
       }),
+      // data explorer (OCC/ADMIN): the whole database, read-only
+      getExplorerCatalog: build.query({ query: () => ({ url: u('/api/explorer/catalog') }), providesTags: [TAG] }),
+      getExplorerRows: build.query({
+        query: ({ table, limit, offset, q, sort, dir, f = [] }) => {
+          const p = new URLSearchParams({ table, limit, offset, dir: dir ?? 'asc' });
+          if (q) p.set('q', q);
+          if (sort) p.set('sort', sort);
+          f.forEach((x) => p.append('f', x));
+          return { url: u(`/api/explorer/rows?${p}`) };
+        },
+      }),
+      getExplorerLinks: build.query({ query: ({ table, row }) => ({ url: u('/api/explorer/links'), params: { table, row: JSON.stringify(row) } }) }),
+      getExplorerProfile: build.query({ query: (table) => ({ url: u('/api/explorer/profile'), params: { table } }) }),
       getRules: q('/api/rules'),
       getRuleMatches: q('/api/rules/matches'),
       getApprovals: q('/api/approvals'),
@@ -187,6 +200,10 @@ export const {
   useGetRuleFieldsQuery,
   useGetIntegrationsQuery,
   useGetAlternatesQuery,
+  useGetExplorerCatalogQuery,
+  useGetExplorerRowsQuery,
+  useGetExplorerLinksQuery,
+  useGetExplorerProfileQuery,
   useGetDownstreamQuery,
   useExecuteDecisionMutation,
   usePatchSystemMutation,

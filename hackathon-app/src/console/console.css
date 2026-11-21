@@ -401,7 +401,7 @@ textarea{width:100%;min-height:70px;background:var(--surface-2);border:1px solid
 }
 
 
-/* =================== FOOH additions (React port) =================== */
+/* =================== FOOH! additions (React port) =================== */
 .app{height:100dvh}
 .cw-link{color:inherit;text-decoration:none}
 .btn.on-nav,.btn[aria-current="page"]{background:var(--surface-3);color:var(--text)}
@@ -490,3 +490,15 @@ button.alt:hover,.hub-btn:hover{border-color:var(--ai)}
 .hub-btn{background:none;border:none;border-right:1px solid var(--line);padding:8px 14px;display:flex;flex-direction:column;justify-content:center;white-space:nowrap;flex-shrink:0}
 .hub-btn:hover{background:var(--surface-2)}
 .check-row{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-top:12px}
+
+/* ---- top bar is always exactly two rows, at any zoom: row 1 = deadline + role lens, row 2 = tools ---- */
+.bar{display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:2px;min-width:0}
+.bar-top{display:flex;align-items:center;gap:12px;min-width:0;flex-wrap:nowrap}
+.bar-top > *{flex-shrink:0}
+.bar-top > .next{flex:1 1 0;min-width:0}
+.bar-top > .next > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-top .lenses{margin-left:0;overflow:visible;flex-shrink:0}
+.bar-top > .who{flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+.tools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
+.tools .btn{white-space:nowrap;flex-shrink:0}
+.scn-row select{max-width:290px}

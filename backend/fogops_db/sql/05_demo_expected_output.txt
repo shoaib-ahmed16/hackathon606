@@ -321,7 +321,7 @@ COMMIT
     2 | G9472     | AIRBORNE_HOLDING | 02:55Z   | 02:55Z | 06:55:00   | t         | t        | 0.738 | {"Low fuel endurance while airborne","Crew margin only 00:55","1 onward rotation(s) within 8h","164 connecting pax"} | 
     3 | G9588D    | ON_GROUND_RKT    | 03:20Z   | 03:20Z | 07:20:00   | t         | t        | 0.150 | {"1 onward rotation(s) within 8h","134 connecting pax"}                                                              | 
     4 | G9455     | AIRBORNE         | 02:45Z   |        |            | f         | f        | 0.606 | {"Low fuel endurance while airborne","Crew margin only 01:50","1 onward rotation(s) within 8h","124 connecting pax"} | LVP in force at SHJ and cockpit crew not LVP-qualified (CP 110877): LVP-qualified crew change or wait for LVP cancellation
-    5 | G9464D    | ON_GROUND_RKT    | 03:20Z   |        |            | f         | f        | 0.446 | {"Crew margin only 00:20","1 onward rotation(s) within 8h","161 connecting pax"}                                     | Crew latest legal departure is before earliest possible departure: replacement crew or discretion needed
+    5 | G9464D    | ON_GROUND_RKT    | 03:20Z   |        |            | f         | f        | 0.444 | {"Crew margin only 00:20","1 onward rotation(s) within 8h","159 connecting pax"}                                     | Crew latest legal departure is before earliest possible departure: replacement crew or discretion needed
 (5 rows)
 
  arrivals_in_window | capacity_per_hr |    window     
@@ -422,7 +422,7 @@ COMMIT
 
  report_id | flights | decisions | timeline_rows |             rule_set             | audit_watermark_id 
 -----------+---------+-----------+---------------+----------------------------------+--------------------
-         1 |       5 |         3 |            86 | GCAA FDP v1 Crew_FDTL 2026-11-20 |               4816
+         1 |       5 |         3 |            86 | GCAA FDP v1 Crew_FDTL 2026-11-20 |               4823
 (1 row)
 
 === 16. Guardrail check: approved rule set is immutable

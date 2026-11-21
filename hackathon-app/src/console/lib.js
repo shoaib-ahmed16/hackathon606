@@ -1,4 +1,4 @@
-// Domain helpers for the FOOH console: labels, tones and the "what is happening to this flight" wording.
+// Domain helpers for the FOOH! console: labels, tones and the "what is happening to this flight" wording.
 // Pure functions over the rows the API returns (v_flight_watch + severity + tags); no React in here.
 import { fmtDay, fmtZ, fmtTime, MIN } from '@/features/ops/time';
 import { ms } from '@/features/ops/helpers';

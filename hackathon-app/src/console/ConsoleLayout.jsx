@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAppDispatch } from '@/app/hooks';
-import { LogoMark } from '@/components/Logo';
+import { LogoFull } from '@/components/Logo';
 import { APP_NAME } from '@/config/brand';
 import { useSignOut } from '@/features/auth/useSignOut';
 import {
@@ -84,9 +84,8 @@ function Strip({ d, onSheet, onAirport }) {
   return (
     <header className="strip" aria-label="Situation">
       <div className="brand">
-        <LogoMark size={30} />
+        <LogoFull height={38} bar />
         <span className="bn">
-          {APP_NAME}
           <small>{hub?.iata ?? kase?.hub_iata ?? 'Hub'} disruption room</small>
         </span>
       </div>
@@ -107,7 +106,7 @@ function Strip({ d, onSheet, onAirport }) {
           >
             {cases.map((c) => (
               <option key={c.case_id} value={c.case_id}>
-                #{c.case_id} {c.title} ({c.scenario_kind.toLowerCase()}){c.phase === 'CLOSED' ? ' [closed]' : ''}
+                #{c.case_id} {c.title} ({c.scenario_kind.toLowerCase()})
               </option>
             ))}
           </select>
@@ -207,6 +206,7 @@ function Bar({ d, onSheet }) {
   const nav = ({ isActive }) => `btn ghost ${isActive ? 'on-nav' : ''}`;
   return (
     <div className="bar">
+      <div className="bar-top">
       <div className="next" data-src="min(next_deadline_utc)">
         <Pill tone="exceeded">Next deadline</Pill>
         {next ? (
@@ -230,14 +230,16 @@ function Bar({ d, onSheet }) {
       <span className="who">
         {actor?.display_name} · {roleLabel(actor?.role_code)}
       </span>
+      </div>
       <span className="tools">
         <button className="btn ghost" onClick={() => onSheet('newcase')}>New case</button>
-        {d.kase && <button className="btn ghost" onClick={() => onSheet('case')} title="Close or delete this case, move the reopening forecast">Case…</button>}
+        {d.kase && <button className="btn ghost" onClick={() => onSheet('case')} title="Close or delete this case, move the reopening forecast">Manage case</button>}
         <NavLink to="/rules" className={nav}>Rules &amp; filters</NavLink>
         <NavLink to="/integrations" className={nav}>Integrations</NavLink>
         <NavLink to="/audit" className={nav}>Audit</NavLink>
         <NavLink to="/data-quality" className={nav}>Data quality</NavLink>
-        <button className="btn ghost" onClick={() => onSheet('whatif')}>What if…</button>
+        {['OCC', 'ADMIN'].includes(actor?.role_code) && <NavLink to="/data" className={nav} title="Browse every table and its relations (read-only)">Data explorer</NavLink>}
+        <button className="btn ghost" onClick={() => onSheet('whatif')}>What if</button>
         <button className="btn ghost" disabled={pushing} onClick={onPush} title="Advance the live case with simulated movements, passengers, crew duty status and fuel (safe to press again)">
           {pushing ? 'Pushing…' : 'Push live data'}
         </button>

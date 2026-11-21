@@ -27,7 +27,7 @@ const persist = (s) => {
 };
 
 // Client-only state: which case we are looking at, who is acting, which flight is open.
-// Everything operational (flights, crew, decisions, audit) lives in the FOOH database.
+// Everything operational (flights, crew, decisions, audit) lives in the FOOH! database.
 const opsSlice = createSlice({
   name: 'ops',
   initialState: {

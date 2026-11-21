@@ -1,24 +1,21 @@
-# FOOH: brand sheet
+# FOOH!: brand sheet
 
 ## Name
-**FOOH**. The product name chosen by the team. Short, one word, easy to say on a call or put on a door sign.
+**FOOH!**. The product name chosen by the team. Short, one word, easy to say on a call or put on a door sign.
 Not yet checked for trademark or domain availability. Do that before any public launch.
 
 ## Tagline and one-liners
 - **Tagline:** Disruption control for airline operations.
-- **One line:** FOOH turns the disruption "firefighter" group chat into one shared decision room, where the AI prepares the facts
+- **One line:** FOOH! turns the disruption "firefighter" group chat into one shared decision room, where the AI prepares the facts
   and options and people stay responsible for every decision.
 - **Three proof points:** every affected flight ordered by how soon a decision is needed; crew legality, fuel and alternates on
   one screen; a full audit trail of who decided what and why.
 
 ## Logo
-An aircraft climbing out of a fog bank on a deep-to-sky blue tile. The fog is drawn as soft layers that thicken toward the ground,
-the contrail cuts through the bank and dissolves into the mist, and a pale arc above marks the clear approach. It says what the
-product does in one glance: aircraft crossing fog, with a way through. (Earlier versions: a runway, which read as a warning triangle at small sizes,
-and hard-edged bands, which looked like blinds.)
-- Files: `hackathon-app/public/favicon.svg` (also the app icon), `public/logo.svg` (same artwork), `public/logo-1024.png` (transparent, for slides and posters), and `hackathon-app/src/components/Logo.jsx` (`LogoMark`, `Logo`).
-- Use the mark alone at small sizes (favicon, collapsed sidebar); use mark plus the word "FOOH" elsewhere.
-- Keep clear space of at least a quarter of the mark's width. Do not recolour, stretch or add effects.
+The team's logo (`image.png` in the project root): wind swirls sweeping fog away behind a climbing aircraft, with the wordmark "FOOH!" in brushed-silver letters on deep navy. The AI-tool watermark in the original corner was painted out.
+- Files in `hackathon-app/public/`: `logo-full.png` (wide logo with the wordmark, edges faded into the navy; top bar and login), `logo-bar.png` (tighter crop for the top bar), `logo-source.png` (cleaned full square artwork, for slides and posters), `logo-512.png` (mark without the lettering, rounded; app icon), `favicon.png`, `apple-touch-icon.png`.
+- `LogoFull` in `src/components/Logo.jsx` shows the wide logo on the same navy as the artwork. Use the lettering-free mark only at small sizes (tab icon).
+- Keep clear space of at least a quarter of the logo's height. Do not recolour, stretch or add effects.
 
 ## Colour
 | Use | Colour |
@@ -27,8 +24,8 @@ and hard-edged bands, which looked like blinds.)
 | Logo tile, light end / app primary | `#0284c7` |
 | Dark-mode primary | `#38bdf8` |
 | Tile gradient mid-tone | `#0369a1` |
-| Aircraft and fog | white |
-| Contrail and approach arc | `#7dd3fc` / `#bae6fd` |
+| Logo background navy | `#0b1a31` |
+| Logo silver and ice blue | `#c9d6df` / `#9fd3dc` |
 
 Status colours (green, amber, red) are reserved for operational meaning and are never used for decoration.
 

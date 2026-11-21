@@ -11,6 +11,7 @@ const Integrations = lazy(() => import('@/console/pages/IntegrationsPage'));
 const Alerts = lazy(() => import('@/pages/Alerts'));
 const Audit = lazy(() => import('@/pages/Audit'));
 const ReportsAudit = lazy(() => import('@/pages/ReportsAudit'));
+const DataExplorer = lazy(() => import('@/pages/DataExplorer'));
 const Login = lazy(() => import('@/pages/Login'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
@@ -22,6 +23,7 @@ export default function AppRoutes() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>
+          <Route path="data" element={<DataExplorer />} />
           <Route element={<ConsoleLayout />}>
             <Route index element={<Board />} />
             <Route path="rules" element={<Rules />} />

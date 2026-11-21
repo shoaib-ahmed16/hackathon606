@@ -138,3 +138,15 @@ Rows that must be visible to the views (airport status, fuel) are stamped with `
 ## Deploy
 
 See the root `docker-compose.yml` and `.env.example` (db + api + web, UI on 8080, API on 8888).
+
+## Data explorer (OCC and ADMIN only, read-only)
+A full-screen page (`/data` in the UI) to browse every table and view with its relations, for validating the data end to end.
+Every query runs in a READ ONLY transaction with a 10 s statement timeout; table and column names come from the catalog, values are
+bound parameters, and columns that look like secrets (password, token, hash, ...) and the credentials table are never returned.
+
+| Endpoint | What it gives |
+|---|---|
+| `GET /api/explorer/catalog` | every table/view: columns, primary and foreign keys both ways, view lineage, row counts, domain |
+| `GET /api/explorer/rows?table=&q=&f=col\|op\|val&sort=&dir=&limit=&offset=` | rows with search, column filters (`eq`, `like`, `null`, `notnull`), sorting, paging |
+| `GET /api/explorer/links?table=&row={json}` | for one row: parent rows it points at, child rows that point at it (two levels, with counts) |
+| `GET /api/explorer/profile?table=` | per column: empty count, distinct count, min, max |

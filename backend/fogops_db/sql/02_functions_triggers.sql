@@ -815,10 +815,13 @@ BEGIN
             v_std + make_interval(mins => v_block), coalesce(s.registration, f.registration_planned),
             f.op_type, 'RECOVERY', f.flight_id, coalesce(s.pax, f.pax_planned),
             'decision:' || d.decision_id)
+    -- flights are shared across scenarios: another replay may already have created this recovery leg
+    ON CONFLICT (flight_no, std_utc, dep_iata) DO UPDATE SET source = flight.source
     RETURNING flight_id INTO v_rec_flight;
     INSERT INTO flight_state (scenario_id, flight_id, registration, etd_utc, eta_utc, pax, last_received_at)
     VALUES (d.scenario_id, v_rec_flight, coalesce(s.registration, f.registration_planned), v_std,
-            v_std + make_interval(mins => v_block), coalesce(s.pax, f.pax_planned), v_now);
+            v_std + make_interval(mins => v_block), coalesce(s.pax, f.pax_planned), v_now)
+    ON CONFLICT (scenario_id, flight_id) DO NOTHING;
 
     -- 3) diversion tracking record for the station
     INSERT INTO diversion (scenario_id, case_id, original_flight_id, alternate_iata, decision_id,
@@ -1269,14 +1272,26 @@ RETURNS TABLE (hub_iata CHAR(3), now_utc TIMESTAMPTZ, endurance_left_min INT, fu
                hub_status TEXT, hub_lvp BOOLEAN, reopen_utc TIMESTAMPTZ, reopen_quality TEXT,
                cockpit_all_lvp BOOLEAN, crew_known BOOLEAN,
                legal_end_now TIMESTAMPTZ, disc_end_now TIMESTAMPTZ,
-               legal_end_if_diverted TIMESTAMPTZ, disc_end_if_diverted TIMESTAMPTZ)
+               legal_end_if_diverted TIMESTAMPTZ, disc_end_if_diverted TIMESTAMPTZ,
+               -- time-base fields (rule TB-1..TB-4, see README "Time-base rules")
+               flight_phase TEXT, anchor_utc TIMESTAMPTZ, endurance_until TIMESTAMPTZ, earliest_sign_in TIMESTAMPTZ)
 LANGUAGE plpgsql STABLE AS $$
 #variable_conflict use_column
 DECLARE v_now TIMESTAMPTZ := scenario_now(p_scenario_id); f flight%ROWTYPE; rs rule_set%ROWTYPE;
-        e RECORD; hs RECORD; c RECORD;
+        e RECORD; hs RECORD; c RECORD; st flight_state%ROWTYPE; v_phase TEXT; v_anchor TIMESTAMPTZ; v_si TIMESTAMPTZ;
         v_le TIMESTAMPTZ; v_de TIMESTAMPTZ; v_led TIMESTAMPTZ; v_ded TIMESTAMPTZ; v_known BOOLEAN := TRUE; n INT := 0;
 BEGIN
     SELECT * INTO f FROM flight WHERE flight_id = p_flight_id;
+    SELECT * INTO st FROM flight_state WHERE scenario_id = p_scenario_id AND flight_id = p_flight_id;
+    -- TB-1: the decision moment depends on where the flight is in its life, not on "now" alone
+    v_phase := CASE WHEN st.status IN ('HOLDING') THEN 'HOLDING'
+                    WHEN st.status IN ('AIRBORNE','TAXI_OUT') THEN 'AIRBORNE'
+                    WHEN st.status IN ('DIVERTING','LANDED','ON_BLOCKS','CANCELLED') THEN 'NOT_APPLICABLE'
+                    ELSE 'NOT_DEPARTED' END;
+    v_anchor := CASE v_phase
+                  WHEN 'HOLDING'  THEN v_now
+                  WHEN 'AIRBORNE' THEN v_now      -- an airborne flight can divert now (position: hub area, see assumptions)
+                  ELSE greatest(v_now, coalesce(st.eta_utc, f.sta_utc) - interval '20 minutes') END;  -- pre-departure: anchor at arrival
     SELECT * INTO rs FROM rule_set WHERE rule_set_id = active_rule_set('GCAA FDP', v_now);
     SELECT fe.as_of_utc + make_interval(mins => fe.est_holding_endurance_min) AS until, fe.quality::text AS q
       INTO e FROM flight_fuel_estimate fe
@@ -1291,6 +1306,7 @@ BEGIN
               WHERE fc.scenario_id = p_scenario_id AND l.flight_id = p_flight_id AND l.is_active
                 AND fc.is_current AND fc.crew_id IS NOT NULL LOOP
         n := n + 1;
+        v_si := least(coalesce(v_si, c.sign_in_utc), c.sign_in_utc);
         IF c.status = 'VERIFICATION_REQUIRED' OR c.legal_end_utc IS NULL THEN v_known := FALSE; CONTINUE; END IF;
         v_le := least(coalesce(v_le, c.legal_end_utc), c.legal_end_utc);
         v_de := least(coalesce(v_de, c.discretion_end_utc), c.discretion_end_utc);
@@ -1314,7 +1330,8 @@ BEGIN
                                   AND ca.valid_to IS NULL AND ca.from_leg_seq <= l.leg_seq
            JOIN crew_type ct ON ct.code = ca.position_code AND ct.requires_lvp
           WHERE l.scenario_id = p_scenario_id AND l.flight_id = p_flight_id AND l.is_active),
-        v_known AND n > 0, v_le, v_de, v_led, v_ded;
+        v_known AND n > 0, v_le, v_de, v_led, v_ded,
+        v_phase, v_anchor, e.until, v_si;
 END $$;
 
 -- Rank every active alternate for a flight. Read-only: safe to call on every screen refresh.
@@ -1362,12 +1379,12 @@ BEGIN
           FROM alt a
     ), t AS (
         SELECT m.*,
-               i.now_utc + make_interval(mins => m.fl_min) AS arr_utc,
-               i.endurance_left_min - m.fl_min AS fuel_margin,
-               i.now_utc + make_interval(mins => m.fl_min + m.min_ground_time_min) AS ready,
-               greatest(i.now_utc + make_interval(mins => m.fl_min + m.min_ground_time_min),
+               i.anchor_utc + make_interval(mins => m.fl_min) AS arr_utc,
+               floor(extract(epoch FROM i.endurance_until - i.anchor_utc)/60)::int - m.fl_min AS fuel_margin,
+               i.anchor_utc + make_interval(mins => m.fl_min + m.min_ground_time_min) AS ready,
+               greatest(i.anchor_utc + make_interval(mins => m.fl_min + m.min_ground_time_min),
                         coalesce(i.reopen_utc - make_interval(mins => m.ret_blk),
-                                 i.now_utc + make_interval(mins => m.fl_min + m.min_ground_time_min))) AS earliest_dep,
+                                 i.anchor_utc + make_interval(mins => m.fl_min + m.min_ground_time_min))) AS earliest_dep,
                i.legal_end_if_diverted - make_interval(mins => m.ret_blk) AS latest_legal,
                i.disc_end_if_diverted  - make_interval(mins => m.ret_blk) AS latest_disc
           FROM m
@@ -1391,7 +1408,13 @@ BEGIN
                   (CASE WHEN i.endurance_left_min IS NULL THEN jsonb_build_object('code','FUEL_ENDURANCE_UNKNOWN','verify',true) END),
                   (CASE WHEN t.fuel_margin < 0 THEN jsonb_build_object('code','CANNOT_REACH_WITH_FUEL','margin_min',t.fuel_margin) END),
                   (CASE WHEN t.lvp_in_force AND i.cockpit_all_lvp IS DISTINCT FROM TRUE
-                        THEN jsonb_build_object('code','CREW_NOT_LVP_QUALIFIED_FOR_ALTERNATE') END)
+                        THEN jsonb_build_object('code','CREW_NOT_LVP_QUALIFIED_FOR_ALTERNATE') END),
+                  (CASE WHEN i.flight_phase = 'NOT_APPLICABLE'
+                        THEN jsonb_build_object('code','FLIGHT_NOT_DIVERTIBLE','phase','already diverted, landed or cancelled') END),
+                  -- TB-4: a return that would depart before the crew has even signed in means the time base is wrong
+                  (CASE WHEN i.earliest_sign_in IS NOT NULL AND t.earliest_dep < i.earliest_sign_in
+                        THEN jsonb_build_object('code','TIME_BASE_INCONSISTENT','verify',true,
+                                                'earliest_return_dep', t.earliest_dep, 'crew_sign_in', i.earliest_sign_in) END)
                 ) v(x) WHERE x IS NOT NULL) AS blocking
           FROM t
     ), sc AS (
@@ -1416,6 +1439,8 @@ BEGIN
            fin.latest_legal, fin.latest_disc, fin.crew_margin, fin.outcome, fin.road_positioning_min,
            fin.historical_diversions, fin.hist_median_ground_min, fin.blocking,
            array_remove(ARRAY[
+               CASE WHEN i.flight_phase = 'NOT_DEPARTED'
+                    THEN format('Pre-departure assessment: times anchored at projected arrival %s', to_char(i.anchor_utc AT TIME ZONE 'UTC','DD HH24:MI"Z"')) END,
                CASE WHEN fin.fuel_margin IS NOT NULL THEN format('Fuel margin on arrival %s min', fin.fuel_margin) END,
                CASE fin.outcome
                     WHEN 'CREW_CAN_RETURN' THEN format('Crew can fly %s-%s legally (%s min spare)', fin.alt_iata, i.hub_iata, fin.crew_margin)
@@ -1450,8 +1475,8 @@ BEGIN
 
     -- HOLD evaluation: land at forecast reopening + approach
     v_land := CASE WHEN i.reopen_utc IS NULL THEN NULL
-                   ELSE greatest(i.reopen_utc, i.now_utc) + make_interval(mins => p_approach_min) END;
-    v_spare := floor(extract(epoch FROM (i.now_utc + make_interval(mins => i.endurance_left_min)) - v_land)/60)::int;
+                   ELSE greatest(i.reopen_utc, i.anchor_utc) + make_interval(mins => p_approach_min) END;
+    v_spare := floor(extract(epoch FROM i.endurance_until - v_land)/60)::int;
     v_hold_crew := floor(extract(epoch FROM i.legal_end_now - v_land)/60)::int;
     IF i.reopen_utc IS NULL THEN v_hold_block := v_hold_block || jsonb_build_object('code','REOPENING_TIME_UNKNOWN','verify',true); END IF;
     IF i.endurance_left_min IS NULL THEN v_hold_block := v_hold_block || jsonb_build_object('code','FUEL_ENDURANCE_UNKNOWN','verify',true); END IF;
@@ -1496,7 +1521,7 @@ BEGIN
            x.arr, x.fuel_m, x.crew_m, x.score, x.execable, x.blocking, x.reasons
       FROM (
         SELECT 'HOLD'::rec_type AS action, NULL::char(3) AS alt,
-               i.now_utc + make_interval(mins => greatest(0, coalesce(i.endurance_left_min, 0))) AS hold_until,
+               coalesce(i.endurance_until, i.anchor_utc) AS hold_until,
                v_land AS arr, v_spare AS fuel_m, v_hold_crew AS crew_m, v_hold_score AS score,
                v_hold_ok AS execable, v_hold_block AS blocking, v_hold_reasons AS reasons
         UNION ALL
@@ -1524,12 +1549,95 @@ BEGIN
             format('Hub reopening quality: %s', coalesce(i.reopen_quality, 'none')),
             'Distance to alternates measured from the hub (aircraft assumed in the hub terminal area)',
             'Diversion counts as one extra sector for every operating crew member',
+            CASE WHEN i.flight_phase = 'NOT_DEPARTED'
+                 THEN format('Flight not yet departed: pre-departure assessment, all times anchored at projected arrival %s (not at the current clock)',
+                             to_char(i.anchor_utc AT TIME ZONE 'UTC','DD HH24:MI"Z"'))
+                 ELSE format('Decision moment %s (%s)', to_char(i.anchor_utc AT TIME ZONE 'UTC','DD HH24:MI"Z"'), lower(i.flight_phase)) END,
             'Alternate status/parking taken from the latest airport_status_event',
             format('Hold preferred when feasible with >= %s min fuel spare at landing', p_min_hold_spare_min)),
         uncertainty = jsonb_build_object('reopening_utc', i.reopen_utc, 'reopening_quality', i.reopen_quality,
                                          'endurance_left_min', i.endurance_left_min)
      WHERE rec_id = v_rec;
     RETURN v_rec;
+END $$;
+
+-- ---------------------------------------------------------------------
+-- K. Downstream impact: what else breaks if this flight is late or diverted
+--    Aircraft: the same registration's next legs, with delay propagated leg by leg.
+--    Crew: remaining legs of the duty are already inside legality (compute_latest_departure);
+--          here we add each operating crew member's NEXT planned roster duty and the rest gap.
+--    Passengers: connections at risk per downstream leg.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION downstream_impact(p_scenario_id INT, p_flight_id BIGINT,
+                                             p_ready_at_hub_utc TIMESTAMPTZ DEFAULT NULL,
+                                             p_horizon_hours INT DEFAULT 24)
+RETURNS TABLE (kind TEXT, seq INT, ref TEXT, route TEXT, planned_utc TIMESTAMPTZ, projected_utc TIMESTAMPTZ,
+               delay_min INT, connecting_pax INT, impact TEXT)
+LANGUAGE plpgsql STABLE AS $$
+#variable_conflict use_column
+DECLARE
+    f flight%ROWTYPE; s flight_state%ROWTYPE; v_reg TEXT; v_ready TIMESTAMPTZ; v_hub CHAR(3);
+    nx RECORD; v_dep TIMESTAMPTZ; v_blk INT; v_gt INT; i INT := 0; v_rest INT; c RECORD; v_end TIMESTAMPTZ;
+BEGIN
+    SELECT * INTO f FROM flight WHERE flight_id = p_flight_id;
+    SELECT * INTO s FROM flight_state WHERE scenario_id = p_scenario_id AND flight_id = p_flight_id;
+    v_reg := coalesce(s.registration, f.registration_planned);
+    v_hub := f.arr_iata;
+    SELECT min_ground_time_min INTO v_gt FROM airport WHERE iata = v_hub;
+    -- aircraft ready at the hub: caller's what-if time, else projected on-blocks + turnaround
+    v_ready := coalesce(p_ready_at_hub_utc, coalesce(s.ata_utc, s.eta_utc, f.sta_utc) + make_interval(mins => coalesce(v_gt, 40)));
+
+    FOR nx IN SELECT f2.*, s2.etd_utc
+                FROM flight f2 LEFT JOIN flight_state s2 ON s2.flight_id = f2.flight_id AND s2.scenario_id = p_scenario_id
+               WHERE coalesce(s2.registration, f2.registration_planned) = v_reg
+                 AND f2.std_utc > f.std_utc AND f2.std_utc < f.sta_utc + make_interval(hours => p_horizon_hours)
+                 AND coalesce(s2.status::text, 'SCHEDULED') = 'SCHEDULED' AND f2.flight_id <> p_flight_id
+               ORDER BY f2.std_utc
+    LOOP
+        i := i + 1;
+        v_blk := ceil(extract(epoch FROM nx.sta_utc - nx.std_utc) / 60);
+        v_dep := greatest(coalesce(nx.etd_utc, nx.std_utc), v_ready);
+        kind := 'AIRCRAFT'; seq := i; ref := nx.flight_no; route := nx.dep_iata || '-' || nx.arr_iata;
+        planned_utc := nx.std_utc; projected_utc := v_dep;
+        delay_min := greatest(0, floor(extract(epoch FROM v_dep - nx.std_utc) / 60))::int;
+        connecting_pax := coalesce((SELECT sum(pax_count) FROM pax_connection pc WHERE pc.inbound_flight_id = nx.flight_id), 0)::int;
+        impact := CASE WHEN delay_min = 0 THEN 'On time (aircraft ready ' || to_char(v_ready AT TIME ZONE 'UTC','HH24:MI"Z"') || ')'
+                       ELSE format('Delayed %s min: aircraft %s not back until %s', delay_min, v_reg,
+                                   to_char(v_ready AT TIME ZONE 'UTC','DD HH24:MI"Z"')) END;
+        RETURN NEXT;
+        SELECT min_ground_time_min INTO v_gt FROM airport WHERE iata = nx.arr_iata;
+        v_ready := v_dep + make_interval(mins => v_blk + coalesce(v_gt, 40));
+    END LOOP;
+
+    -- crew: next planned duty after this one, and whether minimum rest still fits
+    SELECT coalesce((parameters->>'min_rest_after_duty_min')::int, 720) INTO v_rest
+      FROM rule_set WHERE rule_set_id = active_rule_set('GCAA FDP', scenario_now(p_scenario_id));
+    FOR c IN
+        SELECT DISTINCT ON (ca.crew_id) ca.crew_id, ca.position_code, fc.projected_end_utc,
+               re.block_name, re.duty_type, re.start_utc
+          FROM crew_duty_leg l
+          JOIN crew_assignment ca ON ca.duty_id = l.duty_id AND ca.scenario_id = l.scenario_id AND ca.valid_to IS NULL
+          JOIN crew_type ct ON ct.code = ca.position_code AND ct.gates_flight_legality
+          LEFT JOIN fdp_calculation fc ON fc.scenario_id = l.scenario_id AND fc.duty_id = l.duty_id
+                                      AND fc.crew_id = ca.crew_id AND fc.is_current
+          LEFT JOIN LATERAL (SELECT * FROM roster_entry re
+                              WHERE re.crew_id = ca.crew_id AND re.duty_type IN ('FLIGHT','DUTY','TRAINING','SIM','EVENT')
+                                AND re.start_utc > coalesce(fc.projected_end_utc, f.sta_utc)
+                              ORDER BY re.start_utc LIMIT 1) re ON TRUE
+         WHERE l.scenario_id = p_scenario_id AND l.flight_id = p_flight_id AND l.is_active
+         ORDER BY ca.crew_id
+    LOOP
+        v_end := greatest(coalesce(c.projected_end_utc, f.sta_utc), coalesce(p_ready_at_hub_utc - make_interval(mins => coalesce(v_gt,40)), c.projected_end_utc));
+        kind := 'CREW'; seq := NULL; ref := c.position_code || ' ' || c.crew_id;
+        route := coalesce(c.block_name, '—'); planned_utc := c.start_utc; projected_utc := v_end;
+        delay_min := NULL; connecting_pax := NULL;
+        impact := CASE WHEN c.start_utc IS NULL THEN 'No further duty in the roster window'
+                       WHEN c.start_utc - v_end < make_interval(mins => v_rest)
+                       THEN format('Rest conflict: only %s h before next duty (%s), minimum %s h',
+                                   round(extract(epoch FROM c.start_utc - v_end)/3600.0, 1), c.duty_type, v_rest/60)
+                       ELSE format('OK: %s h rest before next duty (%s)', round(extract(epoch FROM c.start_utc - v_end)/3600.0, 1), c.duty_type) END;
+        RETURN NEXT;
+    END LOOP;
 END $$;
 
 -- ---------------------------------------------------------------------

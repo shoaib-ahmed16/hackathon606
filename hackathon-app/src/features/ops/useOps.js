@@ -38,10 +38,13 @@ export function useOps() {
   const token = useAppSelector((s) => s.auth.token);
 
   // default to the newest case once, so the app opens on something real
+  // Closed cases are history (Audit and Report still reach them): they are not offered in the case picker, and if the selected
+  // case gets closed the app moves to the newest open one.
+  const openCases = useMemo(() => (cases.data ?? []).filter((c) => c.phase !== 'CLOSED'), [cases.data]);
   useEffect(() => {
-    const known = cases.data?.some((c) => c.case_id === ops.caseId);
-    if (cases.data?.length && !known) dispatch(selectCase(cases.data[0]));
-  }, [ops.caseId, cases.data, dispatch]);
+    const known = openCases.some((c) => c.case_id === ops.caseId);
+    if (openCases.length && !known) dispatch(selectCase(openCases[0]));
+  }, [ops.caseId, openCases, dispatch]);
 
   const ctx = { scenario_id: ops.scenarioId, case_id: ops.caseId };
   const skip = !ops.caseId;
@@ -81,8 +84,8 @@ export function useOps() {
   }, [dispatch, token]);
 
   const kase = useMemo(
-    () => cases.data?.find((c) => c.case_id === ops.caseId),
-    [cases.data, ops.caseId],
+    () => openCases.find((c) => c.case_id === ops.caseId),
+    [openCases, ops.caseId],
   );
   const actor = useMemo(
     () => (user ? { user_id: user.id, role_code: user.role, display_name: user.name } : null),
@@ -97,7 +100,7 @@ export function useOps() {
     ctx,
     kase,
     actor,
-    cases: cases.data ?? [],
+    cases: openCases,
     flights: flights.data ?? [],
     crew: crew.data ?? [],
     airport: airport.data ?? [],
@@ -119,9 +122,9 @@ export function useOps() {
     notifications: notifications.data ?? { unread: 0, items: [] },
     isLoading:
       cases.isLoading ||
-      (cases.isSuccess && cases.data.length > 0 && !ops.caseId) ||
+      (cases.isSuccess && openCases.length > 0 && !ops.caseId) ||
       (!skip && flights.isLoading),
     error: firstError?.error,
-    noCase: cases.isSuccess && cases.data.length === 0,
+    noCase: cases.isSuccess && openCases.length === 0,
   };
 }

@@ -71,7 +71,10 @@ fogops_db/
 │   ├── 04_seed_reference.sql        crew types, roles, demo users, feed sources, LIVE scenario
 │   ├── 05_demo_fog_replay.sql       end-to-end replay of the final challenge (also the e2e test
 │   │                                and the reference for how the API should call the DB)
-│   └── 05_demo_expected_output.txt  output of the demo for comparison
+│   ├── 05_demo_expected_output.txt  output of the demo for comparison
+│   ├── 06_proposed_extensions.sql   MVP additions (subscriptions, notifications, data requests, custom rules,
+│   │                                approval policy, external systems, KPI/severity views); not in rebuild.sh yet
+│   └── 07_proposed_triggers.sql     multi-role approval, notification fan-out, aeroMart outbox
 └── loader/load_data.py              loads the organizer Excel files into the schema
 ```
 
@@ -170,11 +173,11 @@ The loader expects these files: `OCC_Flight_Rotation_20Nov_23Nov26.xls`, `OCC_Fl
 |---|---|
 | Airports | 429 |
 | FDP rules | 216 |
-| Flights | 855 (+30 created from duty sheets) |
+| Flights | 855 (+4 created from duty sheets; 27 duty-sheet legs with a revised time linked to the rotation flight) |
 | Duties / assignments | 524 / 3,224 |
 | Roster rows | 26,172 |
 | Standby slots | 1,020 |
-| Pax connection pairs | 9,626 |
+| Pax connections | 5,061 (31,548 pax) |
 | History | 65,943 flights, 65,922 fuel rows |
 | Block-time routes | 249 |
 
@@ -289,7 +292,7 @@ Each table is listed with who writes it.
 | `flight_event` | event_id; unique (scenario, source, message_id) | raw payload; `apply_result` | F |
 | `flight_state` | (scenario, flight) | projected state, `field_ts` per field, derived `status` | F |
 | `flight_fuel_estimate` | estimate_id | holding endurance with a `quality` label | A |
-| `pax_connection` | (inbound, outbound) | connecting pax counts | L |
+| `pax_connection` | (inbound, outbound) | passengers arriving on `inbound_flight_id` who continue on `outbound_flight_id` at `connection_iata`. Stores `pax_count` (max of both views), `pax_inbound_view`, `pax_outbound_view`, `source_view` and `sched_connection_min` (section 12) | L |
 
 ### Airport operations
 
@@ -450,6 +453,7 @@ All functions live in schema `fogops` with a pinned `search_path`. The "Writes" 
 | `v_airport_status_current` | scenario × airport | Latest effective status, including `lvp_in_force` |
 | `v_flight_crew_legality` | scenario × flight | Binding duty-level legality (used by other views) |
 | `v_feed_freshness` | feed source | Data age and `is_stale` |
+| `v_connection_risk` | scenario × connection | Projected connection time and status: OK, AT_RISK (< 40 min), MISSED, INBOUND_DIVERTED or CANCELLED. Feeds the "connecting passengers affected" numbers and misconnect handling |
 | `v_open_exceptions` | exception | Verification items, BLOCKING first |
 
 `v_flight_watch` columns, grouped:
@@ -633,6 +637,45 @@ The slot interval is 60 / capacity.
 
 ---
 
+### Time-base rules (TB-1 to TB-5)
+
+These rules exist because of a real bug. G9822 BKK→SHJ (departs 21 Nov 01:20Z) was evaluated with a clock of 20 Nov 17:11Z. The engine assumed the diversion happened "now", which gave three wrong results:
+
+- a return to SHJ at 18:15Z on 20 Nov, 16 hours before the crew even sign in;
+- a crew margin of 963 minutes;
+- "18 h 09 left" on the crew bar.
+
+The rules:
+
+| Rule | Statement | Where |
+|---|---|---|
+| **TB-1** | Every hold/divert evaluation has a **decision moment** (`anchor_utc`) that depends on the flight phase: <br>• HOLDING or AIRBORNE → the scenario clock (it can divert now); <br>• NOT_DEPARTED → projected arrival − 20 min, as a *pre-departure assessment*; <br>• diverted, landed or cancelled → not divertible | `flight_decision_inputs()` |
+| **TB-2** | All diversion times are computed from the decision moment, never from "now" directly: arrival at the alternate, fuel margin, ready time, return departure, hold landing | `rank_alternates()`, `propose_hold_or_divert()` |
+| **TB-3** | Crew time only "runs" after sign-in. If `duty_started = false`, the UI shows *"duty starts HH:MMZ · legal until HH:MMZ"*, never a countdown | `v_crew_legality_ranking.duty_started` |
+| **TB-4** | Sanity check: a return departure earlier than the crew's sign-in means the time base is wrong. The option is blocked as `TIME_BASE_INCONSISTENT` (verify) | `rank_alternates()` |
+| **TB-5** | One clock: every countdown and margin is computed against `scenario_now()` from the database. The browser clock is used only to tick the display | API + UI |
+
+### Downstream impact (aircraft rotation, crew next duty, connections)
+
+`downstream_impact(scenario, flight, ready_at_hub_utc DEFAULT NULL, horizon_hours DEFAULT 24)` returns two kinds of row.
+
+**AIRCRAFT rows: the same aircraft's next legs.**
+
+1. The aircraft's ready time is `ready_at_hub_utc` (a what-if, e.g. the diversion return time + turnaround), otherwise projected on-blocks + minimum ground time.
+2. Each leg departs at max(STD/ETD, ready time). Its delay is propagated leg by leg using the scheduled block time + the minimum ground time at its arrival airport.
+3. Each leg shows its own connecting passengers.
+
+Example for G9822 → A6-ATC. If the aircraft is back at SHJ only at 12:30Z, the next legs are delayed by:
+
+| Leg | Delay |
+|---|---|
+| G9181 SHJ-ELQ | +120 min |
+| G9182 ELQ-SHJ | +120 min (202 connecting pax) |
+| G9821 SHJ-BKK | +35 min |
+| G9822 next day | +15 min |
+
+**CREW rows: each operating crew member's next roster duty.** The remaining legs of the *current* duty are already inside legality (`compute_latest_departure` subtracts them). The rows show the rest gap against `min_rest_after_duty_min` and flag a rest conflict if it is too short.
+
 ## 11. Workflows (how the API should call the database)
 
 `sql/05_demo_fog_replay.sql` is the executable reference for all of these.
@@ -724,8 +767,24 @@ The worker itself is **not implemented yet** (section 14).
 | Duty-sheet legs missing from the rotation | 30 flights created | Flagged `FLIGHT_FROM_DUTY_SHEET_ONLY` |
 | Roster (10 days) | `roster_entry` | SHJ local → UTC |
 | Crew_FDTL | rule_set v1 (APPROVED) + 216 rules | sha256 stored |
-| Connecting pax | `pax_connection` | Rows outside 20–23 Nov skipped |
+| Connecting pax | `pax_connection` | Direction normalised with `is_in_bound` and the two views merged (see below); connections outside 20–23 Nov skipped |
 | Historical flights / fuel | `hist.*` | Builds `block_time_reference`, alternate history, median ground time |
+
+**Connecting-passenger file layout.** Columns A–G hold the "actual" flight, H is `is_in_bound`, I is the passenger count and J–O hold the connecting flight. The meaning of the two flight blocks depends on `is_in_bound`:
+
+| `is_in_bound` | Rows | A–G is | J–O is |
+|---|---|---|---|
+| TRUE | 5,331 | the flight arriving at the connection station | the onward flight departing from it |
+| FALSE | 5,090 | the flight departing from the connection station | the feeder flight arriving there |
+
+The loader treats the file as follows:
+
+- **Normalising direction.** Every row is turned into (inbound → outbound).
+- **Merging views.** Most connections appear in both views (4,565 of 5,856 unique connections), so the two views are merged rather than added. Both counts are kept, and `pax_count` is the higher of the two.
+- **Disagreements.** 7 connections have different counts in the two views and are logged as `PAX_VIEWS_DISAGREE` (INFO).
+- **Checks.** The inbound flight's arrival station must equal the outbound flight's departure station (0 failures). Scheduled connection times range from 40 to 1,495 minutes; the 40-minute minimum is used as the minimum connection time in `v_connection_risk`.
+- **Result.** 5,856 unique connections in the file, of which 5,061 (31,548 pax) fall inside the 20–23 Nov rotation. Nearly all connect at SHJ (5,044 connections, 31,454 pax); a few connect at MCT, BAH, CAI and other stations.
+- **Verified against a source sample.** G9288 IST→SHJ on 20 Nov has 9 onward connections totalling 44 pax, the same in both views.
 
 **Findings:**
 
@@ -737,6 +796,8 @@ The worker itself is **not implemented yet** (section 14).
 **Exception codes in use:**
 
 - `SHEET_MAXFDP_MISMATCH`;
+- `PAX_VIEWS_DISAGREE`;
+- `DUTY_SHEET_TIME_DIFFERS`;
 - `NO_FDP_RULE`;
 - `NO_CREW_ASSIGNED`;
 - `NO_CREW_PAIRING`;
@@ -817,6 +878,10 @@ The worker itself is **not implemented yet** (section 14).
 | 7 | **LVP enforcement:** `airport_status_event.lvp_in_force`, `crew_type.requires_lvp`, `lvp_in_force()`, `flight_lvp_check()`; applied in the flight watch, standby candidates, the recovery plan and the crew ranking | Organizer rule: LVP required for fog landings |
 | 8 | **Alternate engine:** `flight_decision_inputs()`, `rank_alternates()`, `propose_hold_or_divert()`, `v_recommendation_options`, `alternate_airport.hist_median_ground_min`; the demo now uses engine-generated recommendations | Recommendations were hand-written before |
 | 9 | **Hold policy:** a feasible hold with ≥ 15 min fuel spare beats a diversion; below the buffer it ranks after executable diversions | Hold and divert were scored on the same scale |
+| 11 | `execute_diversion` reuses an existing recovery flight, so the replay can run repeatedly on the same database. Added `06_proposed_extensions.sql` and `07_proposed_triggers.sql`, validated by applying them to a fresh build and running the full replay twice with 0 errors. See `FogOps_Developer_Guide.md` | Team discussion: subscriptions, Teams/email alerts, per-flight discussion, data requests, custom rules, multi-role approvals, deep links, aeroMart trigger |
+| 13 | Loader no longer retries the same flight number on the previous/next day (flights repeat daily, so 4 duties had been linked to the wrong day, with margins up to 1,870 min). Legs must fall inside the duty window (sign-in −1 h … +20 h). Added `db_validation.sql` checks for this. 07 now pins the search_path of its functions | Found by the database validation script |
+| 12 | **Time-base rules TB-1 to TB-5** (decision moment by flight phase; diversion maths anchored to it; `duty_started`; `TIME_BASE_INCONSISTENT` check) and **`downstream_impact()`** (aircraft knock-on, crew next duty and rest, connections). The loader now links duty-sheet legs with a revised time to the real rotation flight (`DUTY_SHEET_TIME_DIFFERS`, INFO) instead of creating duplicates: 26 duplicates removed, 4 genuinely missing legs still created | A team screen showed G9822 (departing 21 Nov 01:20Z) evaluated at 20 Nov 17:11Z: crew margin 963 min and "18 h 09 left". The replay outputs are unchanged |
+| 10 | **Connecting-pax fix:** the loader now uses `is_in_bound` to orient each row, merges the two views of each connection, and validates the connection station. `pax_connection` gained `connection_iata`, both view counts, `source_view` and `sched_connection_min`. Added `v_connection_risk` | FALSE rows had been stored reversed (5,059 pairs) and every connection was stored twice, doubling the total (60,147 → 31,548 pax). Connecting-pax counts for *arriving* flights, as used by the recovery plan, were already right |
 
 ### When you extend the system
 

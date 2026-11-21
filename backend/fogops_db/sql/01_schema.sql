@@ -290,12 +290,22 @@ CREATE TABLE flight_fuel_estimate (
 );
 CREATE INDEX ix_fuel_flight ON flight_fuel_estimate (scenario_id, flight_id, as_of_utc DESC);
 
+-- One row per connection: passengers arriving on inbound_flight who continue on outbound_flight
+-- at connection_iata. The source file lists most connections twice (is_in_bound TRUE = seen from the
+-- arriving flight, FALSE = seen from the departing flight); the loader normalises direction and merges.
 CREATE TABLE pax_connection (
-    inbound_flight_id   BIGINT NOT NULL REFERENCES flight,
-    outbound_flight_id  BIGINT NOT NULL REFERENCES flight,
-    pax_count           INT NOT NULL CHECK (pax_count >= 0),
-    PRIMARY KEY (inbound_flight_id, outbound_flight_id)
+    inbound_flight_id     BIGINT NOT NULL REFERENCES flight,
+    outbound_flight_id    BIGINT NOT NULL REFERENCES flight,
+    connection_iata       CHAR(3) NOT NULL REFERENCES airport,
+    pax_count             INT NOT NULL CHECK (pax_count >= 0),   -- max of the two views
+    pax_inbound_view      INT,       -- count from is_in_bound = TRUE rows
+    pax_outbound_view     INT,       -- count from is_in_bound = FALSE rows
+    source_view           TEXT NOT NULL CHECK (source_view IN ('BOTH','INBOUND_VIEW','OUTBOUND_VIEW')),
+    sched_connection_min  INT,       -- outbound STD - inbound STA
+    PRIMARY KEY (inbound_flight_id, outbound_flight_id),
+    CHECK (inbound_flight_id <> outbound_flight_id)
 );
+CREATE INDEX ix_pax_conn_outbound ON pax_connection (outbound_flight_id);
 
 -- ---------------------------------------------------------------------
 -- 5. Airport operating status (SHJ fog, alternates) — append-only

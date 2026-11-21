@@ -250,7 +250,7 @@ def load_crew(cur, data_dir, fmap, airports):
     log(f"crew: {len(members)} members, {len(quals)} qualifications")
 
     # duties, legs, assignments
-    n_duty = n_leg = n_unmatched = n_assign = n_created = 0
+    n_duty = n_leg = n_unmatched = n_assign = n_created = n_revised = 0
     for fname, ds in duty_rows:
         for duty_no, g in ds.groupby("duty_no"):
             duty_date = pd.Timestamp(g["Date"].iloc[0]).date()
@@ -282,11 +282,30 @@ def load_crew(cur, data_dir, fmap, airports):
             duty_id = cur.fetchone()[0]
             n_duty += 1
             for seq, (l, dt) in enumerate(zip(legs.itertuples(), leg_dt), start=1):
-                fid = None
-                for shift in (0, -1, 1):
-                    fid = fmap.get(f"{l.flightNo}|{l.origin}|{(dt + timedelta(days=shift)):%Y-%m-%dT%H:%M}")
-                    if fid:
-                        break
+                # 1) exact match on the leg's own date/time. No day-shift retries: flights repeat daily, so
+                #    trying yesterday/tomorrow links crew to the WRONG day (seen: sign-in 23 Nov, legs 22 Nov).
+                fid = fmap.get(f"{l.flightNo}|{l.origin}|{dt:%Y-%m-%dT%H:%M}")
+                if not fid:
+                    # 2) same flight number + route, nearest STD within 6 h: the duty sheet carries a revised
+                    # time (delay). Link the crew to the REAL rotation flight; never create a duplicate.
+                    cur.execute("""SELECT flight_id, std_utc FROM fogops.flight
+                                   WHERE flight_no=%s AND dep_iata=%s AND arr_iata=%s
+                                     AND abs(extract(epoch FROM std_utc - %s)) < 6*3600
+                                   ORDER BY abs(extract(epoch FROM std_utc - %s)) LIMIT 1""",
+                                (l.flightNo, l.origin, l.destination, dt, dt))
+                    hit = cur.fetchone()
+                    # 3) guard: the matched flight must sit inside this duty's window (sign-in -1 h .. +20 h)
+                    if hit and sign_in and not (sign_in - timedelta(hours=1) <= hit[1] <= sign_in + timedelta(hours=20)):
+                        hit = None
+                    if hit:
+                        fid = hit[0]
+                        cur.execute("""INSERT INTO fogops.data_exception (entity_type, entity_id, code, severity, message, detail)
+                                       VALUES ('flight', %s, 'DUTY_SHEET_TIME_DIFFERS', 'INFO',
+                                       'Duty sheet shows a different departure time than the OCC rotation; crew linked to the rotation flight', %s)
+                                       ON CONFLICT DO NOTHING""",
+                                    (str(fid), Json({"duty_sheet_etd": dt.isoformat(), "rotation_std": hit[1].isoformat(),
+                                                     "diff_min": int((dt - hit[1]).total_seconds() // 60), "file": fname})))
+                        n_revised += 1
                 if not fid and l.origin in airports and l.destination in airports:
                     # leg exists for the crew but not in the rotation window (e.g. next-day return):
                     # create it from the duty sheet so the sector count stays correct
@@ -343,7 +362,7 @@ def load_crew(cur, data_dir, fmap, airports):
                                    valid_from, source, sheet_max_fdp_min) VALUES (1,%s,%s,%s,%s,'DUTY_SHEET',%s)""",
                             (duty_id, cid, c.crewType, ASSIGN_VALID_FROM, hm_to_min(c.maxFdp)))
                 n_assign += 1
-    log(f"duties: {n_duty}, legs: {n_leg} ({n_created} flights created from duty sheets), "
+    log(f"duties: {n_duty}, legs: {n_leg} ({n_revised} linked despite a revised time, {n_created} created from duty sheets), "
         f"unmatched legs: {n_unmatched}, assignments: {n_assign}")
 
     execute_values(cur, """INSERT INTO fogops.standby_slot (duty_date, pattern_name, crew_id, crew_type_code,
@@ -368,39 +387,49 @@ def load_crew(cur, data_dir, fmap, airports):
 
 
 def load_pax(cur, data_dir, fmap):
-    """Connecting passengers: inbound leg (lands at the hub) -> outbound leg (departs the hub).
-
-    The sheet lists EVERY connection twice: once with is_in_bound = TRUE and once with FALSE, where the two flight
-    blocks are swapped (the departing flight comes first). The flag is not reliable, so the direction is decided from
-    the airports: the block that arrives at the hub is the inbound. Both listings of a connection are counted once
-    (the larger figure if the two disagree). Connections where the outbound leaves before the inbound lands are skipped.
-    """
-    HUB = "SHJ"
+    """Connecting passengers.
+    Columns A-G = the 'actual' flight, J-O = the connecting flight, H = is_in_bound, I = pax.
+      is_in_bound TRUE : A-G arrives at the connection station, J-O departs from it (onward flight)
+      is_in_bound FALSE: A-G departs from the connection station, J-O is the feeder that arrives
+    Most connections appear in both views; they are normalised to (inbound -> outbound) and merged."""
     c = pd.read_excel(find(data_dir, "Connecting_pax_data*.xlsx")[0])
-    c.columns = ["flight_date", "in_no", "in_o", "in_d", "in_reg", "in_std", "in_sta", "is_in_bound", "pax",
-                 "out_no", "out_o", "out_d", "out_reg", "out_std", "out_sta"]
-    fkey = lambda no, o, std: f"{no}|{o}|{pd.Timestamp(std):%Y-%m-%dT%H:%M}"  # noqa: E731
-    agg = {}
-    outside = odd = impossible = 0
+    c.columns = ["flight_date", "a_no", "a_o", "a_d", "a_reg", "a_std", "a_sta", "is_in_bound", "pax",
+                 "b_no", "b_o", "b_d", "b_reg", "b_std", "b_sta"]
+    conns, bad_station = {}, 0
     for r in c.itertuples():
-        if r.in_d == HUB and r.out_o == HUB:      # block 1 lands at the hub, block 2 departs it
-            ik, ok, lands, departs = fkey(r.in_no, r.in_o, r.in_std), fkey(r.out_no, r.out_o, r.out_std), r.in_sta, r.out_std
-        elif r.in_o == HUB and r.out_d == HUB:    # swapped listing
-            ik, ok, lands, departs = fkey(r.out_no, r.out_o, r.out_std), fkey(r.in_no, r.in_o, r.in_std), r.out_sta, r.in_std
-        else:
-            odd += 1
+        a = (r.a_no, r.a_o, r.a_d, pd.Timestamp(r.a_std), pd.Timestamp(r.a_sta))
+        b = (r.b_no, r.b_o, r.b_d, pd.Timestamp(r.b_std), pd.Timestamp(r.b_sta))
+        inb, outb = (a, b) if bool(r.is_in_bound) else (b, a)
+        if inb[2] != outb[1]:                       # arrival station of inbound must be departure of outbound
+            bad_station += 1
             continue
-        i, o = fmap.get(ik), fmap.get(ok)
+        e = conns.setdefault((inb, outb), {"in": None, "out": None})
+        side = "in" if bool(r.is_in_bound) else "out"
+        e[side] = (e[side] or 0) + int(r.pax)
+    rows, miss, mismatch = [], 0, []
+    key = lambda f: f"{f[0]}|{f[1]}|{f[3]:%Y-%m-%dT%H:%M}"
+    for (inb, outb), v in conns.items():
+        i, o = fmap.get(key(inb)), fmap.get(key(outb))
         if not i or not o:
-            outside += 1
+            miss += 1
             continue
-        if pd.Timestamp(departs) < pd.Timestamp(lands):
-            impossible += 1
-            continue
-        agg[(i, o)] = max(agg.get((i, o), 0), int(r.pax))
-    execute_values(cur, "INSERT INTO fogops.pax_connection VALUES %s", [(i, o, p) for (i, o), p in agg.items()])
-    log(f"pax connections: {len(agg)} pairs, {sum(agg.values())} pax ({outside} rows outside the 20-23 Nov rotation, "
-        f"{impossible} impossible (outbound before inbound), {odd} not hub connections: skipped)")
+        view = "BOTH" if v["in"] is not None and v["out"] is not None else ("INBOUND_VIEW" if v["in"] is not None else "OUTBOUND_VIEW")
+        pax = max(x for x in (v["in"], v["out"]) if x is not None)
+        if view == "BOTH" and v["in"] != v["out"]:
+            mismatch.append((i, o, inb[0], outb[0], v["in"], v["out"]))
+        rows.append((i, o, inb[2], pax, v["in"], v["out"], view, int((outb[3] - inb[4]).total_seconds() // 60)))
+    execute_values(cur, """INSERT INTO fogops.pax_connection (inbound_flight_id, outbound_flight_id, connection_iata,
+                           pax_count, pax_inbound_view, pax_outbound_view, source_view, sched_connection_min) VALUES %s""", rows)
+    for i, o, fi, fo, pin, pout in mismatch:
+        cur.execute("""INSERT INTO fogops.data_exception (entity_type, entity_id, code, severity, message, detail)
+                       VALUES ('pax_connection', %s, 'PAX_VIEWS_DISAGREE', 'INFO',
+                       'Connecting pax differs between inbound and outbound views; the higher value is used', %s)
+                       ON CONFLICT DO NOTHING""",
+                    (f"{i}->{o}", Json({"inbound": fi, "outbound": fo, "inbound_view": pin, "outbound_view": pout})))
+    views = pd.Series([r[6] for r in rows]).value_counts().to_dict()
+    log(f"pax connections: {len(c)} source rows -> {len(conns)} unique connections; {len(rows)} loaded "
+        f"({sum(r[3] for r in rows)} pax, views {views}), {miss} outside the rotation window, "
+        f"{len(mismatch)} with differing counts, {bad_station} with station mismatch")
 
 
 def load_history(cur, data_dir):

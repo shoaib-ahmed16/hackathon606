@@ -134,7 +134,9 @@ SELECT fc.scenario_id, fc.crew_id, cm.full_name, fc.position_code, fc.duty_id,
        fc.margin_min, fmt_min(fc.margin_min) AS margin_hhmm,
        floor(extract(epoch FROM fc.legal_end_utc - scenario_now(fc.scenario_id))/60)::int AS minutes_until_legal_end,
        fc.status, fc.reasons, fc.inputs->>'rule_set' AS rule_set, fc.inputs->>'source_rule_id' AS rule_ref,
-       fc.inputs->>'band' AS band, fc.calculated_at
+       fc.inputs->>'band' AS band, fc.calculated_at,
+       -- TB-3: before sign-in the crew is not "using" time; show "duty starts HH:MMZ", not a countdown
+       (fc.sign_in_utc <= scenario_now(fc.scenario_id)) AS duty_started
   FROM fdp_calculation fc JOIN crew_member cm ON cm.crew_id = fc.crew_id
  WHERE fc.is_current AND fc.crew_id IS NOT NULL
    AND coalesce(fc.inputs->>'projected_end_basis', '') <> 'ACTUAL';     -- duty still running
@@ -294,6 +296,33 @@ SELECT DISTINCT cf.case_id, coalesce(al.scenario_time_utc, al.occurred_at), 'CRE
   LEFT JOIN app_user u ON u.user_id = al.actor_user_id
  WHERE al.entity_type = 'crew_assignment' AND al.actor_user_id IS NOT NULL
    AND (al.action <> 'INSERT' OR al.after_data->>'source' <> 'DUTY_SHEET');
+
+-- Passenger connections at risk: projected connection time per scenario.
+-- Minimum connection time 40 min = smallest scheduled connection in the supplied data (assumption).
+CREATE OR REPLACE VIEW v_connection_risk AS
+WITH c AS (
+    SELECT si.scenario_id, pc.*, fi.flight_no AS inbound_flight, fi.dep_iata AS inbound_from,
+           fo.flight_no AS outbound_flight, fo.arr_iata AS outbound_to,
+           coalesce(si.ata_utc, si.eta_utc, fi.sta_utc) AS inbound_arrival_utc,
+           coalesce(so.atd_utc, so.etd_utc, fo.std_utc) AS outbound_departure_utc,
+           si.status AS inbound_status, si.actual_arr_iata, so.status AS outbound_status, so.atd_utc AS outbound_atd
+      FROM pax_connection pc
+      JOIN flight fi ON fi.flight_id = pc.inbound_flight_id
+      JOIN flight fo ON fo.flight_id = pc.outbound_flight_id
+      JOIN flight_state si ON si.flight_id = pc.inbound_flight_id
+      LEFT JOIN flight_state so ON so.flight_id = pc.outbound_flight_id AND so.scenario_id = si.scenario_id
+)
+SELECT scenario_id, inbound_flight_id, inbound_flight, inbound_from, outbound_flight_id, outbound_flight, outbound_to,
+       connection_iata, pax_count, source_view, sched_connection_min,
+       inbound_arrival_utc, outbound_departure_utc,
+       floor(extract(epoch FROM outbound_departure_utc - inbound_arrival_utc) / 60)::int AS projected_connection_min,
+       CASE WHEN actual_arr_iata IS NOT NULL AND actual_arr_iata <> connection_iata THEN 'INBOUND_DIVERTED'
+            WHEN inbound_status = 'CANCELLED' OR outbound_status = 'CANCELLED' THEN 'CANCELLED'
+            WHEN outbound_atd IS NOT NULL AND outbound_atd < inbound_arrival_utc THEN 'MISSED'
+            WHEN outbound_departure_utc - inbound_arrival_utc < interval '0 minutes' THEN 'MISSED'
+            WHEN outbound_departure_utc - inbound_arrival_utc < interval '40 minutes' THEN 'AT_RISK'
+            ELSE 'OK' END AS connection_status
+  FROM c;
 
 CREATE OR REPLACE VIEW v_open_exceptions AS
 SELECT exception_id, scenario_id, entity_type, entity_id, code, severity, message, detail, status, raised_at

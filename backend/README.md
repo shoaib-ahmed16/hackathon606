@@ -1,6 +1,6 @@
-# FOOH database (schema `fogops`)
+# FOOH! database (schema `fogops`)
 
-Backing store for **FOOH**, the disruption control room for airline operations (fog operations and crew duty recovery). The schema keeps its internal name `fogops`; renaming it would break existing databases.
+Backing store for **FOOH!**, the disruption control room for airline operations (fog operations and crew duty recovery). The schema keeps its internal name `fogops`; renaming it would break existing databases.
 
 The database holds:
 
@@ -281,3 +281,13 @@ Each item below is currently handled as "verification required" or as a labelled
 
 - The LIVE scenario clock is set to the time of the latest snapshot (20 Nov 16:45Z). Once a real feed is connected, set `scenario.sim_clock_utc = NULL` for LIVE so it uses the wall clock.
 - The 12-per-hour reopening capacity, road positioning times and holding endurance values in the demo are **simulated or assumed**. They are labelled as such in the data (`quality`, `assumptions`, `notes`).
+
+## Installing a new database drop from the DB team
+```
+backend/scripts/install_db_drop.sh ~/Downloads/fogops_db.zip      # or an unpacked folder
+```
+It shows which files changed, replaces `backend/fogops_db/sql` and `loader`, builds the database in a throwaway Postgres container
+(baseline SQL + the Excel files + demo replay), writes `backend/db/init/10_fogops.sql.gz`, restores that seed into a clean database and
+applies our `backend/migrations` on top to prove they still fit. Then commit and, on the server, `git pull && ./reset-db.sh`.
+Our own changes never live inside `fogops_db/` (always in `migrations/`, `scripts/` and `app/`), so a drop is a plain overwrite.
+The 06/07 "proposed" SQL files in a drop are not applied: our migrations already provide those features.
