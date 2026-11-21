@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import logging
 
-from . import audit, auth, config, routes_ask, routes_audit, routes_auth, routes_console, routes_read, routes_write, stream, worker
+from . import audit, auth, config, migrate, routes_ask, routes_audit, routes_auth, routes_console, routes_read, routes_write, stream, worker
 from .deps import current_user
 from .db import fetch, pool
 
@@ -29,6 +29,11 @@ def _ensure_credentials():
 
 @asynccontextmanager
 async def lifespan(_):
+    try:
+        res = migrate.run()  # apply pending backend/migrations/*.sql; no dump/restore needed for schema or logic changes
+        logging.getLogger("fogops").info("migrations: applied=%s current=%s", res["applied"], res["current"])
+    except Exception:
+        logging.getLogger("fogops").exception("MIGRATION FAILED: the database was left at its previous level")
     pool.open()
     _ensure_credentials()
     if health()["schema"] != "current":
@@ -60,7 +65,11 @@ def health():
         "SELECT to_regproc('fogops.propose_hold_or_divert') IS NOT NULL AND EXISTS (SELECT 1 FROM information_schema.columns "
         "WHERE table_schema='fogops' AND table_name='airport_status_event' AND column_name='lvp_in_force') AS ok"
     )[0]["ok"]
-    return {"status": "UP", "db": ok, "schema": "current" if current else "OUTDATED: rebuild the database from fogops_db"}
+    try:
+        level = fetch("SELECT max(version) AS v FROM fogops.schema_migration")[0]["v"]
+    except psycopg.Error:
+        level = None
+    return {"status": "UP", "db": ok, "schema": "current" if current else "OUTDATED: rebuild the database from fogops_db", "migration": level}
 
 
 @app.exception_handler(psycopg.Error)

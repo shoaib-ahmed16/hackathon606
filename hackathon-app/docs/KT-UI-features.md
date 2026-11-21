@@ -115,6 +115,7 @@ This is where one flight is understood and decided. From top to bottom:
 6. **Crew legality:** status, the limiting crew member, legs counted, legal duty end, **the end with commander's discretion (+3 hours)**, the latest legal departure time and the operational target. A warning appears if there are open data problems: *"Treat legality as unverified."*
 7. **Ranked options and the decision:**
    - Each option (for example "Hold at SHJ" or "Divert to XXX") shows a rank, **Executable** or **Blocked**, a score, fuel margin, crew margin, arrival time and the reasons it is blocked.
+   - For a diversion, the reasons also say **how long the flight to that alternate takes** (typical and conservative, from real 2026 flights), **how much fuel is left on arrival above the 30-minute legal final reserve**, **the latest time to leave the hold** for that alternate, and **when the aircraft would be back at SHJ**. See section 16.
    - **Assumption chips** show how trustworthy each input is: *Measured* (green), *Forecast or Estimated* (amber), *Simulated or Assumed* (blue), *Manual* (grey).
    - A **"What will happen" preview** lists the consequences of choosing an option (✓ fine, ! caution, ✕ problem, ? verify).
 8. **Recording a decision:** choose the type (Hold, Divert, Recover, Cancel, Delay, Crew replace, Commander's discretion, Aircraft swap, Override, Other) and **write a rationale (required)**.
@@ -240,3 +241,37 @@ From Crew Control, **Find replacement** checks standby crew for rest, roster con
 5. **Crew duty times in local time** are stored without a time zone in one part of the data; confirm they are not shown directly anywhere without conversion.
 6. **Unused or template parts.** A four-card summary (next crew expiry, aircraft locator, latest-legal departure, standby crew) exists in the code but is not on any screen. The pages *Posts* and *Realtime* are starter-kit demos, not part of the operations product, and are not in the menu.
 7. **Fuel unknown is never "safe".** Where fuel or crew data is missing, the screens say *verify*, and the system will not mark such flights as legal or executable. This is deliberate.
+8. **Database changes no longer need a dump and restore.** Changes are numbered files applied automatically when the API starts. The current level shows in the API health check. Engineers: see `backend/README.md`.
+9. **The new diversion details (bingo time, return-to-SHJ arrival, flight-time basis) are in the data but not yet shown as their own fields in the flight drawer;** they appear in the option's reasons text.
+10. **Two local databases exist** (one for the full stack, one from `backend/docker-compose.yml`) with separate data. Check which one you are looking at.
+
+---
+
+## 15. Where the data comes from
+
+- **Everything comes from the supplied Excel files**: the OCC flight rotation (two snapshots), crew duty sheets, crew roster, the FDP rules table, connecting passengers, historical flights (Jan to Nov 2026) and historical fuel.
+- **Simulated data is allowed, but it must keep the same structure as the Excel files** (same sheets, columns, time zones and keys) and be marked as simulated, so the same loader reads it and nobody mistakes it for real data.
+- **Anything not in the Excel files is an assumption and is labelled** (for example road time from SHJ to an alternate, and the hold burn rate). Section 16 lists the decisions made.
+
+## 16. Diversion: how the system judges it (plain language)
+
+For each alternate airport the system asks four questions, in this order:
+
+1. **How long is the flight there?** From real flights between SHJ and that airport in 2026. It uses the *typical* time for the arrival estimate and the *conservative* time (the slower one in 9 of 10 flights) for the fuel check. If there are fewer than 5 real flights (today only **DWC**), it estimates from distance and says **ESTIMATED**.
+2. **Is there enough fuel?** Fuel on board, reduced for the time since it was reported, must cover the flight **plus the 30-minute final reserve** that aviation rules require the aircraft to land with. If not, the alternate is blocked: "cannot reach with fuel". If fuel was never entered, it says **verify** and the option is not executable.
+3. **When must the aircraft leave?** The **latest time to leave the hold** for this alternate and still land with the reserve. This is the time operations act on.
+4. **What then?** The time to fly back to SHJ (typical for the arrival time, conservative for crew legality), plus the ground time at the alternate, and whether the crew can legally fly the return, need commander's discretion, or need replacing. The earliest return cannot be before SHJ's forecast reopening.
+
+**Decisions made without the organizers** (the files do not say, so these follow aviation practice and the data):
+
+| Decision | Plain reason |
+|---|---|
+| Final reserve is 30 minutes | The international minimum for jet aircraft. If the airline has a stricter figure, it can be changed in one place. |
+| Hold burn rate stays at 2,400 kg/h | The 2026 fuel history implies about 2,300 to 2,600 kg/h, so it is realistic. |
+| Fuel checks use the conservative flight time | A fuel decision must not be optimistic. |
+| Old fuel figures are reduced to "now" | A 90-minute-old estimate must not look current. |
+| The old "2,300 kg minimum diversion fuel" is no longer subtracted | It was an assumption, and it counted the flight time twice. Diversion margins are now about 20 to 45 minutes less pessimistic than before. |
+| Historical diversions are not used for timing | Most were flights leaving SHJ that diverted elsewhere, so they do not describe SHJ arrivals diverting here. |
+| Road time from SHJ to each alternate stays an assumption | It is not in the Excel files. |
+
+Open questions for the airline: does it have a **company minimum landing fuel** above the legal 30 minutes, and what are the **real hold burn rate and fuel on board** per flight (the Excel files give fuel at departure only)?

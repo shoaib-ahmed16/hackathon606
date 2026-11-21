@@ -55,6 +55,44 @@ Legality status of the 524 duties:
 | AT_RISK | 26 |
 | VERIFICATION_REQUIRED | 163 (see "Open questions") |
 
+## Database changes: migrations (no more dump and restore)
+
+The database is restored **once** from `db/init/10_fogops.sql.gz`. Every later change to tables, views or
+functions is a numbered SQL file in [`migrations/`](migrations/), applied automatically when the API starts
+([`app/migrate.py`](app/migrate.py)).
+
+| Item | How it works |
+|---|---|
+| Naming | `NNN_short_name.sql` (three digits), applied in filename order |
+| Tracking | `fogops.schema_migration` (file name, checksum, time applied). `GET /health` shows the latest as `migration` |
+| Each file | Runs once, in its own transaction. If it fails, nothing from that file is kept and the error is in the API log (`MIGRATION FAILED`) |
+| Fresh volume or existing volume | Both end at the same level, because the restored dump is older than the migrations |
+| Concurrency | A Postgres advisory lock stops two API instances migrating at once |
+| Edited after applying | Reported as a checksum mismatch and **not** re-applied. Add a new file instead |
+
+**To make a database change:** add `migrations/00N_what_it_does.sql`, write it so it can be re-run safely
+(`IF NOT EXISTS`, `CREATE OR REPLACE`; use `DROP FUNCTION` first if the return columns change), then
+`docker compose up -d --build api`. Test it on a copy first:
+`createdb fogops_test && pg_dump fogops | psql fogops_test`, then run `app.migrate` with `FOGOPS_DSN` pointing at the copy.
+
+`backend/.dockerignore` excludes `*.sql`; it has an exception for `migrations/*.sql`. Keep it.
+
+Applied so far:
+
+| File | What it adds |
+|---|---|
+| `001_diversion_leg_times.sql` | `divert_policy` (constants), `leg_time_reference` (hub to alternate airborne times), `refresh_leg_time_reference()` |
+| `002_rank_alternates_fuel_policy.sql` | New `rank_alternates()`: historical flight times, final-reserve fuel check, bingo time, return-to-base arrival |
+
+If `hist.flight` is ever reloaded, or alternates change, run `SELECT fogops.refresh_leg_time_reference();`.
+
+### Local ports
+
+The project's `docker-compose.yml` maps the database to `127.0.0.1:${DB_PORT}` (the local `.env` uses 5434).
+`backend/docker-compose.yml` (a separate database, container `fogops-postgres`, volume `backend_fogops-data`) uses 5433.
+They hold **different copies of the data**; check which one you are connected to. `DB_PASSWORD` in `.env` must match the
+password the database volume was created with, or the API cannot log in.
+
 ## Design principles
 
 1. **Event in, state out.**
@@ -179,6 +217,46 @@ Every API transaction starts with `SELECT fogops.set_actor(:user_id);`. The audi
 - **Historical diversions** give the alternate ranking (FJR, RKT, MCT, AAN…) and P90 block times for alternate→SHJ.
 - **Dirty fuel rows** (4,649) are flagged as implausible.
 
+## Diversion model (how "can it divert, and what then?" is answered)
+
+Implemented in `rank_alternates(scenario, flight)`; every option carries its basis so a reviewer can see what is
+measured, historical or assumed. All timing comes from the supplied Excel files; nothing is invented except the
+labelled assumptions below.
+
+1. **Flight time hub to alternate.** `leg_time_reference` holds the **airborne time** (take-off to touchdown) from
+   `hist.flight`, both directions of a pair pooled, outliers (under 5 or over 150 minutes) excluded. **P50** is used for
+   the arrival estimate and **P90** for the fuel check. A pair with fewer than 5 historical flights uses a distance
+   estimate (great-circle distance at 8 km/min + 8 min, P90 = 1.25 x) and is labelled `ESTIMATED`.
+   Today: SHJ-FJR 18/24 min (32 flights), SHJ-RKT 15/19 (89), SHJ-AAN 26/35 (9), SHJ-AUH 29/36 (14),
+   SHJ-MCT 40/45 (1,010), SHJ-DWC 16/20 **ESTIMATED** (2 flights).
+2. **Fuel check.** Minutes of fuel on board now = latest `fuel_on_board_kg` / `burn_rate_hold_kg_per_hr`, less the time
+   since that estimate. **Margin = that minus the P90 leg time minus the final reserve (30 min).** Negative margin blocks
+   the alternate with `CANNOT_REACH_WITH_FUEL`. With no fuel on board or burn rate (only an endurance figure), the older rule
+   is kept and labelled `LEGACY`. With no fuel data at all the option is `verify`, never executable.
+3. **Bingo time** (`bingo_utc`): now + margin, the latest moment the aircraft can leave the hold for that alternate and still land with
+   the final reserve.
+4. **Return to base.** Alternate to hub block time: **P90** protects crew legality (`latest_legal_return_dep_utc`), the
+   **median** gives the expected arrival (`return_arrival_hub_utc` = earliest departure after the ground time + median block).
+   Ground time at the alternate is the airport's minimum ground time. The return cannot be planned before the hub's forecast reopening.
+5. **Crew, stands, status, LVP** checks are unchanged (see the function and `score_breakdown`).
+
+## Decisions made without organizer input
+
+Only the supplied Excel files exist, so these were decided on aviation practice and the data. Change a constant with
+`UPDATE fogops.divert_policy SET value = ... WHERE key = ...` (no migration needed); change logic with a new migration.
+
+| # | Decision | Reason | Where |
+|---|---|---|---|
+| D1 | Final reserve = **30 min** | ICAO Annex 6 Part I (turbine aeroplanes): final reserve at holding speed. The legal floor; a stricter company figure was not supplied | `divert_policy.final_reserve_min` |
+| D2 | Hold burn **2,400 kg/h** kept | The history implies a median of about 38 kg/min (2,280 kg/h) and P90 43 kg/min (2,580 kg/h) on 30-90 min sectors, so it is the right order | `flight_fuel_estimate.burn_rate_hold_kg_per_hr` |
+| D3 | P50 for arrival time, **P90 for the fuel check** | Fuel decisions must be conservative; ETAs should be typical | `rank_alternates` |
+| D4 | Airborne time (not block) for the outbound leg | The aircraft is already airborne; taxi does not apply | `leg_time_reference` |
+| D5 | Pairs with under 5 flights use distance, labelled `ESTIMATED` | Never present a guess as history | `divert_policy.min_leg_sample_n` |
+| D6 | Fuel estimate is **burned down to "now"** | A 90-minute-old estimate must not look fresh | `rank_alternates` |
+| D7 | Old "2,300 kg minimum diversion fuel" no longer subtracted | It was an assumption (not from the Excel files) and double-counted the flight time. Margins are about 20-45 min less pessimistic than before | migration 002 |
+| D8 | The 158 historical diversions are not used for timing | They are mostly flights that left SHJ and diverted elsewhere, not SHJ arrivals diverting to these alternates | n/a |
+| D9 | Road positioning minutes stay **assumed** | Not in the Excel files | `alternate_airport` |
+
 ## Open questions for the organizers
 
 Each item below is currently handled as "verification required" or as a labelled assumption.
@@ -191,6 +269,8 @@ Each item below is currently handled as "verification required" or as a labelled
 4. **Minimum rest after duty** is not supplied. 12 hours is assumed, and it is used only for roster-conflict checks.
 5. **The meaning of the 0-leg FDP rows** and of PTD/PTA in the 16:45 snapshot.
 6. **Should LVP qualification be a hard constraint** for landing at SHJ in fog? Today it is stored and shown in the standby candidates.
+7. **Does the airline have a company minimum landing fuel** above the 30-minute final reserve? If so, set it in `divert_policy` and the engine should use it (decision D1).
+8. **Real hold burn rate and fuel on board per flight.** Today these are estimates; the Excel files give fuel at departure only.
 
 ## Notes
 

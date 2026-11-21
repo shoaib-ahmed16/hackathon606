@@ -34,6 +34,13 @@ so role guardrails apply. Demo users: `occ.dm`, `dispatch.1`, `crew.ctl.1`, `rec
 `station.rkt/fjr/aan/mct` (after the demo script). Password: `DEMO_PASSWORD` (default `FogOps@2026`).
 The `agent` account (the non-human engine) cannot sign in. Set `AUTH_SECRET` in production.
 
+## Database migrations
+
+On startup the API applies any new `backend/migrations/NNN_*.sql` file (see `backend/README.md`, "Database changes").
+`GET /health` returns `"migration": "<latest file>"`. A failed migration is logged as `MIGRATION FAILED` and the database
+stays at its previous level. `rank_alternates()` (used by deadlines and the flight drawer preview) gained columns
+`flight_min_p90, flight_time_basis, final_reserve_min, fuel_basis, bingo_utc, return_arrival_hub_utc`.
+
 ## Background worker (reassessment loop)
 
 Runs inside the API process (`WORKER_ENABLED=true`). It follows the contract in `fogops_db/README.md` section 11:

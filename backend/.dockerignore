@@ -10,3 +10,4 @@ db
 *.txt
 !requirements.txt
 README.md
+!migrations/*.sql
