@@ -508,3 +508,28 @@ button.alt:hover,.hub-btn:hover{border-color:var(--ai)}
 .strip-actions{margin-left:auto}
 .scn-row select{max-width:230px}
 @media (max-width:1700px){ .strip .kbd{display:none} .strip-actions{gap:5px} .strip-actions .btn{padding:6px 10px} .scn-row select{max-width:200px} .clock-z{font-size:17px} }
+
+/* ---- Station view on a phone or tablet (below 768 px). Everything else stays desktop-only (1024 px and up). ----
+   The station lens drops the desk-sized chrome and stacks into one column with large tap targets. */
+@media (max-width: 767px) {
+  body.station-lens{min-width:0}
+  body.station-lens .app{min-width:0}
+  body.station-lens .strip{flex-wrap:wrap;overflow:visible}
+  body.station-lens .strip > *{padding:6px 10px;border-right:none}
+  body.station-lens .strip .alts, body.station-lens .strip .hub, body.station-lens .strip .spacer, body.station-lens .strip .strip-actions .kbd{display:none}
+  body.station-lens .strip .scn{flex:1 1 60%}
+  body.station-lens .scn-row select{max-width:100%;width:100%;min-height:40px}
+  body.station-lens .strip-actions{margin-left:auto}
+  body.station-lens .strip-actions .btn{min-height:40px}
+  body.station-lens .bar-top{flex-wrap:wrap}
+  body.station-lens .bar-top > .next{flex:1 1 100%}
+  body.station-lens .bar-top > .who, body.station-lens .bar .tools, body.station-lens .bar-top > .btn{display:none}
+  body.station-lens .lenses{max-width:100%;overflow-x:auto}
+  body.station-lens .station{padding:10px 12px}
+  body.station-lens .st-card{padding:12px}
+  body.station-lens .big-btns{display:grid;grid-template-columns:1fr;gap:10px}
+  body.station-lens .big-btns .big, body.station-lens .big-btns button{min-height:56px;font-size:16px;width:100%}
+  body.station-lens .st-bar select{min-height:44px;width:100%}
+  body.station-lens .sheet{width:100vw;max-width:100vw}
+}
+.kpi .v{overflow:hidden;text-overflow:ellipsis} /* a long value is cut with an ellipsis, never drawn outside its card */

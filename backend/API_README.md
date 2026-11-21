@@ -150,3 +150,13 @@ bound parameters, and columns that look like secrets (password, token, hash, ...
 | `GET /api/explorer/rows?table=&q=&f=col\|op\|val&sort=&dir=&limit=&offset=` | rows with search, column filters (`eq`, `like`, `null`, `notnull`), sorting, paging |
 | `GET /api/explorer/links?table=&row={json}` | for one row: parent rows it points at, child rows that point at it (two levels, with counts) |
 | `GET /api/explorer/profile?table=` | per column: empty count, distinct count, min, max |
+
+## Security notes (changed after the demo test report)
+* **Session token:** only in the `Authorization: Bearer` header. A `?token=` in the URL is no longer accepted anywhere.
+* **Live stream:** `POST /api/stream/ticket` (with the bearer header) returns a random ticket valid for 30 seconds and usable once; open
+  `GET /api/stream?ticket=...` with it. Reconnecting means asking for a new ticket.
+* **API docs** (`/docs`, `/redoc`, `/openapi.json`) are off unless `ENABLE_DOCS=1` is set in `.env`, and the web container never forwards them.
+* **`POST /api/records/{table}`** accepts only `decision`, `case_comment`, `airport_status_event`, `flight_fuel_estimate` and `crew_replacement`,
+  each for the roles that work with it. Recommendations, cases and watch lists have their own endpoints.
+* **`DELETE /api/cases/{id}`** is admin-only (and still refuses a case that has decisions or comments). OCC closes cases.
+* Replacement finder: `crew_replacement_options()` now returns `from_leg_seq` and `report_station` and counts road time before sign-in.

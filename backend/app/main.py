@@ -45,7 +45,10 @@ async def lifespan(_):
     pool.close()
 
 
-app = FastAPI(title="Foooh! API", description="Foooh!: disruption control for airline operations (fog operations and crew duty recovery)", version="0.1.0", lifespan=lifespan)
+# The interactive API docs map every endpoint, so they are off unless ENABLE_DOCS=1 (set it in .env on a dev machine).
+_docs = config.ENABLE_DOCS
+app = FastAPI(title="Foooh! API", description="Foooh!: disruption control for airline operations (fog operations and crew duty recovery)", version="0.1.0", lifespan=lifespan,
+              docs_url="/docs" if _docs else None, redoc_url="/redoc" if _docs else None, openapi_url="/openapi.json" if _docs else None)
 app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(audit.AuditMiddleware)
 app.include_router(routes_auth.r)  # login is open; everything else needs a signed-in user
@@ -59,7 +62,7 @@ app.include_router(routes_collab.r)  # KPIs, approvals, subscriptions, data requ
 app.include_router(routes_explorer.r)  # data explorer (OCC/ADMIN only, read-only)
 app.include_router(routes_feed.r)  # simulated live feed push (resolves the user through actor())
 app.include_router(routes_write.r)  # actions resolve the user through actor()
-app.include_router(stream.r, dependencies=[Depends(current_user)])
+app.include_router(stream.r)  # the ticket route checks the bearer token itself; the stream itself needs the one-time ticket
 
 
 @app.get("/health", tags=["ops"])

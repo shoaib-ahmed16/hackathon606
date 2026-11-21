@@ -10,6 +10,7 @@ SEARCH_PATH = "fogops,hist,public"
 
 # --- auth
 AUTH_SECRET = os.environ.get("AUTH_SECRET", "dev-only-change-me")
+ENABLE_DOCS = os.environ.get("ENABLE_DOCS", "0").lower() in ("1", "true", "yes")  # Swagger / OpenAPI (off by default)
 TOKEN_TTL_SEC = int(os.environ.get("TOKEN_TTL_HOURS", "12")) * 3600
 # initial password for every demo user that has no credential yet (change it in production)
 DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD", "FogOps@2026")

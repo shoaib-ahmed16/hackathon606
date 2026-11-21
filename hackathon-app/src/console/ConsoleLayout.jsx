@@ -328,7 +328,7 @@ function CaseSheet({ d, onClose }) {
           {!confirm && (
             <div className="ai-buttons" style={{ marginTop: 8 }}>
               <button className="btn" disabled={kase?.phase === 'CLOSED'} onClick={() => setConfirm('close')}>Close case (keep history)</button>
-              <button className="btn danger" onClick={() => setConfirm('delete')}>Delete case…</button>
+              {actor?.role_code === 'ADMIN' && <button className="btn danger" onClick={() => setConfirm('delete')}>Delete case…</button>}
             </div>
           )}
           {confirm && (
@@ -360,6 +360,11 @@ export default function ConsoleLayout() {
   const [airportIata, setAirportIata] = useState(null);
   const { ops } = d;
 
+  // the Station view is the one screen meant for a phone or tablet: below 768 px it drops the desk-sized chrome (see console.css)
+  useEffect(() => {
+    document.body.classList.toggle('station-lens', ops.lens === 'station');
+    return () => document.body.classList.remove('station-lens');
+  }, [ops.lens]);
   useEffect(() => {
     document.body.classList.toggle('show-src', Boolean(ops.showSources));
     return () => document.body.classList.remove('show-src');

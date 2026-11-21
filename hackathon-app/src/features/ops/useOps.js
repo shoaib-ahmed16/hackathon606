@@ -72,16 +72,37 @@ export function useOps() {
   const notifications = useGetMyNotificationsQuery(undefined, { pollingInterval: 30000 });
 
   // live push: the DB NOTIFYs when anything changes; refetch everything tagged Ops
+  // The browser asks for a one-time ticket (with its normal Authorization header) and only the ticket goes in the stream URL, so the session
+  // token never lands in access logs or browser history. A ticket works once: when the stream drops, ask for a new one and reconnect.
   useEffect(() => {
+    if (!token) return undefined;
     let es;
-    try {
-      es = new EventSource(`${OPS_API_URL}/api/stream?token=${encodeURIComponent(token)}`);
-      es.addEventListener('reassess', () => dispatch(api.util.invalidateTags(['Ops'])));
-      es.addEventListener('notify', () => dispatch(api.util.invalidateTags(['Ops'])));
-    } catch {
-      /* polling still works */
-    }
-    return () => es?.close();
+    let timer;
+    let stopped = false;
+    const refresh = () => dispatch(api.util.invalidateTags(['Ops']));
+    const connect = async () => {
+      try {
+        const r = await fetch(`${OPS_API_URL}/api/stream/ticket`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) throw new Error(String(r.status));
+        const { ticket } = await r.json();
+        if (stopped) return;
+        es = new EventSource(`${OPS_API_URL}/api/stream?ticket=${encodeURIComponent(ticket)}`);
+        es.addEventListener('reassess', refresh);
+        es.addEventListener('notify', refresh);
+        es.onerror = () => {
+          es.close();
+          if (!stopped) timer = setTimeout(connect, 5000);
+        };
+      } catch {
+        if (!stopped) timer = setTimeout(connect, 15000); // polling keeps the screen fresh meanwhile
+      }
+    };
+    connect();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      es?.close();
+    };
   }, [dispatch, token]);
 
   const kase = useMemo(

@@ -151,7 +151,16 @@ def clone(b: Clone, user=Depends(actor)):
 
 # Human workflow rows are plain INSERTs; guardrail triggers enforce roles and status transitions.
 # Only these tables are writable, and columns are checked against the real table definition.
-WRITABLE = {"decision", "decision_approval", "recommendation", "recommendation_option", "case_comment", "airport_status_event", "disruption_case", "case_flight", "flight_fuel_estimate", "crew_replacement"}
+# Only what the screens write through here, and only for the roles that do it (the database guardrails still apply on top).
+# Recommendations, cases and watch lists are NOT writable from outside: the engine and the dedicated endpoints own them.
+HUMANS = {"OCC", "DISPATCH", "CREW_CONTROL", "STATION", "RECOVERY", "ADMIN"}
+WRITABLE = {
+    "decision": HUMANS - {"STATION"},
+    "case_comment": HUMANS,
+    "airport_status_event": HUMANS,
+    "flight_fuel_estimate": HUMANS - {"STATION"},
+    "crew_replacement": {"OCC", "CREW_CONTROL", "ADMIN"},
+}
 
 
 @r.post("/records/{table}")
@@ -159,6 +168,7 @@ def insert_record(table: str, body: dict[str, Any], user=Depends(actor)):
     if table not in WRITABLE:
         raise HTTPException(404, f"Table not writable: {table}")
     with tx(user) as conn:
+        _require_role(conn, user, tuple(sorted(WRITABLE[table])))
         cols = {c["column_name"] for c in conn.execute("SELECT column_name FROM information_schema.columns WHERE table_schema='fogops' AND table_name=%s", (table,)).fetchall()}
         bad = set(body) - cols
         if bad or not body:
@@ -260,7 +270,7 @@ def delete_case(case_id: int, user=Depends(actor)):
     """Delete a case that nobody has acted on. Cases with decisions or comments are part of the audit
     trail (the database forbids deleting those rows), so they must be closed instead."""
     with tx(user) as conn:
-        _require_role(conn, user)
+        _require_role(conn, user, ("ADMIN",))  # operational history is never deleted by duty staff: OCC closes a case, only an admin can remove an empty one
         case = conn.execute("SELECT case_id FROM disruption_case WHERE case_id = %s", (case_id,)).fetchone()
         if not case:
             raise HTTPException(404, "Unknown case")

@@ -1,18 +1,38 @@
 import asyncio
 import json
+import secrets
+import time
 
 import psycopg
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from . import config
+from .deps import current_user
 
 r = APIRouter(prefix="/api", tags=["live"])
 
+# EventSource cannot send an Authorization header, and a session token in the URL would end up in access logs and browser history.
+# So the browser first asks for a ticket (with its normal header): random, valid for 30 seconds, usable once. Only the ticket goes in the URL.
+_TICKETS: dict[str, float] = {}
+TICKET_TTL = 30
+
+
+@r.post("/stream/ticket")
+def stream_ticket(uid: int = Depends(current_user)):
+    now = time.time()
+    for k in [k for k, exp in _TICKETS.items() if exp < now]:  # forget expired ones
+        _TICKETS.pop(k, None)
+    t = secrets.token_urlsafe(24)
+    _TICKETS[t] = now + TICKET_TTL
+    return {"ticket": t, "expires_in": TICKET_TTL}
+
 
 @r.get("/stream")
-async def stream():
-    """Server-Sent Events: relays the DB's NOTIFY fogops_reassess so the UI can refresh instantly."""
+async def stream(ticket: str):
+    """Server-Sent Events: relays the DB's NOTIFY fogops_reassess so the UI can refresh instantly. Needs a one-time ticket."""
+    if _TICKETS.pop(ticket, 0) < time.time():
+        raise HTTPException(401, "Stream ticket missing, used or expired")
 
     async def gen():
         async with await psycopg.AsyncConnection.connect(config.DSN, autocommit=True) as conn:

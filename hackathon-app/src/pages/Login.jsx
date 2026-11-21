@@ -81,9 +81,11 @@ export default function Login() {
         <button type="submit" className="btn primary" disabled={isLoading}>
           {isLoading ? 'Signing in...' : 'Sign in'}
         </button>
-        <div className="k" style={{ textAlign: 'center', marginTop: 14 }}>
-          Demo users: occ.dm, dispatch.1, crew.ctl.1, recovery.1 (password: FogOps@2026)
-        </div>
+        {import.meta.env.VITE_SHOW_DEMO_USERS === 'true' && (
+          <div className="k" style={{ textAlign: 'center', marginTop: 14 }}>
+            Demo users: occ.dm, dispatch.1, crew.ctl.1, recovery.1 (password: FogOps@2026)
+          </div>
+        )}
       </form>
     </div>
   );
