@@ -83,6 +83,25 @@ def standby(duty_id: int, position: str, station: str, from_leg: int = 1, scenar
     return fetch("SELECT * FROM standby_candidates(%s,%s,%s,%s,%s)", (scn(scenario_id), duty_id, position.upper(), station.upper(), from_leg))
 
 
+@r.get("/crew/replacement-options")
+def replacement_options(duty_id: int, position: str, destination: str, from_leg: int = 1, scenario_id: int | None = None):
+    """Replacement finder for the flight's destination: legal for the current legs (N) and one more sector (N+1),
+    positioning to the destination, weekly workload vs the pool average. Ranked, suggestions first."""
+    return fetch("SELECT * FROM crew_replacement_options(%s,%s,%s,%s,%s)", (scn(scenario_id), duty_id, position.upper(), destination.upper(), from_leg))
+
+
+@r.get("/crew/leg-outlook")
+def leg_outlook(duty_id: int, scenario_id: int | None = None):
+    """Crew on a duty: legality now (N legs) and with one more sector (N+1), from the approved FDP rules."""
+    return fetch("SELECT * FROM crew_leg_outlook(%s,%s)", (scn(scenario_id), duty_id))
+
+
+@r.get("/crew/next-duty-legal")
+def next_duty_legal(duty_id: int, scenario_id: int | None = None):
+    """Per crew on a duty: duty end + minimum rest = from when they are legal for their next flight (rest is labelled ASSUMED)."""
+    return fetch("SELECT * FROM crew_next_duty_legal(%s,%s)", (scn(scenario_id), duty_id))
+
+
 @r.get("/airport/status")
 def airport_status(scenario_id: int | None = None):
     return view("v_airport_status_current", {"scenario_id": scn(scenario_id)})

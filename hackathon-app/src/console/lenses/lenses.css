@@ -37,3 +37,16 @@
 .sum-grid > div{border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2);padding:8px 10px}
 .sum-grid b{display:block;font-size:20px}
 .sum-grid span{font-size:12px;color:var(--muted)}
+
+/* Crew Control: expanded crew list (legality for N and N+1 per crew member) */
+.crew-detail{padding:6px 14px 12px;border-top:1px solid var(--line);background:var(--surface-2)}
+.cd-row{display:grid;grid-template-columns:minmax(160px,1fr) minmax(200px,1fr) minmax(220px,1fr);gap:12px;align-items:center;padding:8px 10px;border-radius:var(--r-md);margin-top:6px}
+.cd-head{font-size:12px;color:var(--muted);padding-top:2px;padding-bottom:0;margin-top:4px}
+
+/* Crew Control row layout: wider margin + action columns, stacked pills and buttons (no overlap) */
+.crew-view .rw-row{grid-template-columns:170px 120px minmax(220px,1fr) 190px 140px}
+.crew-view .rw-row .pill{white-space:nowrap}
+.outlook{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:6px}
+.crew-view .rw-actions{flex-direction:column;align-items:stretch}
+.crew-view .rw-actions .k{text-align:center}
+.cd-row{grid-template-columns:minmax(150px,1fr) minmax(190px,1fr) minmax(200px,1fr) minmax(210px,1fr)}
