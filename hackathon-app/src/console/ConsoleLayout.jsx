@@ -82,7 +82,9 @@ function altChip(code, airport) {
   if (!a) return { cls: 'verify', mark: '?', text: 'verify' };
   if (a.op_status !== 'OPEN') return { cls: 'blocked', mark: '✕', text: a.op_status.toLowerCase() };
   if (a.fuel_ok === false) return { cls: 'blocked', mark: '✕', text: 'No fuel' };
-  return { cls: '', mark: '✓', text: a.parking_available != null ? `${a.parking_available} stands` : 'Open' };
+  // free stands = what the station reported minus diverted aircraft still on the ground there (the stand is given back when they leave)
+  const free = a.stands_free ?? a.parking_available;
+  return { cls: '', mark: '✓', text: free != null ? `${free} stands` : 'Open', title: a.stands_diverted > 0 ? `${a.parking_available} reported, ${a.stands_diverted} used by diverted aircraft` : undefined };
 }
 
 function ThemeIcon({ dark }) {
@@ -190,7 +192,7 @@ function Strip({ d, onSheet, onAirport }) {
           {altCodes.map((c) => {
             const a = altChip(c, airport);
             return (
-              <button type="button" key={c} className={`alt ${a.cls}`} onClick={() => onAirport(c)} title={a.cls === 'verify' ? `${c} is not confirmed. Click to verify it.` : `Click to update ${c}`}>
+              <button type="button" key={c} className={`alt ${a.cls}`} onClick={() => onAirport(c)} title={a.cls === 'verify' ? `${c} is not confirmed. Click to verify it.` : `${a.title ? `${a.title}. ` : ''}Click to update ${c}`}>
                 <b>
                   {c} {a.mark}
                 </b>
