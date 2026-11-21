@@ -10,11 +10,17 @@ import './chat.css';
 
 const MODE = {
   predefined: ['From live data', 'legal'],
-  ai: ['AI, grounded on case data', 'ai'],
+  ai: ['AI · case data + Foooh! guide', 'ai'],
   fallback: ['AI not configured', 'risk'],
   error: ['Unavailable', 'exceeded'],
-  help: ['Built-in guide', 'ai'],
+  help: ['Foooh! guide', 'ai'],
 };
+// starter questions are grouped: about this case, and about Foooh! itself (its terms, rules and screens)
+const ABOUT_FOOOH = /^(how (does|are|is)|what (does|is) (lvp|n\+1|severity|fdp|p90)|is the recommendation|explain|what is (a|an|the) )/i;
+const Icon = ({ d, size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
+);
+const SPARK = <><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z" /></>;
 const REASON = { write: 'Read-only', pii: 'No personal data', injection: 'Rules cannot be changed', domain: 'Out of scope', length: 'Too long' };
 const FLIGHT = /\bG9\d{3,4}D?\b|\bA6-?[A-Z]{3}\b/i;
 const PRONOUN = /\b(it|that flight|this flight|that one|this one|the same flight|its)\b/i;
@@ -71,7 +77,9 @@ export default function AskChat({ d, state, setState, onOpenView }) {
     const sent = !FLIGHT.test(question) && PRONOUN.test(question) && lastFlight ? `${question} (${lastFlight})` : question;
     setLog((l) => [...l, { role: 'user', text: question }]);
     try {
-      const res = await ask({ question: sent, ...d.ctx }).unwrap();
+      // the conversation so far goes with the question, so a follow-up ("why?", "and for RKT?") is understood
+      const history = log.slice(-8).map((m) => ({ role: m.role === 'user' ? 'user' : 'bot', text: String(m.role === 'user' ? m.text : m.answer ?? '').slice(0, 700) })).filter((t) => t.text);
+      const res = await ask({ question: sent, history, ...d.ctx }).unwrap();
       setLog((l) => [...l, { role: 'bot', question, items: [], actions: [], ...res }]);
     } catch (e) {
       setLog((l) => [...l, { role: 'bot', question, mode: 'error', answer: getErrorMessage(e), items: [], actions: [] }]);
@@ -102,38 +110,45 @@ export default function AskChat({ d, state, setState, onOpenView }) {
   if (state === 'min')
     return (
       <button type="button" className="chat-pill" onClick={() => setState('open')} aria-label="Open the assistant">
-        <span className="chat-dot" /> Ask Foooh! <span className="kbd">⌘K</span>
+        <Icon d={SPARK} /> Ask Foooh! <span className="kbd">⌘K</span>
         {log.length > 0 && <span className="chat-count">{log.filter((m) => m.role === 'bot').length}</span>}
       </button>
     );
 
-  const starters = (sug.data?.items ?? []).slice(0, 8);
+  const starters = (sug.data?.items ?? []).slice(0, 16);
   return (
     <aside className="chat" aria-label="Assistant" data-src="ask() · guarded: read-only, domain-limited, no personal data">
       <header className="chat-h">
-        <div>
-          <b>Ask Foooh!</b>
-          <span className="k">Read-only · this disruption only · no personal data</span>
+        <div className="chat-id">
+          <span className="chat-av"><Icon d={SPARK} size={18} /></span>
+          <div>
+            <b>Ask Foooh!</b>
+            <span className="k">Case data + Foooh! guide · read-only</span>
+          </div>
         </div>
         <span className="chat-btns">
-          <button type="button" className="btn ghost sm" onClick={() => setLog([])} disabled={log.length === 0} title="Start a new conversation">New chat</button>
-          <button type="button" className="btn ghost sm" onClick={() => setState('min')} aria-label="Minimise" title="Minimise (Esc)">—</button>
-          <button type="button" className="btn ghost sm" onClick={() => setState('closed')} aria-label="Close" title="Close">✕</button>
+          <button type="button" className="chat-ic" onClick={() => setLog([])} disabled={log.length === 0} aria-label="New chat" title="New chat"><Icon d={<><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></>} /></button>
+          <button type="button" className="chat-ic" onClick={() => setState('min')} aria-label="Minimise" title="Minimise (Esc)"><Icon d={<path d="M5 12h14" />} /></button>
+          <button type="button" className="chat-ic" onClick={() => setState('closed')} aria-label="Close" title="Close"><Icon d={<path d="M6 6l12 12M18 6L6 18" />} /></button>
         </span>
       </header>
 
       <div className="chat-body" aria-live="polite">
-        <div className="bub bot">
-          <div className="answer">
-            Hi, I'm the Foooh! assistant. Ask me about the flights, crew, deadlines and approvals on this case, or how any screen works, for example "How does the Recovery tab work?". I only read data: I can't change anything, and I show crew by position and number, never by name.
-          </div>
-          {!sug.data?.ai && sug.data && <div className="k" style={{ marginTop: 6 }}>Free-text questions need the AI key on the server; the suggested questions work now.</div>}
+        <div className="chat-hello">
+          <h4>How can I help?</h4>
+          <p>Ask about the flights, crew, deadlines and passengers on this case, or what any Foooh! term, rule or screen means. I only read data and never show crew names.</p>
+          {!sug.data?.ai && sug.data && <div className="k" style={{ marginTop: 8 }}>Free-text questions need the AI key on the server. Suggested questions and "What is …?" definitions work now.</div>}
         </div>
         {log.length === 0 && (
           <div className="chat-starters">
-            {starters.map((s) => (
-              <button type="button" key={s} className="fchip" onClick={() => send(s)}>{s}</button>
-            ))}
+            <div className="chat-group">
+              <span className="gl">About this case</span>
+              <div className="row">{starters.filter((x) => !ABOUT_FOOOH.test(x)).map((x) => <button type="button" key={x} className="fchip" onClick={() => send(x)}>{x}</button>)}</div>
+            </div>
+            <div className="chat-group">
+              <span className="gl">About Foooh!</span>
+              <div className="row">{starters.filter((x) => ABOUT_FOOOH.test(x)).map((x) => <button type="button" key={x} className="fchip" onClick={() => send(x)}>{x}</button>)}</div>
+            </div>
           </div>
         )}
 
@@ -171,8 +186,9 @@ export default function AskChat({ d, state, setState, onOpenView }) {
                 </div>
               )}
               <div className="src">
-                {m.mode === 'refused' ? <Pill tone="exceeded">{REASON[m.reason] ?? 'Not allowed'}</Pill> : MODE[m.mode]?.[0] && <Pill tone={MODE[m.mode][1]}>{MODE[m.mode][0]}</Pill>}
-                {m.source && <> {m.source}</>}
+                <span className={`src-dot ${m.mode === 'refused' ? 'exceeded' : MODE[m.mode]?.[1] ?? ''}`} />
+                <b>{m.mode === 'refused' ? REASON[m.reason] ?? 'Not allowed' : MODE[m.mode]?.[0]}</b>
+                {m.source && <span>· {m.source}</span>}
               </div>
             </div>
           ),
@@ -193,24 +209,29 @@ export default function AskChat({ d, state, setState, onOpenView }) {
         }}
       >
         <label className="sr" htmlFor="chat-q">Message the assistant</label>
-        <textarea
-          id="chat-q"
-          ref={input}
-          rows={1}
-          maxLength={300}
-          value={q}
-          placeholder="Ask about this case, or how a screen works…"
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
-        />
-        <button type="submit" className="btn primary" disabled={!q.trim() || isLoading}>Send</button>
+        <div className="chat-box">
+          <textarea
+            id="chat-q"
+            ref={input}
+            rows={1}
+            maxLength={300}
+            value={q}
+            placeholder="Ask about this case or any Foooh! term…"
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+          />
+          <button type="submit" className="chat-send" disabled={!q.trim() || isLoading} aria-label="Send"><Icon d={<><path d="M12 19V5" /><path d="M5 12l7-7 7 7" /></>} size={17} /></button>
+        </div>
       </form>
-      {lastFlight && <div className="chat-ctx k">Follow-ups like "it" or "that flight" mean {lastFlight}.</div>}
+      <div className="chat-hint">
+        <span>Enter to send · Shift+Enter for a new line</span>
+        {lastFlight && <span>"it" means {lastFlight}</span>}
+      </div>
     </aside>
   );
 }
