@@ -76,12 +76,19 @@ def deadlines(case_id: int, scenario_id: int | None = None):
                 # alternate with more spare fuel: that would give the duty manager minutes that do not exist for the recommended option.
                 best = next((o for o in opts if o["alt_iata"] == f.get("recommended_alternate")), None) or (min(opts, key=lambda o: o["rank"]) if opts else None)
                 if best:
-                    d = {"deadline_utc": now + timedelta(minutes=max(0, best["fuel_margin_min"])), "kind": "divert", "reason": f"Last moment to divert to {best['alt_iata']} on fuel",
+                    d = {"deadline_utc": (inp["endurance_until"] - timedelta(minutes=end - best["fuel_margin_min"])) if inp.get("endurance_until") and inp["endurance_until"] > now + timedelta(seconds=2) else now + timedelta(minutes=best["fuel_margin_min"]), "kind": "divert", "reason": f"Last moment to divert to {best['alt_iata']} on fuel",
                          "why": [f"Holding endurance {end} min (quality: {str(inp.get('fuel_quality')).lower()})", f"Flight time to {best['alt_iata']} about {best['est_flight_min']} min ({round(float(best['distance_km']))} km plus approach)",
                                  f"Spare fuel on arrival at {best['alt_iata']} if diverting now: {best['fuel_margin_min']} min, so the decision can wait about that long",
                                  f"SHJ reopening {z(inp.get('reopen_utc'))} ({str(inp.get('reopen_quality')).lower()})" if inp.get("reopen_utc") else "No reopening forecast on record"]}
                 else:
-                    d = {"deadline_utc": now + timedelta(minutes=max(0, end)), "kind": "fuel", "reason": "Fuel runs out (no executable alternate)", "why": [f"Holding endurance {end} min and no alternate is executable. Escalate to the OCC duty manager."]}
+                    # Fuel is estimated to be at or below final reserve already: the moment it crossed is not known (the estimate stops at "now"), so there is no
+                    # countdown to show. A moving "deadline = now" restarted the timer at 0 on every refresh; it is flagged instead and shown as a fixed state.
+                    eu = inp.get("endurance_until")
+                    if end <= 0 or not eu or eu <= now + timedelta(seconds=2):
+                        d = {"deadline_utc": None, "kind": "fuel", "at_reserve": True, "reason": "Fuel at or below final reserve (estimate)",
+                             "why": ["The estimated fuel on board is at or below the final reserve and no alternate is executable.", "Verify the position and fuel with the crew now. Escalate to the OCC duty manager."]}
+                    else:
+                        d = {"deadline_utc": eu, "kind": "fuel", "reason": "Fuel runs out (no executable alternate)", "why": [f"Holding endurance {end} min and no alternate is executable. Escalate to the OCC duty manager."]}
         elif f["latest_legal_offblocks_utc"] and status in ("SCHEDULED", "TAXI_OUT"):
             d = {"deadline_utc": f["latest_legal_offblocks_utc"], "kind": "departure", "reason": "Latest legal departure", "why": [f"Crew legal end {z(f['legal_end_utc'])}", f"Latest legal off-blocks {z(f['latest_legal_offblocks_utc'])}"]}
         if d:

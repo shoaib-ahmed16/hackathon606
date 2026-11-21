@@ -630,11 +630,12 @@ button.alt:hover,.hub-btn:hover{border-color:var(--ai)}
 .strip-actions .icon-btn svg{width:18px;height:18px;flex-shrink:0}
 
 /* wider flight drawer; alternates table compact so every column stays visible */
-/* a selected flight gets a wide drawer; the board squeezes to fit */
-.main.has-panel{grid-template-columns:minmax(0,1fr) clamp(520px,42vw,780px)}
-.main.has-panel .row{grid-template-columns:88px minmax(110px,1fr) 96px 104px minmax(120px,1.2fr) 96px;gap:10px}
+/* the drawer is slim until a flight is selected, then it widens; the board columns keep room for their content */
+.main.has-panel{grid-template-columns:minmax(0,1fr) 340px}
+.main.has-flight{grid-template-columns:minmax(0,1fr) clamp(480px,34vw,660px)}
+.main.has-panel .row{grid-template-columns:84px minmax(120px,1fr) 104px 150px minmax(130px,1.1fr) 92px;gap:10px}
 .main.has-panel .row > .lvp-cell{display:none}
-@media (max-width:1180px){.main.has-panel{grid-template-columns:1fr}}
+@media (max-width:1180px){.main.has-panel,.main.has-flight{grid-template-columns:1fr}}
 .panel .tbl-wrap{margin:0 -4px}
 .altt{font-size:12px}
 .altt th,.altt td{padding:5px 5px;white-space:nowrap;vertical-align:top}
@@ -671,3 +672,8 @@ a.brand-link:focus-visible{outline:none;box-shadow:0 0 0 2px color-mix(in srgb,v
 .wn-time{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
 .wn-empty{padding:10px 14px 14px;color:var(--muted);font-size:13px}
 .wn-foot{display:flex;justify-content:flex-end;padding:8px 12px 12px}
+
+.conn-banner{background:color-mix(in srgb,var(--risk) 22%,var(--surface));color:var(--text);font-size:12.5px;padding:6px 16px;text-align:center;border-bottom:1px solid color-mix(in srgb,var(--risk) 50%,transparent)}
+.crash{padding:24px 28px;max-width:640px}
+.crash h3{margin:0 0 6px}
+.crash pre{white-space:pre-wrap;background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:12px;max-height:160px;overflow:auto}

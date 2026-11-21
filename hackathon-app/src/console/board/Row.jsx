@@ -138,7 +138,7 @@ const Row = memo(function Row({ f, cur, last, dl, fuelEnd, rules, selected, watc
       </div>
       <div className="rec"><RecCell f={f} cur={cur} last={last} verifyFuel={verifyFuel} /></div>
       <div className="cd-cell">
-        {recovered ? <span className="k">Done</span> : at ? <><Cd at={at} big /><span className="k">{fmtZday(at, now)}</span></> : dl?.kind === 'diverting' || dl?.kind === 'crew' ? <><span className={`cd-big long ${dl.kind === 'crew' ? 'c-disc' : 'c-legal'}`}>{dl.kind === 'crew' ? 'Needs crew decision' : 'Diverting'}</span><span className="k">{dl.reason}</span></> : <><span className={`cd-big ${isAirborne(f) || f.diverted_to ? 'c-verify' : 'k'}`}>{isAirborne(f) || f.diverted_to ? '?' : '—'}</span><span className="k">{isAirborne(f) || f.diverted_to ? human(dl?.reason ?? 'verify') : 'no deadline running'}</span></>}
+        {recovered ? <span className="k">Done</span> : at ? <><Cd at={at} big /><span className="k">{fmtZday(at, now)}</span></> : dl?.at_reserve ? <><span className="cd-big long c-exceeded">At reserve</span><span className="k">fuel (estimate)</span></> : dl?.kind === 'diverting' || dl?.kind === 'crew' ? <><span className={`cd-big long ${dl.kind === 'crew' ? 'c-disc' : 'c-legal'}`}>{dl.kind === 'crew' ? 'Needs crew decision' : 'Diverting'}</span><span className="k">{dl.reason}</span></> : <><span className={`cd-big ${isAirborne(f) || f.diverted_to ? 'c-verify' : 'k'}`}>{isAirborne(f) || f.diverted_to ? '?' : '—'}</span><span className="k">{isAirborne(f) || f.diverted_to ? human(dl?.reason ?? 'verify') : 'no deadline running'}</span></>}
       </div>
     </div>
   );

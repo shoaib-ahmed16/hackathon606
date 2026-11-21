@@ -50,6 +50,7 @@ export const cdText = (target, now) => {
   const a = Math.abs(s);
   const h = Math.floor(a / 3600);
   const m = Math.floor((a % 3600) / 60);
+  if (s < 0) return a < 60 ? 'just passed' : `passed ${h > 0 ? `${h} h ${String(m).padStart(2, '0')} min` : `${m} min`} ago`; // overdue: whole minutes, no second-by-second ticking
   const body =
     h > 0
       ? `${h} h ${String(m).padStart(2, '0')} min`

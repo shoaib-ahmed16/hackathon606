@@ -673,7 +673,14 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
           {why && <ol style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>{(dl.why ?? []).map((w) => <li key={w}>{w}</li>)}</ol>}
         </div>
       )}
-      {dl && dlAt == null && dl.kind !== 'diverting' && dl.kind !== 'crew' && !isRecovered(f) && <div className="sec"><h3>Deadline</h3><Pill tone="verify">Cannot compute</Pill> <span className="k">{dl.reason}</span></div>}
+      {dl?.at_reserve && !isRecovered(f) && (
+        <div className="sec" data-src="deadlines">
+          <h3>Deadline</h3>
+          <div><Pill tone="exceeded">Fuel at final reserve</Pill> <span>{dl.reason}</span></div>
+          <ol style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>{(dl.why ?? []).map((w) => <li key={w}>{w}</li>)}</ol>
+        </div>
+      )}
+      {dl && dlAt == null && !dl.at_reserve && dl.kind !== 'diverting' && dl.kind !== 'crew' && !isRecovered(f) && <div className="sec"><h3>Deadline</h3><Pill tone="verify">Cannot compute</Pill> <span className="k">{dl.reason}</span></div>}
 
       {!isRecovered(f) && (
         <div className="sec" data-src="v_crew_legality_ranking · crew_qualification">

@@ -30,7 +30,7 @@ import ReportSheet from './sheets/ReportSheet';
 import WhatIfSheet from './sheets/WhatIfSheet';
 import { Cd, Pill, Sheet } from './ui/ui';
 import { plain } from './board/Briefing';
-import { fmtTime, fmtZ, fmtZday, roleLabel } from './lib';
+import { fmtTime, fmtZ, fmtZday, isRecovered, roleLabel } from './lib';
 
 const LENSES = [
   ['occ', 'OCC'],
@@ -337,6 +337,7 @@ function Bar({ d, onSheet }) {
   // a deadline that passed within the last hour still comes first (in red, "passed N min ago"); older ones do not hide what is coming
   const next = dated.find((x) => ms(x.deadline_utc) >= now - 3600000) ?? dated[dated.length - 1];
   const nextAt = next ? ms(next.deadline_utc) : null;
+  const reserve = d.deadlines.find((x) => x.at_reserve && !d.flights.find((f) => f.flight_id === x.flight_id && isRecovered(f)));   // fuel already at reserve: a fixed state, not a countdown
   const goLens = (l) => {
     dispatch(setLens(l));
     if (loc.pathname !== '/') navigate('/');
@@ -348,7 +349,9 @@ function Bar({ d, onSheet }) {
       <div className="bar-top">
       <div className="next" data-src="min(next_deadline_utc)">
         <Pill tone="exceeded">Next deadline</Pill>
-        {next ? (
+        {reserve ? (
+          <span><b className="c-exceeded">{reserve.flight_no}: {reserve.reason}</b> <span className="k">verify position and fuel now</span></span>
+        ) : next ? (
           <span>
             <Cd at={nextAt} className="cd" /> {next.flight_no}: {next.reason} ({fmtZday(nextAt, now)} / {fmtTime(nextAt)} SHJ)
           </span>
@@ -514,6 +517,7 @@ export default function ConsoleLayout() {
       <div className="page">
         <h2>Cannot reach the {APP_NAME} API</h2>
         <p className="lead">{getErrorMessage(d.error)}. Check that the API container is running (see backend/API_README.md).</p>
+        <button type="button" className="btn primary" onClick={() => window.location.reload()}>Try again</button>
       </div>
     );
 
@@ -527,6 +531,7 @@ export default function ConsoleLayout() {
             <div className="replay-banner">
               {d.kase?.scenario_kind} scenario. Nothing here affects live operations.
             </div>
+            {d.reconnecting && <div className="conn-banner" role="status">Connection to the server was interrupted. Showing the last data received; retrying automatically.</div>}
             <Strip d={d} onSheet={(v) => (v === 'ask' ? setChat((c) => (c === 'open' ? 'min' : 'open')) : setSheet(v))} onAirport={setAirportIata} />
           </div>
           <Bar d={d} onSheet={setSheet} />

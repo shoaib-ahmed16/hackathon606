@@ -1,3 +1,4 @@
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppDispatch } from '@/app/hooks';
 import { passesAll, priorityOf, rulesFor, filterLabel } from '@/features/ops/boardFilters';
@@ -50,11 +51,12 @@ function Board({ d }) {
       if (isRecovered(f)) return 'done';
       const dl = dlBy[f.flight_id];
       // no deadline: unknown fuel in the air needs a look soon; a flight on the ground with nothing running is just monitored
+      if (dl?.at_reserve) return 'act';   // fuel already at final reserve: first lane, fixed state
       if (!dl?.deadline_utc) return isAirborne(f) || f.diverted_to ? 'soon' : 'mon';
       const m = (ms(dl.deadline_utc) - nowMin * MIN) / MIN;
       return m < 15 ? 'act' : m <= 45 ? 'soon' : 'mon';
     };
-    const key = (f) => (dlBy[f.flight_id]?.deadline_utc ? ms(dlBy[f.flight_id].deadline_utc) : nowMin * MIN + 20 * MIN);
+    const key = (f) => (dlBy[f.flight_id]?.at_reserve ? 0 : dlBy[f.flight_id]?.deadline_utc ? ms(dlBy[f.flight_id].deadline_utc) : nowMin * MIN + 20 * MIN);
     const out = { act: [], soon: [], mon: [], done: [] };
     for (const f of list) out[laneOf(f)].push(f);
     for (const k in out)
@@ -146,19 +148,19 @@ export default function BoardPage() {
   }, [lens, selected, dispatch, close]);
 
   return (
-    <div className={`main${hasPanel ? " has-panel" : ""}`} style={hasPanel ? undefined : { gridTemplateColumns: '1fr' }}>
-      <section className="view" aria-live="polite">
+    <div className={`main${hasPanel ? " has-panel" : ""}${selected ? " has-flight" : ""}`} style={hasPanel ? undefined : { gridTemplateColumns: '1fr' }}>
+      <section className="view" aria-live="polite"><ErrorBoundary label="board">
         {lens === 'occ' && <Board d={d} />}
         {lens === 'dispatch' && <DispatchView d={d} />}
         {lens === 'crew' && <CrewView d={d} />}
         {lens === 'station' && <StationView d={d} />}
         {lens === 'recovery' && <RecoveryView d={d} />}
-      </section>
+      </ErrorBoundary></section>
       {hasPanel && (
         <>
           <div className={`panel-scrim ${selected ? 'open' : ''}`} onClick={close} />
           <aside className={`panel ${selected ? 'open' : ''}`} aria-label="Flight details">
-            <FlightPanel d={d} onClose={close} />
+            <ErrorBoundary label="flight panel"><FlightPanel d={d} onClose={close} /></ErrorBoundary>
           </aside>
         </>
       )}

@@ -117,7 +117,11 @@ export function useOps() {
   );
   const teams = useMemo(() => new Set((subs.data ?? []).filter((x) => x.teams).map((x) => x.flight_id)), [subs.data]);
   const subscribed = useMemo(() => new Set((subs.data ?? []).map((x) => x.flight_id)), [subs.data]);
-  const firstError = [cases, flights, crew].find((r) => r.isError);
+  // A failed poll must not wipe a screen that already has data: the last good data stays on show and a thin banner says the link is down.
+  // Only a failure with nothing to show (first load) becomes the full-page error.
+  const failed = [cases, flights, crew].filter((r) => r.isError);
+  const firstError = failed.find((r) => r.data === undefined);
+  const reconnecting = failed.length > 0 && !firstError;
 
   return {
     ops,
@@ -150,6 +154,7 @@ export function useOps() {
       (cases.isSuccess && openCases.length > 0 && !ops.caseId) ||
       (!skip && flights.isLoading),
     error: firstError?.error,
+    reconnecting,
     noCase: cases.isSuccess && openCases.length === 0,
   };
 }
