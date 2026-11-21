@@ -9,6 +9,7 @@ const Board = lazy(() => import('@/console/pages/BoardPage'));
 const Rules = lazy(() => import('@/console/pages/RulesPage'));
 const Integrations = lazy(() => import('@/console/pages/IntegrationsPage'));
 const Alerts = lazy(() => import('@/pages/Alerts'));
+const AirportCapacity = lazy(() => import('@/pages/AirportCapacity'));
 const Audit = lazy(() => import('@/pages/Audit'));
 const ReportsAudit = lazy(() => import('@/pages/ReportsAudit'));
 const Login = lazy(() => import('@/pages/Login'));
@@ -26,6 +27,7 @@ export default function AppRoutes() {
             <Route index element={<Board />} />
             <Route path="rules" element={<Rules />} />
             <Route path="integrations" element={<Integrations />} />
+            <Route path="capacity" element={<AirportCapacity />} />
             <Route path="audit" element={<Audit />} />
             <Route path="data-quality" element={<Alerts />} />
             <Route path="reports" element={<ReportsAudit />} />

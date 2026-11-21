@@ -27,25 +27,48 @@ services:
       retries: 20
       start_period: 60s # first start restores the dump
 
-  api:
-    build: ./backend
+#  api:
+#    build: ./backend
+#    restart: unless-stopped
+#    depends_on:
+#      db:
+#        condition: service_healthy
+#    environment:
+#      FOGOPS_DSN: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@db:5432/fogops
+#      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
+#      DEMO_PASSWORD: ${DEMO_PASSWORD:-FogOps@2026}
+#      CORS_ORIGINS: ${CORS_ORIGINS:-http://130.61.182.207:8080,http://localhost:3000}
+#      # Ask (free-text questions). Leave empty and only the suggested questions work.
+#      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+#      ASK_MODEL: ${ASK_MODEL:-claude-haiku-5-5}
+#      ASK_MAX_TOKENS: ${ASK_MAX_TOKENS:-400}
+#      ASK_RATE_PER_MIN: ${ASK_RATE_PER_MIN:-6}
+#      ASK_DAILY_LIMIT: ${ASK_DAILY_LIMIT:-150}
+#    ports:
+#      - '${API_PORT:-8888}:8000'
+  app:
+    build: ./hackathonTeamYashasvi
+    container_name: backend-service-fogOps
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      FOGOPS_DSN: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@db:5432/fogops
-      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
-      DEMO_PASSWORD: ${DEMO_PASSWORD:-FogOps@2026}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://130.61.182.207:8080,http://localhost:3000}
-      # Ask (free-text questions). Leave empty and only the suggested questions work.
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ASK_MODEL: ${ASK_MODEL:-claude-haiku-5-5}
-      ASK_MAX_TOKENS: ${ASK_MAX_TOKENS:-400}
-      ASK_RATE_PER_MIN: ${ASK_RATE_PER_MIN:-6}
-      ASK_DAILY_LIMIT: ${ASK_DAILY_LIMIT:-150}
     ports:
-      - '${API_PORT:-8888}:8000'
+      - "${APP_PORT:-8888}:8888"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fogops
+      DB_USERNAME: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env}
+      MANAGEMENT_TRACING_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8888 && printf \"GET /actuator/health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q UP <&3'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
 
   web:
     build:
@@ -54,7 +77,7 @@ services:
         VITE_OPS_API_URL: ${OPS_API_URL:-/ops-api} # same-origin proxy -> no CORS
     restart: unless-stopped
     depends_on:
-      api:
+      app:
         condition: service_healthy
     ports:
       - '${HTTP_PORT:-8080}:80'
