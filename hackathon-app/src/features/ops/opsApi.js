@@ -71,6 +71,7 @@ export const opsApi = api.enhanceEndpoints({ addTagTypes: [TAG] }).injectEndpoin
         method: 'PATCH',
         body,
       })),
+      pushFeed: m((body) => ({ url: u('/api/feed/push'), method: 'POST', body: body ?? {} })),
       flightEvent: m((body) => ({ url: u('/api/events/flight'), method: 'POST', body })),
       addRecord: m(({ table, body }) => ({
         url: u(`/api/records/${table}`),
@@ -114,6 +115,7 @@ export const {
   useGetAskQuestionsQuery,
   useGetAuditQuery,
   useAskMutation,
+  usePushFeedMutation,
   useWhatIfMutation,
   useApprovePlanMutation,
   useMoveSlotMutation,

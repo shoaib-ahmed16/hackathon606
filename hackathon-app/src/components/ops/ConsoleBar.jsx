@@ -7,7 +7,10 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
+import toast from 'react-hot-toast';
 import { useAppDispatch } from '@/app/hooks';
+import { usePushFeedMutation } from '@/features/ops/opsApi';
+import { getErrorMessage } from '@/utils/getErrorMessage';
 import { openPanel, setLens, toggleSources } from '@/features/ops/opsSlice';
 import { ms } from '@/features/ops/helpers';
 import { useNow } from '@/hooks/useNow';
@@ -26,6 +29,19 @@ export default function ConsoleBar({ d, briefing, onBriefing }) {
   const dispatch = useAppDispatch();
   const now = useNow();
   const { ops, deadlines } = d;
+  const [pushFeed, { isLoading: pushing }] = usePushFeedMutation();
+  const onPush = async () => {
+    try {
+      const r = await pushFeed().unwrap();
+      toast.success(
+        r.events_applied || r.crew_duties_active || r.crew_duties_completed
+          ? `Feed pushed: ${r.flights_updated} flights, ${r.events_applied} events, ${r.crew_duties_active} duties started, ${r.crew_duties_completed} completed, ${r.fuel_estimates} fuel updates`
+          : 'Feed pushed: already up to date',
+      );
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  };
   const dated = deadlines
     .filter((x) => x.deadline_utc)
     .sort((a, b) => ms(a.deadline_utc) - ms(b.deadline_utc));
@@ -94,6 +110,15 @@ export default function ConsoleBar({ d, briefing, onBriefing }) {
         ))}
       </ToggleButtonGroup>
       <Stack direction="row" spacing={0.5}>
+        <Button
+          size="small"
+          variant="outlined"
+          disabled={pushing}
+          onClick={onPush}
+          title="Simulate the live feed up to now: flight movements, passengers, crew duty status, standby release and fuel"
+        >
+          {pushing ? 'Pushing...' : 'Push live data'}
+        </Button>
         <Button size="small" onClick={() => dispatch(openPanel('whatif'))}>
           What if...
         </Button>

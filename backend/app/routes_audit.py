@@ -11,7 +11,7 @@ SYSTEM_ENTITIES = ("data_exception", "recommendation", "recommendation_option", 
 
 FRIENDLY = [
     ("/api/auth/login", "Signed in"), ("/api/auth/logout", "Signed out"), ("/api/ask", "Asked the assistant"),
-    ("/api/cases/create", "Created a case"), ("/api/events/flight", "Sent a flight feed event"),
+    ("/api/cases/create", "Created a case"), ("/api/events/flight", "Sent a flight feed event"), ("/api/feed/push", "Pushed the live data feed"),
     ("/api/crew/swap", "Executed a crew swap"), ("/api/recovery/build", "Built a recovery plan"),
     ("/api/scenarios/clone", "Cloned a scenario"), ("/api/whatif", "Ran a what-if"),
 ]

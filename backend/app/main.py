@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import logging
 
-from . import audit, auth, config, migrate, routes_ask, routes_audit, routes_auth, routes_console, routes_read, routes_write, stream, worker
+from . import audit, auth, config, migrate, routes_ask, routes_audit, routes_auth, routes_console, routes_feed, routes_read, routes_write, stream, worker
 from .deps import current_user
 from .db import fetch, pool
 
@@ -53,6 +53,7 @@ app.include_router(routes_read.r, dependencies=[Depends(current_user)])
 app.include_router(routes_audit.r, dependencies=[Depends(current_user)])
 app.include_router(routes_console.r, dependencies=[Depends(current_user)])
 app.include_router(routes_ask.r, dependencies=[Depends(current_user)])
+app.include_router(routes_feed.r)  # simulated live feed push (resolves the user through actor())
 app.include_router(routes_write.r)  # actions resolve the user through actor()
 app.include_router(stream.r, dependencies=[Depends(current_user)])
 
