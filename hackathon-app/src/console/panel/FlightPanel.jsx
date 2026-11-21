@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import {
   useAddRecordMutation,
   useGetAlternatesQuery,
+  useGetDownstreamQuery,
   useGetCommentsQuery,
   useGetFlightDetailQuery,
   useGetFlightLinksQuery,
@@ -282,6 +283,37 @@ function Alternates({ d, f }) {
   );
 }
 
+// What else breaks if this flight is late or diverted: the tail's next legs, crew rest before their next duty, connecting passengers.
+function Downstream({ d, f }) {
+  const q = useGetDownstreamQuery({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id });
+  const rows = q.data ?? [];
+  if (!rows.length) return null;
+  const aircraft = rows.filter((x) => x.kind === 'AIRCRAFT');
+  const crew = rows.filter((x) => x.kind === 'CREW');
+  const pax = aircraft.reduce((n, x) => n + (x.delay_min > 0 ? x.connecting_pax ?? 0 : 0), 0);
+  const bad = (x) => x.delay_min > 0 || /conflict/i.test(x.impact ?? '');
+  return (
+    <div className="sec" data-src="downstream_impact()">
+      <h3>Downstream impact {pax > 0 && <Pill tone="risk">{pax} connecting pax affected</Pill>}</h3>
+      <div className="tbl-wrap">
+        <table className="altt">
+          <thead><tr><th>Next</th><th>Route</th><th>Planned</th><th>Impact</th></tr></thead>
+          <tbody>
+            {[...aircraft, ...crew].map((x, i) => (
+              <tr key={i} className={bad(x) ? 'verify' : ''}>
+                <td><b>{x.kind === 'CREW' ? x.ref : x.ref}</b></td>
+                <td>{x.route}</td>
+                <td>{x.planned_utc ? fmtZ(ms(x.planned_utc)) : '—'}</td>
+                <td>{x.impact}{x.kind === 'AIRCRAFT' && x.connecting_pax > 0 ? ` · ${x.connecting_pax} connecting pax` : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function Discussion({ d, f }) {
   const comments = useGetCommentsQuery({ case_id: d.ctx.case_id, flight_id: f.flight_id }).data ?? [];
   const [add, { isLoading }] = useAddRecordMutation();
@@ -440,6 +472,7 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
       {!isRecovered(f) && (
         <div className="sec" data-src="v_crew_legality_ranking · crew_qualification">
           <h3>Crew duty <Pill tone={(verdictPill[f.crew_status] ?? 't-verify').slice(2)}>{human(f.crew_status ?? 'unknown').replace(/^./, (c) => c.toUpperCase())}</Pill></h3>
+          {crew && crew.signIn > minuteNow && <div className="k" style={{ marginBottom: 6 }}>Duty starts {fmtZ(crew.signIn)} · legal until {fmtZ(crew.legal)} (the clock only runs after sign-in)</div>}
           {crew && <Ribbon c={crew} />}
           <dl className="facts" style={{ marginTop: 12 }}>
             {fdp && (<><dt>Limit</dt><dd>{Math.floor(fdp.max_fdp_min / 60)}:{String(fdp.max_fdp_min % 60).padStart(2, '0')} · {fdp.legs_counted} sector{fdp.legs_counted > 1 ? 's' : ''} · band {fdp.band_tz ?? ''}{fdp.source_rule_id ? ` · rule ${fdp.source_rule_id}` : ''}</dd></>)}
@@ -461,6 +494,7 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
       )}
 
       <Alternates d={d} f={f} />
+      {!isRecovered(f) && <Downstream d={d} f={f} />}
 
       <div className="sec" data-src="flight_event · decision · decision_approval · case_comment · data_request (this flight)">
         <h3>Flight briefing <span className="k">actions taken on this flight</span></h3>

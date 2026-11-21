@@ -40,6 +40,10 @@ export const opsApi = api.enhanceEndpoints({ addTagTypes: [TAG] }).injectEndpoin
         query: ({ flightId, ...params }) => ({ url: u(`/api/flights/${flightId}/alternates`), params }),
         providesTags: [TAG],
       }),
+      getDownstream: build.query({
+        query: ({ flightId, ...params }) => ({ url: u(`/api/flights/${flightId}/downstream`), params }),
+        providesTags: [TAG],
+      }),
       getRules: q('/api/rules'),
       getRuleMatches: q('/api/rules/matches'),
       getApprovals: q('/api/approvals'),
@@ -183,6 +187,7 @@ export const {
   useGetRuleFieldsQuery,
   useGetIntegrationsQuery,
   useGetAlternatesQuery,
+  useGetDownstreamQuery,
   useExecuteDecisionMutation,
   usePatchSystemMutation,
   useMarkEnteredMutation,

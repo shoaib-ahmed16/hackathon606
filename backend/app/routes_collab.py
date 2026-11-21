@@ -462,3 +462,11 @@ def execute_decision(decision_id: int, turnaround_min: int | None = None, user=D
             raise HTTPException(409, "This crew replacement has no crew details recorded; use the replacement finder")
         swap(Swap(scenario_id=d["scenario_id"], case_id=d["case_id"], decision_id=decision_id, reason=d["rationale"] or "Approved replacement", **keep), user)
     return {"decision_id": decision_id, "executed": kind}
+
+
+# ---------------------------------------------------------------- downstream impact (downstream_impact(), read-only)
+@r.get("/flights/{flight_id}/downstream")
+def downstream(flight_id: int, scenario_id: int | None = None, ready_at_hub_utc: datetime | None = None, user=Depends(actor)):
+    """What else breaks if this flight is late or diverted: the tail's next legs (delay carried leg by leg), each operating crew
+    member's next duty and rest, and connecting passengers. `ready_at_hub_utc` is an optional what-if (aircraft back at the hub at ...)."""
+    return fetch("SELECT * FROM downstream_impact(%s,%s,%s)", (_scn(scenario_id), flight_id, ready_at_hub_utc))
