@@ -8,6 +8,7 @@ import Loader from '@/components/Loader';
 const Board = lazy(() => import('@/console/pages/BoardPage'));
 const Rules = lazy(() => import('@/console/pages/RulesPage'));
 const Integrations = lazy(() => import('@/console/pages/IntegrationsPage'));
+const Alternates = lazy(() => import('@/console/pages/AlternatesPage'));
 const Alerts = lazy(() => import('@/pages/Alerts'));
 const AirportCapacity = lazy(() => import('@/pages/AirportCapacity'));
 const Audit = lazy(() => import('@/pages/Audit'));
@@ -29,6 +30,7 @@ export default function AppRoutes() {
             <Route index element={<Board />} />
             <Route path="rules" element={<Rules />} />
             <Route path="integrations" element={<Integrations />} />
+            <Route path="alternates" element={<Alternates />} />
             <Route path="capacity" element={<AirportCapacity />} />
             <Route path="audit" element={<Audit />} />
             <Route path="data-quality" element={<Alerts />} />

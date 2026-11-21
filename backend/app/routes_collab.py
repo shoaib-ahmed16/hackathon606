@@ -12,6 +12,7 @@ from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 
 from .db import fetch, live_scenario_id, tx
+from .plain import humanize
 from .deps import actor
 from .routes_write import agent_user_id
 
@@ -52,7 +53,7 @@ def approval_policy(user=Depends(actor)):
 _APPROVALS_SQL = """
 SELECT d.decision_id, d.scenario_id, d.case_id, d.flight_id, f.flight_no, d.decision_type::text AS decision_type,
        d.status::text AS status, d.alternate_iata, d.rationale, d.followed_recommendation, d.decided_role AS proposed_role,
-       u.display_name AS proposed_by, d.decided_at,
+       u.display_name AS proposed_by, d.decided_at, d.decided_by,
        COALESCE((SELECT array_agg(p.approver_role ORDER BY p.approver_role) FROM approval_policy p
                   WHERE p.decision_type = d.decision_type AND p.required), '{}') AS required_roles,
        COALESCE((SELECT array_agg(DISTINCT a.approver_role) FROM decision_approval a
@@ -87,6 +88,8 @@ def approvals(case_id: int | None = None, flight_id: int | None = None, status: 
         waiting = [x for x in d["required_roles"] if x not in d["approved_roles"]]
         policy_ok = not d["allowed_roles"] or me["role_code"] in d["allowed_roles"]  # no policy rows = any approver
         d["waiting_for"] = waiting
+        # the proposer can take their own proposal back (the picture changed); OCC and admin can too. Not once it is executed.
+        d["can_withdraw"] = bool(d["status"] in ("PROPOSED", "APPROVED") and (d["decided_by"] == me["user_id"] or me["role_code"] in ("OCC", "ADMIN")))
         d["can_approve"] = bool(
             d["status"] == "PROPOSED" and can_approve_role and policy_ok
             and me["role_code"] not in d["approved_roles"] and not d["rejected_roles"]
@@ -100,6 +103,30 @@ def approvals(case_id: int | None = None, flight_id: int | None = None, status: 
 class Verdict(BaseModel):
     verdict: str = "APPROVED"  # APPROVED | REJECTED
     comment: str | None = None
+
+
+class Withdraw(BaseModel):
+    reason: str = "The picture changed"
+
+
+@r.post("/decisions/{decision_id}/withdraw")
+def withdraw(decision_id: int, b: Withdraw, user=Depends(actor)):
+    """Take back a proposal that is still waiting or approved but not executed: it becomes REVOKED with who and why (never deleted).
+    The proposer or OCC/admin can do it; the engine then re-assesses the flight and approvers are told."""
+    reason = (b.reason or "").strip()
+    if not reason:
+        raise HTTPException(422, "Say why it is withdrawn")
+    with tx(user) as conn:
+        me = _me(conn, user)
+        d = conn.execute("SELECT decision_id, decided_by, status::text AS status FROM decision WHERE decision_id = %s FOR UPDATE", (decision_id,)).fetchone()
+        if not d:
+            raise HTTPException(404, "Unknown decision")
+        if d["status"] not in ("PROPOSED", "APPROVED"):
+            raise HTTPException(409, f"A {d['status'].lower()} decision cannot be withdrawn here")
+        if d["decided_by"] != me["user_id"] and me["role_code"] not in ("OCC", "ADMIN"):
+            raise HTTPException(403, "Only the person who proposed it, or OCC, can withdraw it")
+        conn.execute("UPDATE decision SET status = 'REVOKED', revoked_by = %s, revoke_reason = %s WHERE decision_id = %s", (me["user_id"], reason[:300], decision_id))
+    return {"decision_id": decision_id, "status": "REVOKED"}
 
 
 @r.post("/decisions/{decision_id}/approvals")
@@ -352,7 +379,12 @@ def flight_links(flight_id: int, scenario_id: int | None = None, user=Depends(ac
 
 # ---------------------------------------------------------------- per-flight timeline (the flight briefing)
 @r.get("/flights/{flight_id}/timeline")
-def flight_timeline(flight_id: int, scenario_id: int | None = None, since: datetime | None = None, limit: int = Query(300, le=2000),
+def flight_timeline(flight_id: int, scenario_id: int | None = None, since: datetime | None = None, limit: int = Query(300, le=2000), user=Depends(actor)):
+    """Everything that happened to ONE flight on one clock: feed events, decisions, approvals, comments, requests, station (crew ids shown as names)."""
+    return humanize(_timeline(flight_id, scenario_id, since, limit, user))
+
+
+def _timeline(flight_id: int, scenario_id: int | None = None, since: datetime | None = None, limit: int = Query(300, le=2000),
                     user=Depends(actor)):
     """Everything that happened to ONE flight on one clock: feed events, decisions, approvals, comments, requests, station."""
     return fetch(
@@ -470,3 +502,57 @@ def downstream(flight_id: int, scenario_id: int | None = None, ready_at_hub_utc:
     """What else breaks if this flight is late or diverted: the tail's next legs (delay carried leg by leg), each operating crew
     member's next duty and rest, and connecting passengers. `ready_at_hub_utc` is an optional what-if (aircraft back at the hub at ...)."""
     return fetch("SELECT * FROM downstream_impact(%s,%s,%s)", (_scn(scenario_id), flight_id, ready_at_hub_utc))
+
+
+# ---------------------------------------------------------------- connecting passengers per flight (v_connection_risk, read-only)
+@r.get("/flights/{flight_id}/connections")
+def flight_connections(flight_id: int, scenario_id: int | None = None, user=Depends(actor)):
+    """Passengers arriving on this flight who connect onward: the onward flight, how many, the projected connection time against the
+    scheduled one and the 40 min minimum, and the status. Worst first, so Customer Service can start with the passengers at risk."""
+    return fetch(
+        """SELECT outbound_flight_id, outbound_flight, outbound_to, connection_iata, pax_count, sched_connection_min,
+                  inbound_arrival_utc, outbound_departure_utc, projected_connection_min, connection_status
+             FROM v_connection_risk WHERE scenario_id = %s AND inbound_flight_id = %s
+            ORDER BY CASE connection_status WHEN 'MISSED' THEN 0 WHEN 'INBOUND_DIVERTED' THEN 1 WHEN 'CANCELLED' THEN 2 WHEN 'AT_RISK' THEN 3 ELSE 4 END,
+                     projected_connection_min NULLS LAST""",
+        (_scn(scenario_id), flight_id),
+    )
+
+
+# ---------------------------------------------------------------- fuel in kilograms (flight_fuel_estimate + rank_alternates, read-only)
+@r.get("/flights/{flight_id}/fuel-card")
+def fuel_card(flight_id: int, scenario_id: int | None = None, user=Depends(actor)):
+    """Fuel on board, burn rate and, for each alternate, what the aircraft would land with and what the return leg would need.
+    The engine works in minutes of holding; this turns them into kilograms with the SAME margins, and says which numbers are assumptions:
+    the burn rate is the holding burn from the estimate, used as a stand-in for the burn on the leg (no aircraft-type burn table in the data)."""
+    s = _scn(scenario_id)
+    est = fetch("""SELECT as_of_utc, fuel_on_board_kg, burn_rate_hold_kg_per_hr, min_diversion_fuel_kg, est_holding_endurance_min, quality, basis
+                     FROM flight_fuel_estimate WHERE scenario_id = %s AND flight_id = %s ORDER BY as_of_utc DESC LIMIT 1""", (s, flight_id))
+    if not est:
+        return {"available": False, "reason": "No fuel on board has been reported or estimated for this flight."}
+    e = est[0]
+    burn = float(e["burn_rate_hold_kg_per_hr"] or 0)
+    now = fetch("SELECT scenario_now(%s) AS t", (s,))[0]["t"]
+    left_now = None if e["fuel_on_board_kg"] is None else max(0.0, float(e["fuel_on_board_kg"]) - burn * max(0.0, (now - e["as_of_utc"]).total_seconds() / 3600))
+    alts = []
+    try:
+        for a in fetch("SELECT * FROM rank_alternates(%s,%s)", (s, flight_id)):
+            if a["fuel_margin_min"] is None or not burn:
+                alts.append({"alt_iata": a["alt_iata"], "is_executable": a["is_executable"], "fuel_margin_min": a["fuel_margin_min"]})
+                continue
+            per_min = burn / 60
+            reserve_min = a["final_reserve_min"] or 30
+            at_landing = (a["fuel_margin_min"] + reserve_min) * per_min          # fuel left on touchdown
+            above_reserve = a["fuel_margin_min"] * per_min                       # fuel above the final reserve
+            back = (a["return_block_min"] or 0) * per_min + reserve_min * per_min  # the return leg plus a final reserve again
+            alts.append({"alt_iata": a["alt_iata"], "is_executable": a["is_executable"], "fuel_margin_min": a["fuel_margin_min"],
+                         "lands_with_kg": round(max(0.0, at_landing)), "above_reserve_kg": round(above_reserve),
+                         "return_leg_need_kg": round(back), "uplift_needed_kg": round(max(0.0, back - max(0.0, at_landing))),
+                         "return_block_min": a["return_block_min"], "final_reserve_min": reserve_min})
+    except Exception:  # noqa: BLE001 - not an airborne flight: nothing to rank
+        pass
+    return {"available": True, "as_of_utc": e["as_of_utc"], "fuel_on_board_kg": e["fuel_on_board_kg"], "fuel_now_kg": None if left_now is None else round(left_now),
+            "burn_rate_kg_per_hr": burn or None, "endurance_min": e["est_holding_endurance_min"], "quality": e["quality"], "basis": e["basis"],
+            "assumption": "Burn rate = the holding burn from the estimate, used as a stand-in for the burn on the leg. Replace with an aircraft-type burn table when one is supplied.",
+            "alternates": alts}
+

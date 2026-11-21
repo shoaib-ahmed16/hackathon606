@@ -9,6 +9,7 @@ import {
   useGetFuelQuery,
   useGetDiversionsQuery,
   useGetCasesQuery,
+  useGetAlternateAirportsQuery,
   useGetCrewLegalityQuery,
   useGetDecisionLogQuery,
   useGetExceptionsQuery,
@@ -35,6 +36,7 @@ export function useOps() {
   const ops = useAppSelector(selectOps);
   const cases = useGetCasesQuery(undefined, { pollingInterval: 30000 });
   const user = useAppSelector(selectUser);
+  const alternates = useGetAlternateAirportsQuery({ hub: 'SHJ' }, { pollingInterval: 60000 });
   const token = useAppSelector((s) => s.auth.token);
 
   // default to the newest case once, so the app opens on something real
@@ -123,6 +125,7 @@ export function useOps() {
     kase,
     actor,
     cases: openCases,
+    alternates: alternates.data ?? EMPTY_LIST,
     flights: flights.data ?? [],
     crew: crew.data ?? [],
     airport: airport.data ?? [],

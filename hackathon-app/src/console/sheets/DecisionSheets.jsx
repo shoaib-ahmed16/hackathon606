@@ -8,13 +8,15 @@ import {
   useGetApprovalPolicyQuery,
   useGetFlightDetailQuery,
   useGetIntegrationsQuery,
+  useGetLegOutlookQuery,
   useSendVerdictMutation,
+  useWithdrawDecisionMutation,
   useAddTagMutation,
 } from '@/features/ops/opsApi';
 import { DECISION_TYPES } from '@/features/ops/helpers';
 import { getErrorMessage } from '@/utils/getErrorMessage';
-import { Conseq, ReasonChips, RoleChips, Sheet } from '../ui/ui';
-import { REASONS, TAG_LABEL, decisionWhat, roleLabel, typeLabel } from '../lib';
+import { Conseq, Pill, ReasonChips, RoleChips, Sheet } from '../ui/ui';
+import { REASONS, TAG_LABEL, decisionWhat, plainCodes, plainProposal, roleLabel, typeLabel, verdictPill } from '../lib';
 import { fmtZ, ms } from '../lib';
 
 const policyFor = (rows, type) => {
@@ -48,11 +50,22 @@ export function ProposeSheet({ d, f, opt, onClose }) {
   const [type, setType] = useState(opt?.type ?? 'DELAY');
   const [alt, setAlt] = useState('');
   const [reason, setReason] = useState(null);
-  const [why, setWhy] = useState(opt && !over ? `Agree with the engine (option ${opt.rank}): ${detail?.recommendation?.rationale ?? opt.what}` : '');
+  const [newDep, setNewDep] = useState(''); // HH:MM UTC, for a delay
+  const [why, setWhy] = useState(opt && !over ? plainProposal(opt, detail?.recommendation?.rationale) : '');
   const dtype = opt ? opt.type : type;
   const pol = policyFor(policy, dtype);
   const lines = opt ? linesFor(detail, opt.type, opt.alt) : null;
-  const ready = why.trim() && (!over || reason) && (opt || dtype !== 'DIVERT' || alt.trim().length === 3);
+  const ready = why.trim() && (!over || reason) && (opt || dtype !== 'DIVERT' || alt.trim().length === 3) && (dtype !== 'DELAY' || newDep);
+  // the new departure as a full UTC time: on the flight's own day, or the next day if that would be hours before the planned departure
+  const newDepIso = (() => {
+    if (!newDep || !f.std_utc) return null;
+    const std = new Date(f.std_utc);
+    const [h, m] = newDep.split(':').map(Number);
+    let t = Date.UTC(std.getUTCFullYear(), std.getUTCMonth(), std.getUTCDate(), h, m);
+    if (t < std.getTime() - 6 * 3600000) t += 24 * 3600000;
+    return new Date(t).toISOString();
+  })();
+  const delayMin = newDepIso ? Math.round((new Date(newDepIso) - new Date(f.etd_utc ?? f.std_utc)) / 60000) : null;
 
   const submit = async () => {
     const ok = await run(
@@ -66,9 +79,10 @@ export function ProposeSheet({ d, f, opt, onClose }) {
             option_id: opt?.option_id ?? null,
             decision_type: dtype,
             alternate_iata: (opt ? opt.alt : alt.trim().toUpperCase()) || null,
+            target_time_utc: dtype === 'DELAY' ? newDepIso : null,
             rationale: over ? `[Not the engine's first option: ${reason}] ${why.trim()}` : why.trim(),
             followed_recommendation: Boolean(opt) && !over,
-            details: over ? { override_reason: reason } : opt ? {} : { free_form: true },
+            details: { ...(over ? { override_reason: reason } : opt ? {} : { free_form: true }), ...(dtype === 'DELAY' && newDepIso ? { new_departure_utc: newDepIso, delay_min: delayMin } : {}) },
             decided_by: d.actor.user_id,
             decided_role: d.actor.role_code,
           },
@@ -106,6 +120,13 @@ export function ProposeSheet({ d, f, opt, onClose }) {
           <Conseq lines={lines} />
         </>
       )}
+      {dtype === 'DELAY' && (
+        <>
+          <div className="field-l">New departure time (UTC)</div>
+          <input type="time" className="field-in" value={newDep} onChange={(e) => setNewDep(e.target.value)} style={{ width: 130 }} />
+          {delayMin != null && <span className="k"> {delayMin >= 0 ? `${delayMin} min later than now planned` : `${-delayMin} min earlier than planned`}{newDepIso ? ` (${fmtZ(ms(newDepIso))})` : ''}</span>}
+        </>
+      )}
       <div className="field-l">Approvals required</div>
       <RoleChips roles={pol.approvers.length ? pol.approvers : ['OCC']} />
       <div className="k">
@@ -124,18 +145,25 @@ export function ProposeSheet({ d, f, opt, onClose }) {
 }
 
 // ---------------------------------------------------------------- approve
-export function ApproveSheet({ d, f, decision: x, onClose, onReject }) {
+export function ApproveSheet({ d, f, decision: x, onClose, onReject, onDone, onFindReplacement }) {
   const [verdict, { isLoading }] = useSendVerdictMutation();
+  const [exec, { isLoading: executing }] = useExecuteDecisionMutation();
   const detail = useGetFlightDetailQuery({ flightId: f.flight_id, ...d.ctx }).data;
   const [comment, setComment] = useState('');
   const others = x.required_roles.filter((r) => r !== d.actor.role_code && !x.approved_roles.includes(r));
   const log = d.decisions.find((l) => l.decision_id === x.decision_id);
-  const send = async () => {
+  // the last approver who is also allowed to execute (OCC) can do both here: this dialog already showed what will happen
+  const canExecute = others.length === 0 && ['OCC', 'ADMIN'].includes(d.actor.role_code);
+  const send = async (andExecute = false) => {
+    let res = null;
     const ok = await run(
-      () => verdict({ decisionId: x.decision_id, verdict: 'APPROVED', comment: comment.trim() || undefined }).unwrap(),
-      (r) => (r.status === 'APPROVED' ? 'Approved by all required roles. OCC can execute.' : `Approved as ${roleLabel(d.actor.role_code)}. Waiting for ${r.waiting_for.map(roleLabel).join(' and ')}.`),
+      async () => (res = await verdict({ decisionId: x.decision_id, verdict: 'APPROVED', comment: comment.trim() || undefined }).unwrap()),
+      (r) => (r.status === 'APPROVED' ? (andExecute ? 'Approved by all required roles.' : 'Approved by all required roles. Execute it from the flight panel.') : `Approved as ${roleLabel(d.actor.role_code)}. Waiting for ${r.waiting_for.map(roleLabel).join(' and ')}.`),
     );
-    if (ok) onClose();
+    if (!ok) return;
+    if (andExecute && res?.status === 'APPROVED') await run(() => exec({ decisionId: x.decision_id }).unwrap(), `Executed: ${decisionWhat(x)}`);
+    onDone?.(res);
+    onClose();
   };
   return (
     <Sheet
@@ -146,13 +174,15 @@ export function ApproveSheet({ d, f, decision: x, onClose, onReject }) {
         <>
           <button className="btn ghost" onClick={onClose}>Cancel</button>
           <button className="btn danger" onClick={onReject}>Reject</button>
-          <button className="btn primary" disabled={isLoading} onClick={send}>Approve</button>
+          <button className={`btn ${canExecute ? '' : 'primary'}`} disabled={isLoading || executing} onClick={() => send(false)}>Approve</button>
+          {canExecute && <button className="btn primary" disabled={isLoading || executing} onClick={() => send(true)}>Approve and execute</button>}
         </>
       }
     >
-      <div className="state-note" style={{ marginTop: 0 }}>“{x.rationale}”</div>
+      <div className="state-note" style={{ marginTop: 0 }}>“{plainCodes(x.rationale)}”</div>
       <div className="field-l">What will happen</div>
       <Conseq lines={linesFor(detail, x.decision_type, x.alternate_iata)} />
+      {['DIVERT', 'CREW_REPLACE', 'RECOVER', 'COMMANDER_DISCRETION', 'DELAY'].includes(x.decision_type) && <CrewOutlook d={d} f={f} onFind={onFindReplacement} />}
       <div className="field-l">Approval status</div>
       <RoleChips roles={x.required_roles} approved={x.approved_roles} rejected={x.rejected_roles} me={d.actor.role_code} />
       <p className="approver-note">
@@ -160,6 +190,57 @@ export function ApproveSheet({ d, f, decision: x, onClose, onReject }) {
       </p>
       <div className="field-l">Comment (optional)</div>
       <textarea value={comment} onChange={(e) => setComment(e.target.value)} />
+    </Sheet>
+  );
+}
+
+// The crew on this flight's duty, each with the legal position for the legs flown (N) and for one more sector (N+1):
+// what an approver needs to see before agreeing to a decision that changes the return leg.
+function CrewOutlook({ d, f, onFind }) {
+  const { data = [] } = useGetLegOutlookQuery({ scenario_id: d.ctx.scenario_id, duty_id: f.duty_id }, { skip: !f.duty_id });
+  if (!data.length) return null;
+  const word = (s) => String(s).replaceAll('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+  const tone = (s) => verdictPill[s]?.slice(2) ?? 'verify';
+  const m = (v) => (v == null ? '' : v < 0 ? ` · ${-v} min short` : ` · ${v} min spare`);
+  return (
+    <>
+      <div className="field-l">Crew on this flight (legal for the legs flown, and for one more sector)</div>
+      <div className="crew-outlook">
+        {data.map((c) => (
+          <div className="co-row" key={c.crew_id}>
+            <b>{c.position_code} {c.full_name}</b>
+            <Pill tone={tone(c.status_n)}>Now ({c.legs_n}): {word(c.status_n)}{m(c.margin_n_min)}</Pill>
+            <Pill tone={tone(c.status_n1)}>+1 sector ({c.legs_n1}): {word(c.status_n1)}{m(c.margin_n1_min)}</Pill>
+          </div>
+        ))}
+      </div>
+      {onFind && <button type="button" className="btn" onClick={onFind}>Find replacement crew</button>}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- withdraw (the proposer takes a proposal back)
+export function WithdrawSheet({ f, decision: x, onClose }) {
+  const [withdraw, { isLoading }] = useWithdrawDecisionMutation();
+  const [reason, setReason] = useState('The picture changed');
+  const send = async () => {
+    const ok = await run(() => withdraw({ decisionId: x.decision_id, reason: reason.trim() }).unwrap(), `Withdrawn: ${decisionWhat(x)} (${f.flight_no}). Everyone who was asked to approve is told.`);
+    if (ok) onClose();
+  };
+  return (
+    <Sheet
+      title={`Withdraw: ${decisionWhat(x)} (${f.flight_no})`}
+      sub="The proposal is marked as withdrawn with your name and the reason. It stays in the record; approvers are told, and the engine looks at the flight again."
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>Keep it</button>
+          <button className="btn danger" disabled={!reason.trim() || isLoading} onClick={send}>Withdraw</button>
+        </>
+      }
+    >
+      <div className="field-l">Why</div>
+      <textarea value={reason} onChange={(e) => setReason(e.target.value)} />
     </Sheet>
   );
 }

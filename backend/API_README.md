@@ -160,3 +160,26 @@ bound parameters, and columns that look like secrets (password, token, hash, ...
   each for the roles that work with it. Recommendations, cases and watch lists have their own endpoints.
 * **`DELETE /api/cases/{id}`** is admin-only (and still refuses a case that has decisions or comments). OCC closes cases.
 * Replacement finder: `crew_replacement_options()` now returns `from_leg_seq` and `report_station` and counts road time before sign-in.
+
+## Alternates manager (OCC and ADMIN)
+The airports the engine may divert to are editable from the UI (Alternates, in the tools row). Nothing is deleted: an alternate is switched off, not removed.
+| Endpoint | What it does |
+|---|---|
+| `GET /api/alternates?hub=SHJ` | every alternate, active or not: priority, road time, stands, handling / fuel / customs, history, station logins |
+| `GET /api/airport-search?q=` | find an airport by code, name or country (only airports in the database can be added) |
+| `POST /api/alternates` | add or change one (OCC, ADMIN). Validates codes, ranges and roles. Re-ranks open cases (trigger `reassess_alternate`, migration 015) |
+| `POST /api/alternates/{iata}/station-login` | create `station.<iata>` with the demo password (ADMIN only) |
+A new alternate has no status yet, so it appears as "?" and is not executable until OCC or the station enters its status.
+
+## Added after the usability review
+| Endpoint | What it does |
+|---|---|
+| `POST /api/decisions/{id}/withdraw` | the proposer (or OCC/admin) takes back a proposal that is PROPOSED or APPROVED, with a reason. It becomes REVOKED (kept in the record); approvers are told and the flight is re-assessed. `GET /api/approvals` now returns `can_withdraw` |
+| `GET /api/flights/{id}/connections` | passengers who connect onward from this flight: onward flight, pax, projected vs planned connection time, status (worst first) |
+| `GET /api/flights/{id}/fuel-card` | fuel on board now (kg), burn rate, and per alternate: what the aircraft lands with, kg above the final reserve, and the uplift the return leg needs. The burn rate is the holding burn used as a stand-in for the leg (stated in the response) |
+| `GET /api/crew/fdp-preview?duty_id=&report_utc=` | before sign-in: the bracket and maximum FDP a new report time would give. After sign-in: `locked: true`, no preview |
+| `GET /api/deadlines` | a diverting aircraft returns kind `diverting` (landing time, no departure countdown); when the crew cannot legally fly the return the kind is `crew` and the text says so, with the options |
+
+Migration `017` gives an aircraft that has just been diverted a real landing time (hub to alternate flight time) and plans the recovery leg from it.
+Text built by the database for the briefing and the flight timeline goes through `app/plain.py`: crew ids become names, internal codes become words.
+

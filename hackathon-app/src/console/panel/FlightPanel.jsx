@@ -4,6 +4,9 @@ import {
   useAddRecordMutation,
   useGetAlternatesQuery,
   useGetDownstreamQuery,
+  useGetFdpPreviewQuery,
+  useGetConnectionsQuery,
+  useGetFuelCardQuery,
   useGetCommentsQuery,
   useGetFlightDetailQuery,
   useGetFlightLinksQuery,
@@ -16,10 +19,10 @@ import {
 } from '@/features/ops/opsApi';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 import { Cd, Pill, Ribbon } from '../ui/ui';
-import { AnswerSheet, ApproveSheet, ExecuteSheet, LinkSheet, ProposeSheet, RejectSheet, TagSheet } from '../sheets/DecisionSheets';
+import { AnswerSheet, ApproveSheet, ExecuteSheet, LinkSheet, ProposeSheet, RejectSheet, TagSheet, WithdrawSheet } from '../sheets/DecisionSheets';
 import CrewFinderSheet from '../sheets/CrewFinderSheet';
 import {
-  MIN, REC_LABEL, REC_TONE, fmtZday, TAG_LABEL, currentDecision, decisionWhat, fmtTime, fmtZ, gapsOf, human, isAirborne, isRecovered, liveLabel, ms, roleLabel,
+  MIN, REC_LABEL, REC_TONE, plainCodes, fmtZday, TAG_LABEL, currentDecision, decisionWhat, fmtTime, fmtZ, gapsOf, human, isAirborne, isRecovered, liveLabel, ms, roleLabel,
   sevClass, typeLabel, verdictPill,
 } from '../lib';
 import { useMinuteNow, useNow } from '@/hooks/useNow';
@@ -42,6 +45,7 @@ const optView = (o) => {
     exec: o.is_executable,
     verify: o.needs_verification,
     score: o.score,
+    margin: o.fuel_margin_min,
     why: o.is_executable ? (o.reasons ?? []).slice(0, 3) : blockedWhy.length ? blockedWhy : (o.reasons ?? []).slice(0, 1),
   };
 };
@@ -67,7 +71,7 @@ function Decision({ d, f, list, cur, topOpt, gaps, openSheet }) {
       body = (
         <>
           <div className="dec-empty">
-            <Pill tone="legal">Diversion executed</Pill> {decisionWhat(executed)} · {executed.proposed_by} {hhmm(executed.decided_at)}. The aircraft is at {f.diverted_to}.
+            <Pill tone="legal">Diversion executed</Pill> {decisionWhat(executed)} · {executed.proposed_by} {hhmm(executed.decided_at)}. {f.status === 'DIVERTING' ? `The aircraft is flying to ${f.diverted_to}, landing about ${fmtZ(ms(f.eta_utc))}.` : `The aircraft is at ${f.diverted_to}.`}
           </div>
           <div className="dec-empty" style={{ marginTop: 6 }}>
             {gaps.length ? <>Next step: <b>resolve the data gaps below first</b>.</> : topOpt ? <>Next step at {f.diverted_to}: the engine's top option is <b>{topOpt.what}</b>.</> : 'No open decision at the alternate yet.'}
@@ -143,7 +147,10 @@ function Decision({ d, f, list, cur, topOpt, gaps, openSheet }) {
           );
         })}
       </div>
-      <div className="ai-buttons">{actions}</div>
+      <div className="ai-buttons">
+        {actions}
+        {cur.can_withdraw && <button className="btn ghost" onClick={() => openSheet({ kind: 'withdraw' })} title="Take this proposal back (it stays in the record)">Withdraw</button>}
+      </div>
       {history}
     </div>
   );
@@ -151,6 +158,17 @@ function Decision({ d, f, list, cur, topOpt, gaps, openSheet }) {
 
 function Recs({ d, f, detail, opts, locked, openSheet }) {
   if (isRecovered(f)) return null;
+  // two executable options with the same score: say so, and say which one needs the decision first (it leaves the hold earlier)
+  const ex = opts.filter((o) => o.exec && o.score != null);
+  const tied = new Set();
+  let tieNote = null;
+  if (ex.length > 1 && Math.abs(Number(ex[0].score) - Number(ex[1].score)) < 0.006) {
+    ex.filter((o) => Math.abs(Number(o.score) - Number(ex[0].score)) < 0.006).forEach((o) => tied.add(o.rank));
+    const a = ex[0];
+    const b = ex[1];
+    const sooner = a.margin != null && b.margin != null && a.margin !== b.margin ? (a.margin < b.margin ? a : b) : null;
+    tieNote = `${a.alt ?? 'Option 1'} and ${b.alt ?? 'option 2'} score the same (${Number(a.score).toFixed(2)}). ${a.alt ?? 'Option 1'} is listed first on the engine's order; ${sooner ? `${sooner.alt} needs the decision sooner (it has ${sooner.margin} min of spare fuel against ${sooner === a ? b.margin : a.margin}).` : 'check the leave-the-hold-by time of each.'}`;
+  }
   const rec = detail?.recommendation;
   const assumptions = (rec?.assumptions ?? []).map((a) => String(a));
   return (
@@ -163,7 +181,7 @@ function Recs({ d, f, detail, opts, locked, openSheet }) {
             <span className="conf">Confidence {Math.round(rec.confidence * 100)}% <span className="conf-bar"><i style={{ width: `${rec.confidence * 100}%` }} /></span></span>
           )}
         </div>
-        <p className="ai-why">{rec?.rationale ?? 'No open recommendation for this flight.'}</p>
+        <p className="ai-why">{rec?.rationale ? plainCodes(rec.rationale) : 'No open recommendation for this flight.'}</p>
         {assumptions.length > 0 && (
           <div className="chips">
             {assumptions.map((a) => {
@@ -174,6 +192,7 @@ function Recs({ d, f, detail, opts, locked, openSheet }) {
         )}
         <div className="opts open" id="opts">
           {opts.length === 0 && <span className="k">No open options.</span>}
+          {tieNote && <div className="tie-note k">{tieNote}</div>}
           {opts.map((o) => {
             const blocked = !o.exec;
             return (
@@ -197,7 +216,7 @@ function Recs({ d, f, detail, opts, locked, openSheet }) {
                     </span>
                   ))}
                 </span>
-                <span className="sc">{o.exec ? `Score ${Number(o.score).toFixed(2)}` : o.verify ? 'Verify' : 'Blocked'}</span>
+                <span className="sc">{o.exec ? `Score ${Number(o.score).toFixed(2)}` : o.verify ? 'Verify' : 'Blocked'}{tied.has(o.rank) && <span className="tie" title="Same score as another executable option">tie</span>}</span>
               </button>
             );
           })}
@@ -260,6 +279,9 @@ function Gaps({ d, f, gaps, openSheet }) {
 
 function Alternates({ d, f }) {
   const q = useGetAlternatesQuery({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id }, { skip: !isAirborne(f) || Boolean(f.diverted_to) });
+  const fc = useGetFuelCardQuery({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id }, { skip: !isAirborne(f) || Boolean(f.diverted_to) }).data;
+  const kgBy = Object.fromEntries((fc?.alternates ?? []).map((x) => [x.alt_iata, x]));
+  const kg = (v) => (v == null ? '?' : `${Number(v).toLocaleString()} kg`);
   const fuel = useGetFuelQuery({ scenario_id: d.ctx.scenario_id }).data?.find((x) => x.flight_id === f.flight_id);
   const now = useNow();
   if (!isAirborne(f) || f.diverted_to) return null;
@@ -270,10 +292,18 @@ function Alternates({ d, f }) {
       <dl className="facts" style={{ marginBottom: 8 }}>
         <dt>Holding endurance</dt>
         <dd>{left == null ? <span className="c-verify">? not reported</span> : `${left} min (${String(fuel.quality).toLowerCase()})`}</dd>
+        {fc?.available && (
+          <>
+            <dt>Fuel on board</dt>
+            <dd>{kg(fc.fuel_now_kg)} <span className="k">now ({String(fc.quality ?? '').toLowerCase()}; {kg(fc.fuel_on_board_kg)} at {fmtZ(ms(fc.as_of_utc))})</span></dd>
+            <dt>Burn rate</dt>
+            <dd>{fc.burn_rate_kg_per_hr ? `${Number(fc.burn_rate_kg_per_hr).toLocaleString()} kg/h` : '?'} <span className="k">holding burn; also used for the leg (an assumption)</span></dd>
+          </>
+        )}
       </dl>
       <div className="tbl-wrap">
         <table className="altt">
-          <thead><tr><th>Alternate</th><th>Stands</th><th>Fuel margin</th><th>Return to hub</th><th /></tr></thead>
+          <thead><tr><th>Alternate</th><th>Stands</th><th>Fuel margin</th><th>Lands with</th><th>Uplift for return</th><th>Return to hub</th><th /></tr></thead>
           <tbody>
             {(q.data ?? []).map((a) => {
               const verify = (a.blocking_constraints ?? []).some((c) => c.verify);
@@ -282,13 +312,94 @@ function Alternates({ d, f }) {
                 <tr key={a.alt_iata} className={`${a.is_executable ? '' : 'blocked'} ${verify ? 'verify' : ''}`}>
                   <td><b>{a.alt_iata}</b></td>
                   <td>{a.stands_left ?? '?'}</td>
-                  <td>{a.fuel_margin_min == null ? '?' : `${a.fuel_margin_min} min`}</td>
+                  <td>{a.fuel_margin_min == null ? '?' : `${a.fuel_margin_min} min`}{kgBy[a.alt_iata]?.above_reserve_kg != null && <div className="k">{kg(kgBy[a.alt_iata].above_reserve_kg)} above reserve</div>}</td>
+                  <td>{kg(kgBy[a.alt_iata]?.lands_with_kg)}</td>
+                  <td>{kgBy[a.alt_iata]?.uplift_needed_kg == null ? '?' : kgBy[a.alt_iata].uplift_needed_kg === 0 ? <span className="c-legal">none needed</span> : kg(kgBy[a.alt_iata].uplift_needed_kg)}</td>
                   <td>{a.return_block_min ? `${a.return_block_min} min` : '?'}</td>
                   <td>{a.is_executable ? <span className="c-legal">Executable</span> : <span className={verify ? 'c-verify' : 'c-exceeded'}>{why || 'Blocked'}</span>}</td>
                 </tr>
               );
             })}
-            {q.data?.length === 0 && <tr><td colSpan={5} className="k">No alternates ranked.</td></tr>}
+            {q.data?.length === 0 && <tr><td colSpan={7} className="k">No alternates ranked.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {fc?.assumption && <p className="k" style={{ marginTop: 6 }}>{fc.assumption} “Lands with” is what is left on touchdown; “uplift for return” is what the {`return leg plus a final reserve`} would need beyond that.</p>}
+    </div>
+  );
+}
+
+// The sign-in bracket decides the maximum FDP. Before sign-in the report time can still move (see what it would do); after sign-in the bracket is locked.
+const hm = (t) => (t ? String(t).slice(0, 5) : '?');
+const mmhh = (m) => (m == null ? '?' : `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`);
+function ReportTime({ d, f, fdp }) {
+  const signIn = ms(fdp.sign_in_utc);
+  const now = useMinuteNow();
+  const [t, setT] = useState('');
+  const signed = signIn <= now;
+  const iso = (() => {
+    if (!t) return null;
+    const base = new Date(signIn);
+    const [h, m] = t.split(':').map(Number);
+    return new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), h, m)).toISOString();
+  })();
+  const { data } = useGetFdpPreviewQuery({ duty_id: f.duty_id, report_utc: iso ?? fdp.sign_in_utc, scenario_id: d.ctx.scenario_id }, { skip: signed || !f.duty_id });
+  const pv = data?.preview;
+  if (signed)
+    return (
+      <div className="k" style={{ marginTop: 6 }}>
+        🔒 Signed in at {fmtZ(signIn)}: the bracket {hm(fdp.local_start_from)}–{hm(fdp.local_start_to)} (SHJ local) is locked. Only the number of sectors can still change the limit.
+      </div>
+    );
+  return (
+    <div className="report-time">
+      <div className="k">Not signed in yet: the report time can still move, and the limit follows the bracket it falls in.</div>
+      <label className="k">Report time (UTC){' '}
+        <input type="time" className="field-in" value={t || fmtZ(signIn).replace('Z', '')} onChange={(e) => setT(e.target.value)} style={{ width: 110 }} />
+      </label>
+      {pv && (
+        <div style={{ marginTop: 4 }}>
+          Bracket {hm(fdp.local_start_from)}–{hm(fdp.local_start_to)} → <b>{hm(pv.bracket_from)}–{hm(pv.bracket_to)}</b> · max FDP {mmhh(fdp.max_fdp_min)} → <b>{mmhh(pv.max_fdp_min)}</b> · legal end {fmtZ(ms(fdp.legal_end_utc))} → <b>{fmtZ(ms(pv.legal_end_utc))}</b>
+          <span className="k"> (a preview: nothing is changed)</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Passengers on this flight who connect onward, worst first, with an export for Customer Service.
+const CONN_TONE = { OK: 'legal', AT_RISK: 'risk', MISSED: 'exceeded', INBOUND_DIVERTED: 'exceeded', CANCELLED: 'exceeded' };
+const CONN_WORD = { OK: 'Makes it', AT_RISK: 'At risk', MISSED: 'Will miss it', INBOUND_DIVERTED: 'Flight diverted', CANCELLED: 'Cancelled' };
+function Connections({ d, f }) {
+  const q = useGetConnectionsQuery({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id });
+  const rows = q.data ?? [];
+  if (!rows.length) return null;
+  const bad = rows.filter((x) => x.connection_status !== 'OK');
+  const paxBad = bad.reduce((n, x) => n + x.pax_count, 0);
+  const exportCsv = () => {
+    const esc = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`;
+    const head = 'inbound_flight,onward_flight,onward_to,connection_airport,passengers,scheduled_connection_min,projected_connection_min,status,inbound_arrival_utc,onward_departure_utc';
+    const body = rows.map((x) => [f.flight_no, x.outbound_flight, x.outbound_to, x.connection_iata, x.pax_count, x.sched_connection_min, x.projected_connection_min, x.connection_status, x.inbound_arrival_utc, x.outbound_departure_utc].map(esc).join(','));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([[head, ...body].join('\n')], { type: 'text/csv' }));
+    a.download = `connections-${f.flight_no}.csv`;
+    a.click();
+  };
+  return (
+    <div className="sec" data-src="v_connection_risk">
+      <h3>Connecting passengers {paxBad > 0 ? <Pill tone="risk">{paxBad} pax at risk</Pill> : <Pill tone="legal">all connect</Pill>} <button className="why-btn" onClick={exportCsv}>Export for Customer Service</button></h3>
+      <div className="tbl-wrap">
+        <table className="altt">
+          <thead><tr><th>Onward flight</th><th>Pax</th><th>Connection time</th><th>Status</th></tr></thead>
+          <tbody>
+            {rows.map((x) => (
+              <tr key={x.outbound_flight_id} className={x.connection_status === 'OK' ? '' : 'verify'}>
+                <td><b>{x.outbound_flight}</b> <span className="k">to {x.outbound_to}</span><div className="k">leaves {fmtZ(ms(x.outbound_departure_utc))}</div></td>
+                <td>{x.pax_count}</td>
+                <td>{x.projected_connection_min == null ? '?' : `${x.projected_connection_min} min`}<div className="k">planned {x.sched_connection_min ?? '?'} · minimum 40</div></td>
+                <td><Pill tone={CONN_TONE[x.connection_status] ?? 'verify'}>{CONN_WORD[x.connection_status] ?? x.connection_status}</Pill></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -480,7 +591,14 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
           )}
         </div>
       )}
-      {dl && dlAt == null && !isRecovered(f) && <div className="sec"><h3>Deadline</h3><Pill tone="verify">Cannot compute</Pill> <span className="k">{dl.reason}</span></div>}
+      {dl && dlAt == null && (dl.kind === 'diverting' || dl.kind === 'crew') && (
+        <div className="sec">
+          <h3>Deadline <button className="why-btn" onClick={() => setWhy(!why)}>Why?</button></h3>
+          <div><Pill tone={dl.kind === 'crew' ? 'disc' : 'legal'}>{dl.kind === 'crew' ? 'Crew cannot return legally' : 'Diverting'}</Pill> <span>{dl.reason}</span></div>
+          {why && <ol style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>{(dl.why ?? []).map((w) => <li key={w}>{w}</li>)}</ol>}
+        </div>
+      )}
+      {dl && dlAt == null && dl.kind !== 'diverting' && dl.kind !== 'crew' && !isRecovered(f) && <div className="sec"><h3>Deadline</h3><Pill tone="verify">Cannot compute</Pill> <span className="k">{dl.reason}</span></div>}
 
       {!isRecovered(f) && (
         <div className="sec" data-src="v_crew_legality_ranking · crew_qualification">
@@ -489,17 +607,18 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
           {crew && crew.signIn > minuteNow && <div className="k" style={{ marginBottom: 6 }}>Duty starts {fmtZ(crew.signIn)} · legal until {fmtZ(crew.legal)} (the clock only runs after sign-in)</div>}
           {crew && <Ribbon c={crew} />}
           <dl className="facts" style={{ marginTop: 12 }}>
-            {fdp && (<><dt>Limit</dt><dd>{Math.floor(fdp.max_fdp_min / 60)}:{String(fdp.max_fdp_min % 60).padStart(2, '0')} · {fdp.legs_counted} sector{fdp.legs_counted > 1 ? 's' : ''} · band {fdp.band_tz ?? ''}{fdp.source_rule_id ? ` · rule ${fdp.source_rule_id}` : ''}</dd></>)}
+            {fdp && (<><dt>Limit</dt><dd>{Math.floor(fdp.max_fdp_min / 60)}:{String(fdp.max_fdp_min % 60).padStart(2, '0')} · {fdp.legs_counted} sector{fdp.legs_counted > 1 ? 's' : ''} · bracket {fdp.local_start_from ? `${hm(fdp.local_start_from)}–${hm(fdp.local_start_to)}` : '?'} SHJ local{fdp.source_rule_id ? ` · rule ${fdp.source_rule_id}` : ''}</dd></>)}
             <dt>Legal end</dt><dd>{f.legal_end_utc ? `${fmtZ(ms(f.legal_end_utc))} / ${fmtTime(ms(f.legal_end_utc))} SHJ · with discretion ${fmtZ(ms(f.discretion_end_utc))}` : '—'}</dd>
             <dt>Margin at landing</dt><dd>{margin == null ? '—' : margin < 0 ? <span className="c-disc">{-margin} min over</span> : `${margin} min`}</dd>
           </dl>
+          {fdp && <ReportTime d={d} f={f} fdp={fdp} />}
           <div className="crew-list">
             {(detail?.crew ?? []).map((c) => {
               const pilot = ['CP', 'FO'].includes(c.position_code);
               return <div className="crew-li" key={c.crew_id}><span className="pos">{c.position_code}</span><span>{c.full_name}</span>{pilot && (c.lvp ? <Pill tone="legal">LVP ✓</Pill> : <Pill tone="exceeded">Not LVP</Pill>)}</div>;
             })}
           </div>
-          {(f.crew_reasons ?? []).map((r) => <div key={r} className="k" style={{ marginTop: 4 }}>{r}</div>)}
+          {(f.crew_reasons ?? []).map((r) => <div key={r} className="k" style={{ marginTop: 4 }}>{plainCodes(r)}</div>)}
           {f.open_exceptions > 0 && <p className="c-risk" style={{ margin: '8px 0 0' }}>{f.open_exceptions} open data exception(s) on this duty. Treat legality as unverified.</p>}
           {(crewRisk || f.diverted_to) && f.duty_id && (
             <div style={{ marginTop: 10 }}><button className="btn" onClick={() => setSheet({ kind: 'crew' })}>Find replacement crew</button></div>
@@ -509,6 +628,7 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
 
       <Alternates d={d} f={f} />
       {!isRecovered(f) && <Downstream d={d} f={f} />}
+      {!isRecovered(f) && <Connections d={d} f={f} />}
 
       <div className="sec" data-src="flight_event · decision · decision_approval · case_comment · data_request (this flight)">
         <h3>Flight briefing <span className="k">actions taken on this flight</span></h3>
@@ -526,11 +646,12 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
       <Discussion d={d} f={f} />
 
       {sheet?.kind === 'propose' && <ProposeSheet d={d} f={f} opt={sheet.opt} onClose={close} />}
-      {sheet?.kind === 'approve' && cur && <ApproveSheet d={d} f={f} decision={cur} onClose={close} onReject={() => setSheet({ kind: 'reject' })} />}
+      {sheet?.kind === 'approve' && cur && <ApproveSheet d={d} f={f} decision={cur} onClose={close} onReject={() => setSheet({ kind: 'reject' })} onFindReplacement={() => setSheet({ kind: 'crew' })} />}
       {sheet?.kind === 'reject' && cur && <RejectSheet d={d} f={f} decision={cur} onClose={close} />}
       {sheet?.kind === 'execute' && cur && <ExecuteSheet d={d} f={f} decision={cur} onClose={close} />}
       {sheet?.kind === 'answer' && <AnswerSheet d={d} f={f} gap={sheet.gap} onClose={close} />}
       {sheet?.kind === 'tag' && <TagSheet d={d} f={f} onClose={close} />}
+      {sheet?.kind === 'withdraw' && cur && <WithdrawSheet f={f} decision={cur} onClose={close} />}
       {sheet?.kind === 'link' && <LinkSheet f={f} link={sheet.link} onClose={close} />}
       {sheet?.kind === 'crew' && <CrewFinderSheet d={d} f={f} onClose={close} />}
     </>

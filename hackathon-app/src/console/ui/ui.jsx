@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { cdText } from '@/features/ops/time';
 import { useNow } from '@/hooks/useNow';
-import { toneFor } from '../lib';
+import { roleLabel, toneFor } from '../lib';
 
 export const Pill = ({ tone = 'neutral', children, title }) => (
   <span className={`pill t-${tone}`} title={title}>
@@ -67,7 +67,7 @@ export function Drawer({ title, sub, onClose, children }) {
   return createPortal(
     <>
       <div className="panel-scrim open" onClick={onClose} style={{ zIndex: 54 }} />
-      <aside className="drawer open" aria-label={title}>
+      <aside className="drawer open" role="dialog" aria-modal="true" aria-label={title}>
         <div className="sheet-h" style={{ display: 'flex', alignItems: 'center' }}>
           <div>
             <h2>{title}</h2>
@@ -109,7 +109,7 @@ export function RoleChips({ roles, approved = [], rejected = [], me }) {
         const code = r.code ?? r;
         return (
           <span key={code} className={`role ${ok ? 'ok' : no ? 'no' : 'wait'}`}>
-            {ok ? '✓' : no ? '✕' : '⏳'} {r.label ?? code}
+            {ok ? '✓' : no ? '✕' : '⏳'} {r.label ?? roleLabel(code)}
             {me === code ? ' (you)' : ''}
             {ok ? '' : no ? '' : ' · waiting'}
           </span>

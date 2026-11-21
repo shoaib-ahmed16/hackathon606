@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAppDispatch } from '@/app/hooks';
@@ -88,16 +88,21 @@ function Strip({ d, onSheet, onAirport }) {
   const reopen = hub?.expected_reopen_utc ? ms(hub.expected_reopen_utc) : null;
   const pending = d.approvals.filter((x) => x.can_approve).length;
   const unread = d.notifications.unread;
-  const altCodes = useMemo(
-    () =>
-      [
-        ...new Set([
-          ...airport.filter((a) => a.iata !== hub?.iata).map((a) => a.iata),
-          ...options.filter((o) => o.alternate_iata).map((o) => o.alternate_iata),
-        ]),
-      ].sort(),
-    [airport, options, hub?.iata],
-  );
+  // the alternates the engine may use: every ACTIVE one from the alternates list (even before anyone has entered its status),
+  // plus any airport with a status that is not on the list; an alternate that was switched off disappears from the strip
+  const altCodes = useMemo(() => {
+    const list = d.alternates ?? [];
+    const off = new Set(list.filter((a) => !a.is_active).map((a) => a.alt_iata));
+    return [
+      ...new Set([
+        ...list.filter((a) => a.is_active).map((a) => a.alt_iata),
+        ...airport.filter((a) => a.iata !== hub?.iata).map((a) => a.iata),
+        ...options.filter((o) => o.alternate_iata).map((o) => o.alternate_iata),
+      ]),
+    ]
+      .filter((c) => !off.has(c))
+      .sort();
+  }, [d.alternates, airport, options, hub?.iata]);
   return (
     <header className="strip" aria-label="Situation">
       <div className="brand">
@@ -137,9 +142,10 @@ function Strip({ d, onSheet, onAirport }) {
         </button>
       )}
       {hub && (
-        <div className="hub hub-btn" role="button" tabIndex={0} data-src="v_airport_status_current (hub)" onClick={() => onAirport(hub.iata)} onKeyDown={(e) => e.key === 'Enter' && onAirport(hub.iata)} title="Click to update the hub status">
+        <div className="hub" data-src="v_airport_status_current (hub)">
           <div className="hub-line">
             <span className="hub-code">{hub.iata}</span>
+            <button type="button" className="hub-edit" aria-label={`Update ${hub.iata} status`} title={`Update ${hub.iata} status (open, closed, LVP, reopening time)`} onClick={() => onAirport(hub.iata)}>✎</button>
             <Pill tone={hub.op_status === 'OPEN' ? 'legal' : hub.op_status === 'CLOSED' ? 'exceeded' : 'risk'}>{human(hub.op_status)}</Pill>
             {hub.lvp_in_force && <Pill tone="disc">LVP in force</Pill>}
             {hub.visibility_m != null && <span className="k">RVR {hub.visibility_m} m</span>}
@@ -177,10 +183,10 @@ function Strip({ d, onSheet, onAirport }) {
       <Clock refreshedAt={d.refreshedAt} />
       <div className="strip-actions">
         <button className="btn" onClick={() => onSheet('approvals')} data-src="decision PROPOSED ⨝ approval_policy" title="Decisions waiting for your approval">
-          Approvals {pending > 0 && <span className="badge-count">{pending}</span>}
+          Approvals <span className="badge-count" style={{ visibility: pending > 0 ? 'visible' : 'hidden' }}>{pending || 0}</span>
         </button>
         <button className="btn bell" onClick={() => onSheet('notes')} data-src="notification_outbox (IN_APP)" aria-label={`Notifications, ${unread} unread`}>
-          🔔 {unread > 0 && <span className="badge-count">{unread}</span>}
+          🔔 <span className="badge-count" style={{ visibility: unread > 0 ? 'visible' : 'hidden' }}>{unread || 0}</span>
         </button>
         <button className="btn" onClick={() => onSheet('ask')} title="Ask a question (Ctrl/Cmd + K)">
           Ask <span className="kbd">⌘K</span>
@@ -198,6 +204,41 @@ function Strip({ d, onSheet, onAirport }) {
   );
 }
 const human = (c) => String(c ?? '').replaceAll('_', ' ').toLowerCase().replace(/^./, (x) => x.toUpperCase());
+
+// What each role sees in the actions row (inline) and under "Tools" (menu). The same pages still exist for everyone who may open them.
+const ROLE_TOOLS = {
+  OCC: { inline: ['newcase', 'manage', 'whatif', 'report', 'alternates', 'capacity'], menu: ['rules', 'integrations', 'audit', 'quality', 'explorer', 'push', 'sources'] },
+  ADMIN: { inline: ['newcase', 'manage', 'whatif', 'report', 'alternates', 'capacity'], menu: ['rules', 'integrations', 'audit', 'quality', 'explorer', 'push', 'sources'] },
+  DISPATCH: { inline: ['newcase', 'whatif', 'report', 'capacity'], menu: ['rules', 'audit', 'quality'] },
+  CREW_CONTROL: { inline: ['report'], menu: ['audit', 'quality'] },
+  RECOVERY: { inline: ['report', 'capacity'], menu: ['audit'] },
+  STATION: { inline: ['capacity'], menu: ['audit'] },
+};
+
+// One "Tools" button that opens a small list; closes on a click outside, Escape, or after choosing something.
+function ToolsMenu({ children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const esc = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  const kids = Array.isArray(children) ? children.flat().filter(Boolean) : children;
+  if (!kids || kids.length === 0) return null;
+  return (
+    <span className="tools-menu" ref={ref}>
+      <button type="button" className="btn ghost" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>Tools ▾</button>
+      {open && <div className="tools-pop" role="menu" onClick={() => setOpen(false)}>{children}</div>}
+    </span>
+  );
+}
 
 function Bar({ d, onSheet }) {
   const dispatch = useAppDispatch();
@@ -227,6 +268,7 @@ function Bar({ d, onSheet }) {
     if (loc.pathname !== '/') navigate('/');
   };
   const nav = ({ isActive }) => `btn ghost ${isActive ? 'on-nav' : ''}`;
+  const mine = ROLE_TOOLS[actor?.role_code] ?? { inline: ['report'], menu: ['audit'] };
   return (
     <div className="bar">
       <div className="bar-top">
@@ -254,23 +296,31 @@ function Bar({ d, onSheet }) {
         {actor?.display_name} · {roleLabel(actor?.role_code)}
       </span>
       </div>
-      <span className="tools">
-        <button className="btn ghost" onClick={() => onSheet('newcase')}>New case</button>
-        {d.kase && <button className="btn ghost" onClick={() => onSheet('case')} title="Close or delete this case, move the reopening forecast">Manage case</button>}
-        <NavLink to="/rules" className={nav}>Rules &amp; filters</NavLink>
-        <NavLink to="/integrations" className={nav}>Integrations</NavLink>
-        <NavLink to="/capacity" className={nav}>Airport capacity</NavLink>
-        <NavLink to="/audit" className={nav}>Audit</NavLink>
-        <NavLink to="/data-quality" className={nav}>Data quality</NavLink>
-        {['OCC', 'ADMIN'].includes(actor?.role_code) && <NavLink to="/data" className={nav} title="Browse every table and its relations (read-only)">Data explorer</NavLink>}
-        <button className="btn ghost" onClick={() => onSheet('whatif')}>What if</button>
-        <button className="btn ghost" disabled={pushing} onClick={onPush} title="Advance the live case with simulated movements, passengers, crew duty status and fuel (safe to press again)">
-          {pushing ? 'Pushing…' : 'Push live data'}
-        </button>
-        <button className="btn ghost" onClick={() => onSheet('report')}>Report</button>
-        <button className="btn ghost" aria-pressed={ops.showSources} id="srcBtn" onClick={() => dispatch(toggleSources())} title="Show which database object feeds each part">
-          Data sources
-        </button>
+      {/* each role sees its own actions in the row; everything else is one click away under "Tools" */}
+      <span className="tools" role="toolbar" aria-label="Actions">
+        {mine.inline.includes('newcase') && <button className="btn ghost" onClick={() => onSheet('newcase')}>New case</button>}
+        {mine.inline.includes('manage') && d.kase && <button className="btn ghost" onClick={() => onSheet('case')} title="Close this case or move the reopening forecast">Manage case</button>}
+        {mine.inline.includes('whatif') && <button className="btn ghost" onClick={() => onSheet('whatif')}>What if</button>}
+        {mine.inline.includes('report') && <button className="btn ghost" onClick={() => onSheet('report')}>Report</button>}
+        {mine.inline.includes('alternates') && <NavLink to="/alternates" className={nav} title="Add, edit or switch off the alternate airports">Alternates</NavLink>}
+        {mine.inline.includes('capacity') && <NavLink to="/capacity" className={nav}>Airport capacity</NavLink>}
+        <ToolsMenu>
+          {mine.menu.includes('rules') && <NavLink to="/rules" className={nav}>Rules &amp; filters</NavLink>}
+          {mine.menu.includes('integrations') && <NavLink to="/integrations" className={nav}>Integrations</NavLink>}
+          {mine.menu.includes('audit') && <NavLink to="/audit" className={nav}>Audit trail</NavLink>}
+          {mine.menu.includes('quality') && <NavLink to="/data-quality" className={nav}>Data quality</NavLink>}
+          {mine.menu.includes('explorer') && <NavLink to="/data" className={nav} title="Browse every table and its relations (read-only)">Data explorer</NavLink>}
+          {mine.menu.includes('push') && (
+            <button className="btn ghost" disabled={pushing} onClick={onPush} title="Advance the live case with simulated movements, passengers, crew duty status and fuel (safe to press again)">
+              {pushing ? 'Pushing…' : 'Push live data'}
+            </button>
+          )}
+          {mine.menu.includes('sources') && (
+            <button className="btn ghost" aria-pressed={ops.showSources} id="srcBtn" onClick={() => dispatch(toggleSources())} title="Show which database object feeds each part">
+              Data sources
+            </button>
+          )}
+        </ToolsMenu>
       </span>
     </div>
   );

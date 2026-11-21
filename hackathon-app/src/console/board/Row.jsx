@@ -7,6 +7,13 @@ import { etaOverdue } from '@/features/ops/boardFilters';
 const zhm = (t) => { const d = new Date(t); return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}Z`; };
 
 function FuelMeter({ f, fuelEnd, now }) {
+  if (f.diverted_to && f.status === 'DIVERTING')
+    return (
+      <div className="meter">
+        <div className="lbl"><span>Fuel</span><b>In flight</b></div>
+        <div className="track"><div className="fill" style={{ width: '100%', background: 'var(--faint)' }} /></div>
+      </div>
+    );
   if (isAirborne(f) && !f.diverted_to) {
     if (fuelEnd == null)
       return (
@@ -131,7 +138,7 @@ const Row = memo(function Row({ f, cur, last, dl, fuelEnd, rules, selected, watc
       </div>
       <div className="rec"><RecCell f={f} cur={cur} last={last} verifyFuel={verifyFuel} /></div>
       <div className="cd-cell">
-        {recovered ? <span className="k">Done</span> : at ? <><Cd at={at} big /><span className="k">{fmtZday(at, now)}</span></> : <><span className={`cd-big ${isAirborne(f) || f.diverted_to ? 'c-verify' : 'k'}`}>{isAirborne(f) || f.diverted_to ? '?' : '—'}</span><span className="k">{isAirborne(f) || f.diverted_to ? human(dl?.reason ?? 'verify') : 'no deadline running'}</span></>}
+        {recovered ? <span className="k">Done</span> : at ? <><Cd at={at} big /><span className="k">{fmtZday(at, now)}</span></> : dl?.kind === 'diverting' || dl?.kind === 'crew' ? <><span className={`cd-big long ${dl.kind === 'crew' ? 'c-disc' : 'c-legal'}`}>{dl.kind === 'crew' ? 'Needs crew decision' : 'Diverting'}</span><span className="k">{dl.reason}</span></> : <><span className={`cd-big ${isAirborne(f) || f.diverted_to ? 'c-verify' : 'k'}`}>{isAirborne(f) || f.diverted_to ? '?' : '—'}</span><span className="k">{isAirborne(f) || f.diverted_to ? human(dl?.reason ?? 'verify') : 'no deadline running'}</span></>}
       </div>
     </div>
   );

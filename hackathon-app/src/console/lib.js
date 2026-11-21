@@ -28,6 +28,36 @@ export const TYPE_LABEL = {
 };
 export const typeLabel = (t) => TYPE_LABEL[t] ?? String(t ?? '').replaceAll('_', ' ').toLowerCase();
 export const human = (code) => String(code ?? '').replaceAll('_', ' ').toLowerCase();
+
+// Engine codes in words a duty manager reads. Anything not listed is still turned into lower-case words, never shown as CODE_LIKE_THIS.
+const CODE_WORDS = {
+  ENDURANCE_ENDS_BEFORE_REOPENING: 'fuel runs out before the airport reopens',
+  CREW_NOT_LVP_QUALIFIED_FOR_HUB: 'the crew is not LVP-qualified for the hub',
+  CREW_NOT_LVP_QUALIFIED_FOR_ALTERNATE: 'the crew is not LVP-qualified for this alternate',
+  REOPENING_TIME_UNKNOWN: 'the reopening time is not known',
+  FLIGHT_FEED_STALE: 'the flight data is out of date',
+  PROJECTED_END_UNKNOWN: 'the landing time is not known',
+  CANNOT_REACH_WITH_FUEL: 'not enough fuel to reach it',
+  FUEL_ENDURANCE_UNKNOWN: 'fuel endurance is not known',
+  ALTERNATE_STATUS_UNKNOWN: 'the alternate has not been confirmed',
+  ALTERNATE_NOT_OPEN: 'the alternate is not open',
+  WEATHER_BELOW_MINIMA: 'weather is below minima',
+  WEATHER_UNCONFIRMED: 'weather is not confirmed',
+  NO_PARKING: 'no parking stands left',
+  PARKING_UNCONFIRMED: 'parking is not confirmed',
+  NO_FUEL_AT_ALTERNATE: 'no fuel at the alternate',
+  NO_HANDLING: 'no handling agent',
+  TIME_BASE_INCONSISTENT: 'the times do not add up: verify',
+  FLIGHT_NOT_DIVERTIBLE: 'the flight cannot divert any more',
+  SHEET_DISAGREES_WITH_RULESET: 'the duty sheet disagrees with the approved rule',
+};
+export const plainCodes = (s = '') => String(s).replace(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g, (c) => CODE_WORDS[c] ?? human(c));
+// one short sentence for a proposal: what, and the first plain reason. The engine's full text stays behind "Why?"
+export const plainProposal = (opt, rationale) => {
+  const hold = /Hold not feasible: ([A-Z_]+)/.exec(rationale ?? '');
+  const lead = (opt.why?.[0] ?? '').split(' (')[0].replace(/\.$/, '');
+  return [opt.what, [hold ? `holding is not possible: ${plainCodes(hold[1])}` : '', plainCodes(lead)].filter(Boolean).join('; ')].filter(Boolean).join(': ') + '.';
+};
 export const REASONS = [
   'Station capacity',
   'ATC restriction',
@@ -51,10 +81,11 @@ export const isRecovered = (f) => ['LANDED', 'ON_BLOCKS'].includes(f.status) && 
 export const isAirborne = (f) => ['AIRBORNE', 'HOLDING', 'DIVERTING'].includes(f.status);
 
 // The five live statuses the board filters on.
-export const LIVE_STATUSES = ['Airborne', 'Holding', 'At alternate', 'Not departed', 'Recovered'];
+export const LIVE_STATUSES = ['Airborne', 'Holding', 'Diverting', 'At alternate', 'Not departed', 'Recovered'];
 export function liveLabel(f) {
   if (f.status === 'CANCELLED') return 'Cancelled';
   if (f.status === 'HOLDING') return 'Holding';
+  if (f.diverted_to && f.status === 'DIVERTING') return 'Diverting';
   if (f.diverted_to) return 'At alternate';
   if (isRecovered(f)) return 'Recovered';
   if (isAirborne(f)) return 'Airborne';
@@ -65,6 +96,9 @@ export function liveLabel(f) {
 export function whereText(f) {
   const eta = ms(f.eta_utc ?? f.sta_utc);
   if (f.status === 'CANCELLED') return ['Cancelled', ''];
+  // right after a diversion is executed the aircraft is still flying there: it is not "on the ground" until it lands
+  if (f.diverted_to && f.status === 'DIVERTING')
+    return [`Diverting to ${f.diverted_to}`, `Landing about ${fmtZ(eta)}`];
   if (f.diverted_to)
     return [
       `On ground at ${f.diverted_to}`,

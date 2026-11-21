@@ -1,0 +1,267 @@
+<title>FOOH Usability Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column; a decision timeline, then findings as severity-striped rows, then requirement coverage */
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --fg:#14212c; --muted:#5a6b78; --line:#d9e0e6; --accent:#1c5a8a;
+  --crit:#b3261e; --crit-bg:#fbe9e7; --high:#b4590a; --high-bg:#fdf0e1; --med:#7a6400; --med-bg:#faf4d6; --low:#4d5f6d; --low-bg:#eaeef1;
+  --ok:#1f7a45; --ok-bg:#e4f4ea;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f161c; --surface:#16212a; --fg:#e3eaf0; --muted:#97a8b5; --line:#2a3945; --accent:#7db7e6;
+  --crit:#ff8a80; --crit-bg:#3a1d1b; --high:#ffb36b; --high-bg:#3a2a17; --med:#e6cf5c; --med-bg:#332e14; --low:#aab9c4; --low-bg:#22303a;
+  --ok:#74d39c; --ok-bg:#163327; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161c; --surface:#16212a; --fg:#e3eaf0; --muted:#97a8b5; --line:#2a3945; --accent:#7db7e6;
+  --crit:#ff8a80; --crit-bg:#3a1d1b; --high:#ffb36b; --high-bg:#3a2a17; --med:#e6cf5c; --med-bg:#332e14; --low:#aab9c4; --low-bg:#22303a;
+  --ok:#74d39c; --ok-bg:#163327; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:30px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:21px;font-weight:600;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:16px;font-weight:600}
+p{margin:0;max-width:74ch}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.meta{color:var(--muted);font-size:14px;display:flex;flex-wrap:wrap;gap:6px 18px}
+header,section{display:flex;flex-direction:column;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.chip{font-family:var(--mono);font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-block}
+.c-crit{color:var(--crit);background:var(--crit-bg)} .c-high{color:var(--high);background:var(--high-bg)}
+.c-med{color:var(--med);background:var(--med-bg)} .c-low{color:var(--low);background:var(--low-bg)} .c-ok{color:var(--ok);background:var(--ok-bg)}
+ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+li{max-width:80ch}
+code{font-family:var(--mono);font-size:13px}
+.finding{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--low);border-radius:4px;padding:14px 16px;display:grid;grid-template-columns:52px 1fr;gap:4px 14px}
+.finding.crit{border-left-color:var(--crit)} .finding.high{border-left-color:var(--high)} .finding.med{border-left-color:var(--med)}
+.fid{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--muted)}
+.fbody{display:flex;flex-direction:column;gap:6px;min-width:0}
+.lbl{font-weight:600}
+.list{display:flex;flex-direction:column;gap:10px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:680px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.steps{display:flex;flex-direction:column;gap:0;border-left:2px solid var(--line);margin-left:6px}
+.step{position:relative;padding:0 0 18px 20px;display:flex;flex-direction:column;gap:4px}
+.step::before{content:"";position:absolute;left:-7px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+.step .who{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+ol.recs{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
+ol.recs li::marker{font-family:var(--mono);color:var(--accent);font-weight:600}
+@media (max-width:560px){.finding{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">Usability review · FOOH disruption control · http://130.61.182.207:8080</span>
+  <h1>Can OCC, Dispatch and Crew Control decide quickly?</h1>
+  <div class="meta"><span>Run 21 Nov 2026</span><span>Roles: Dispatcher 1, Crew Controller 1, OCC Duty Manager (each signed in separately)</span><span>Where: What-if case #6 (fog replay, SHJ closed 60 min longer)</span></div>
+</header>
+
+<section class="panel">
+  <h2 style="border:0;padding:0">Verdict</h2>
+  <p><b>The core decision loop is easy.</b> A diversion went from proposal to execution in about eight clicks across three roles. Every step showed the same "What will happen" preview, notifications took approvers straight to the flight, and nobody could approve outside their role. The rest of the app hasn't caught up with that loop. The home screen buries the flight list, the menus are crowded and identical for every role, the screen right after executing a diversion shows a misleading deadline, and four of the six items from the morning discussion are only partly built or missing.</p>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    <span class="chip c-crit">2 must-fix</span><span class="chip c-high">6 high</span><span class="chip c-med">6 medium</span><span class="chip c-ok">Decision loop: works</span>
+  </div>
+</section>
+
+<section>
+  <h2>The decision we ran</h2>
+  <p>G9472 (MAA→SHJ) was holding with about 20 min of fuel, SHJ was closed until about 03:45Z, and the engine recommended diverting to RKT.</p>
+  <div class="steps">
+    <div class="step"><span class="who">DISPATCH · 2 clicks · easy</span><p>Opened G9472, clicked <b>Propose: Divert to RKT</b>. The dialog listed what would happen: recovery flight G9472D created, crew legal end moving from 03:50Z to 03:05Z, return needing discretion or a replacement crew, RKT stands 4 → 3, 28 min spare fuel, 164 connecting passengers. It also listed who must approve. Clicked <b>Propose decision</b>, and a confirmation said approvers had been notified. Dispatch had no Approve button on its own proposal.</p></div>
+    <div class="step"><span class="who">CREW CONTROL · 3 clicks · easy</span><p>The bell showed 1 unread: "G9472: DIVERT proposed, your approval is needed". Clicking it opened the flight. The board row showed "Needs your approval · 0/2". <b>Review and approve as Crew Control</b> showed the same preview plus "After your approval it still needs OCC". Approved, and the confirmation said "Waiting for OCC".</p></div>
+    <div class="step"><span class="who">OCC · 4 clicks · some friction</span><p>Approvals → <b>Review as OCC</b>, which said "You are the last required approver". Approved, and the confirmation said "Approved by all required roles. OCC can execute". The queue then left OCC on an empty panel, so I had to find G9472 again, and the open drawer covered the Execute button. <b>Execute</b> showed the preview once more and a note that an aeroMart entry would be queued.</p></div>
+    <div class="step"><span class="who">RESULT · confusing</span><p>The board and KPIs updated (1 diverted). The flight immediately read "At alternate / On ground at RKT", and the header said "Next deadline: <b>passed 40 min ago</b>, latest legal departure from RKT 02:13Z", a time before the diversion happened. The aeroMart line is a placeholder: the Integrations page shows a "Manual task" row, and nothing is sent to aeroMart.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>What works well</h2>
+  <ul>
+    <li><b>One consequence preview, shown at every step.</b> The proposer, each approver and the executor all see the same "What will happen" list.</li>
+    <li><b>Approvals that guide you.</b> "After your approval it still needs OCC" and "You are the last required approver" say exactly where the decision stands.</li>
+    <li><b>Notifications take you to the flight</b>, and the board row carries a "Needs your approval · 0/2" chip.</li>
+    <li><b>Role guardrails:</b> Dispatch can't approve its own proposal, and multi-role approval is enforced.</li>
+    <li><b>Per-crew N and N+1 legality</b> in Crew Control: each crew member's status, max FDP, time to spare or shortfall, and when they're legal for their next duty.</li>
+    <li><b>"Why this time?"</b> explains a deadline in plain steps: endurance, flight time to the alternate, spare fuel, reopening, sign-in, sectors, FDP rule.</li>
+    <li><b>Alternate ranking from history:</b> fuel margin uses P50/P90 leg times from historical flights, plus return block time and past diversion counts.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Usability findings</h2>
+
+  <div class="list">
+    <div class="finding crit"><span class="fid">U1</span><div class="fbody">
+      <h3>Right after a diversion is executed, the screen says the aircraft is on the ground and a deadline passed 40 min ago</h3>
+      <p><span class="lbl">Seen:</span> at 02:53Z, seconds after executing, G9472 reads "At alternate · On ground at RKT". The headline deadline is "Latest legal departure from RKT 02:13Z · passed 40 min ago". The flight to RKT takes about 15 min, and 02:13Z is before the decision was made. The duty manager's first reaction will be that something went wrong.</p>
+      <p><span class="lbl">Fix:</span> show "Diverting to RKT · ETA ~03:08Z" until landing. When the crew already can't return legally, say so in words: "Crew cannot fly RKT→SHJ legally. Options: commander discretion until 06:05Z, or replace crew." Don't show a departure time that already passed before the decision.</p>
+    </div></div>
+
+    <div class="finding crit"><span class="fid">U2</span><div class="fbody">
+      <h3>After the final approval, OCC has to hunt for Execute</h3>
+      <p><span class="lbl">Seen:</span> approving from the queue closes the dialog and leaves an empty panel. The Approvals drawer stays open and covers the flight panel, so the first click on "Execute decision" landed under it.</p>
+      <p><span class="lbl">Fix:</span> when the approver is also the executor, offer "Approve and execute" or an "Execute now" button in the confirmation. Close the drawer and open the flight after approving.</p>
+    </div></div>
+
+    <div class="finding high"><span class="fid">U3</span><div class="fbody">
+      <h3>On the home screen, the flight list starts below the first screen</h3>
+      <p><span class="lbl">Seen:</span> the first screen is a two-row menu, 8 KPI tiles, two rows of filters and an 8-line briefing. The "Act now" lane starts at the bottom edge, and half the width is an empty "Select a flight" panel.</p>
+      <p><span class="lbl">Fix:</span> put the KPIs in one compact row, collapse the briefing to its newest 2 lines, and open the top "Act now" flight in the panel by default.</p>
+    </div></div>
+
+    <div class="finding high"><span class="fid">U4</span><div class="fbody">
+      <h3>Every role gets the same crowded menu</h3>
+      <p><span class="lbl">Seen:</span> about 20 items in two rows: New case, Manage case (close or delete), Rules &amp; filters, Integrations, Airport capacity, Audit, Data quality, Data explorer, What if, Push live data, Report, Data sources, and more. Dispatch and Crew Control see admin and developer tools, including case delete and Push live data.</p>
+      <p><span class="lbl">Fix:</span> show each role only its own actions. Put the rest under one "Tools" menu, and keep Data explorer, Data sources and Push live data for admins.</p>
+    </div></div>
+
+    <div class="finding high"><span class="fid">U5</span><div class="fbody">
+      <h3>The Dispatch tab is the OCC board</h3>
+      <p><span class="lbl">Seen:</span> the Dispatch view is identical to OCC. A dispatcher's job is fuel and alternates across all airborne flights, and today that means opening flights one at a time.</p>
+      <p><span class="lbl">Fix:</span> a Dispatch table of airborne and holding flights with columns for fuel on board, endurance, fuel at SHJ and at the best alternate, the leave-the-hold-by time, and stands left.</p>
+    </div></div>
+
+    <div class="finding high"><span class="fid">U6</span><div class="fbody">
+      <h3>The header moves while it loads, and a click opened the hub-status form</h3>
+      <p><span class="lbl">Seen:</span> as OCC, the Approvals count appeared a moment after the page loaded and pushed the header buttons sideways. A click meant for Approvals opened "Update SHJ (hub)", which can close or reopen the airport. I closed it without saving.</p>
+      <p><span class="lbl">Fix:</span> reserve space for badge counts, and move the hub-status editor away from the header actions (for example, behind an edit icon on the SHJ chip).</p>
+    </div></div>
+
+    <div class="finding high"><span class="fid">U7</span><div class="fbody">
+      <h3>Approvers don't see the urgency or the crew detail they need</h3>
+      <p><span class="lbl">Seen:</span> the approvals queue lists "G9472 – Divert to RKT" with no countdown, although only 20 min remained. The Crew Control dialog says "Return needs commander discretion or a replacement crew" but doesn't name the crew, show the N+1 shortfall (45 min), or link to "Find replacement".</p>
+      <p><span class="lbl">Fix:</span> show the deadline countdown on each queue item. In the Crew Control dialog, show the crew with N and N+1 status, plus a "Find replacement" link.</p>
+    </div></div>
+
+    <div class="finding high"><span class="fid">U8</span><div class="fbody">
+      <h3>Engine codes and raw IDs where people read</h3>
+      <p><span class="lbl">Seen:</span></p>
+      <ul>
+        <li>The proposal rationale is pre-filled with the engine's text, including <code>ENDURANCE_ENDS_BEFORE_REOPENING</code>, and that text goes to every team.</li>
+        <li>Dialogs and the queue show <code>CREW_CONTROL · waiting</code>, while the panel says "Crew Control".</li>
+        <li>The briefing shows "Crew replacement: 108877 out, 109809 in", and the crew panel shows <code>FLIGHT_FEED_STALE</code>.</li>
+      </ul>
+      <p><span class="lbl">Fix:</span> pre-fill a short plain sentence ("Divert to RKT: fuel runs out before SHJ reopens; 28 min spare on arrival"), keep the engine detail behind "Why?", and use names everywhere.</p>
+    </div></div>
+
+    <div class="finding med"><span class="fid">U9</span><div class="fbody">
+      <h3>Timestamps don't match what happened</h3>
+      <p>Both approvals and the execution are stamped 02:45Z, though they happened between 02:50Z and 02:53Z by the case clock. The notification shows 13:48Z and the outbox 13:53Z, which are server time. A duty manager reading the record can't reconstruct the order of events.</p>
+    </div></div>
+    <div class="finding med"><span class="fid">U10</span><div class="fbody">
+      <h3>The proposer can't withdraw or change a proposal</h3>
+      <p>Once Dispatch proposes, nothing on Dispatch's screen lets them withdraw or replace it if the picture changes, for example if FJR becomes the better option.</p>
+    </div></div>
+    <div class="finding med"><span class="fid">U11</span><div class="fbody">
+      <h3>Tied options aren't explained</h3>
+      <p>RKT and FJR both score 0.73. RKT is shown as #1 without saying why. FJR's leave-the-hold-by time is earlier (03:08Z vs 03:13Z), which matters to a dispatcher.</p>
+    </div></div>
+    <div class="finding med"><span class="fid">U12</span><div class="fbody">
+      <h3>The recommendation goes stale after execution</h3>
+      <p>After executing, the decision area says "Next step: Replace the crew", but the recommendation card below still shows the old "DIVERT RKT" reasoning until it refreshes.</p>
+    </div></div>
+    <div class="finding med"><span class="fid">U13</span><div class="fbody">
+      <h3>What-if gives no feedback</h3>
+      <p>"Run what-if" closes with no confirmation and leaves you on the original case, so you have to find the new case in the dropdown. In the copy, the briefing shows "SHJ OPEN – Fog lifting" next to the what-if closure, while the header says Closed.</p>
+    </div></div>
+    <div class="finding med"><span class="fid">U14</span><div class="fbody">
+      <h3>Accessibility</h3>
+      <p>All 8 KPI tiles have the same accessible name, "Filter the board", so a screen reader can't tell them apart. The proposal, approval and execution dialogs aren't marked as dialogs. In Crew Control, clicking a flight number does nothing; only "Open" works.</p>
+    </div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Morning discussion: what's covered</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Item</th><th>Status</th><th>What the app does</th><th>What's missing / recommendation</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Crew legality, automated, with N and N+1 legs</td>
+        <td><span class="chip c-ok">Met</span></td>
+        <td>Crew Control lists each crew member with N legs and N+1 legs: status, max FDP, time to spare or shortfall, and when they're legal for their next flight. The board and Ask use the same numbers.</td>
+        <td>Bring N+1 into the approval dialog (U7). Rows for duties that haven't started still count down to legal end ("36 h 50 min").</td>
+      </tr>
+      <tr>
+        <td>FDP limits and the sign-in lock</td>
+        <td><span class="chip c-high">Not met</span></td>
+        <td>Sign-in time, limit, sector count and rule number are shown. The board shows "Duty starts HH:MMZ" for duties that haven't started.</td>
+        <td>
+          <ul>
+            <li>The bracket isn't shown; it reads "band Asia/Dubai" where it should say "13:00–17:59".</li>
+            <li>Before sign-in, nothing lets you move the report time and see the new bracket and max FDP (08:05 → 13:05 moves from 08:00–12:59 to 13:00–17:59).</li>
+            <li>After sign-in, there's no "bracket locked, only leg count can change" marker.</li>
+            <li>"Delay departure" has only a rationale box, with no new-time field.</li>
+          </ul>
+          <b>Add:</b> a report-time control on duties that haven't signed in, showing current bracket → new bracket and max FDP before and after. Show a lock icon once signed in, and have the engine reject any bracket change after sign-in.
+        </td>
+      </tr>
+      <tr>
+        <td>Stand and slot availability for diversion (history, or an assumed x slots per airport)</td>
+        <td><span class="chip c-med">Partial</span></td>
+        <td>Stands left per alternate come from status entries, and the preview shows "RKT stands 4 → 3". An "Airport capacity" page is designed for this: historical peaks, assumed capacity per airport, and an "Incoming flight capacity assessment" what-if.</td>
+        <td>The capacity page calls <code>/api/airports/capacity</code>, <code>…/compare</code> and <code>…/{iata}/capacity/assess</code>, and all three return 404 because the API doesn't have them yet. The page is empty. Deploy them, and feed "arrival slots left per hour" into the ranking and the preview.</td>
+      </tr>
+      <tr>
+        <td>Connecting passengers</td>
+        <td><span class="chip c-med">Partial</span></td>
+        <td>Totals appear in the KPI bar (656), the preview ("164 connecting passengers affected"), downstream impact and the severity score.</td>
+        <td>There's no list of which onward flights are at risk, with projected connection time against the 40-min minimum connection time. Add a "Connections" section to the panel, and an export for Customer Service.</td>
+      </tr>
+      <tr>
+        <td>Fuel uplift, fuel on board and fuel burn, to work out fuel for the next leg or one extra leg (diversion)</td>
+        <td><span class="chip c-high">Not met</span></td>
+        <td>Only holding endurance in minutes, labelled estimated. The API returns <code>fuel_on_board_kg</code> for each flight, but no screen shows it.</td>
+        <td>There's no uplift, burn rate, fuel at landing in kg, or fuel needed for the return leg. The simulated endurance values also rise by one minute per flight id (45, 46, 47…), so they're clearly placeholders. <b>Add a fuel card:</b> fuel on board, burn rate from history, fuel at SHJ and at each alternate on landing, final reserve, uplift needed at the alternate for the return leg, and the quality of each figure.</td>
+      </tr>
+      <tr>
+        <td>Historical fuel burn, to decide whether SHJ or a UAE alternate can be reached with the fuel available</td>
+        <td><span class="chip c-med">Partial</span></td>
+        <td>The fuel margin per alternate uses historical P50/P90 leg times ("P50/P90 of 89 historical flights SHJ-RKT") and blocks alternates that can't be reached with the fuel.</td>
+        <td>It works in minutes, not kg, and doesn't use burn for the aircraft type and weight. Show "lands at FJR with X kg (Y min) above final reserve", and explain it in the "Why?" chain.</td>
+      </tr>
+      <tr>
+        <td>Stretch: load sheet and flight plan ready after a diversion, for the return to SHJ</td>
+        <td><span class="chip c-low">Not present</span></td>
+        <td>The Station view has Landed, On blocks, Refuel done, Passengers on board/disembarked, Crew arrived and Ready to depart.</td>
+        <td>Add <b>Flight plan filed</b> (Dispatch) and <b>Load sheet ready</b> (Station / load control) to the recovery leg's checklist, each with who and when. Make "Ready to depart" require both, show the state on the board row and in Recovery, and let OCC ask for either one the same way as the "?" data requests.</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Recommended order</h2>
+  <ol class="recs">
+    <li><b>Fix the after-execution screen (U1)</b> and <b>offer Execute straight after the final approval (U2).</b> These are the moments judges will watch.</li>
+    <li><b>Build the FDP sign-in behaviour:</b> show the bracket, a report-time control before sign-in, a lock after sign-in.</li>
+    <li><b>Deploy the capacity endpoints</b> so the Airport capacity page and the slot figures work.</li>
+    <li><b>Add the fuel card</b> (fuel on board, burn, fuel at landing, uplift for the return leg). Fuel on board is already in the API.</li>
+    <li><b>Clean up the home screen and menus by role (U3–U5),</b> and stop the header moving while it loads (U6).</li>
+    <li><b>Plain language and one clock</b> in rationales, chips, the briefing and timestamps (U8, U9).</li>
+    <li><b>Add connection detail, and the flight plan and load sheet checklist</b> for the return leg.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>Test data left behind</h2>
+  <ul>
+    <li>What-if case <b>#6</b> ("SHJ fog 21 Nov 2026 (replay) (what-if +60 min)") with decision 5: Divert G9472 to RKT, proposed, approved by Crew Control and OCC, and executed.</li>
+    <li>An outbox row <code>DIVERT-5 · AEROMART · CREATE_DIVERSION_ENTRY · Manual task</code>. The Integrations page is a placeholder and no connector ships with this build, so nothing was sent anywhere.</li>
+    <li>The demo replay (case #1) and the live cases weren't changed. The hub-status form that opened by mistake was closed without saving, and SHJ still shows Closed in #6.</li>
+    <li>Case #6 can be removed from Manage case when you no longer need it.</li>
+  </ul>
+</section>
+
+</div>

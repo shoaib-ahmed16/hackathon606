@@ -182,7 +182,11 @@ export default function CrewView({ d }) {
                   <Fragment key={c.duty_id}>
                   <div className="rw-row">
                     <span>
-                      <b>{c.flight?.flight_no ?? c.duty_legs}</b>{' '}
+                      {c.flight ? (
+                        <button type="button" className="flt-link" onClick={() => dispatch(selectFlight(c.flight.flight_id))} title="Open this flight">{c.flight.flight_no}</button>
+                      ) : (
+                        <b>{c.duty_legs}</b>
+                      )}{' '}
                       <span className="k">{c.flight ? `${c.flight.dep_iata}→${c.flight.planned_arr_iata ?? c.flight.arr_iata}` : c.duty_legs}</span>
                       <span className="k" style={{ display: 'block' }}>
                         {c.position_code} {c.full_name}
@@ -217,11 +221,11 @@ export default function CrewView({ d }) {
                           Find replacement
                         </button>
                       )}
-                      <button type="button" className="btn ghost" aria-expanded={open.has(c.duty_id)} onClick={() => toggle(c.duty_id)}>
+                      <button type="button" className="btn" aria-expanded={open.has(c.duty_id)} onClick={() => toggle(c.duty_id)}>
                         {open.has(c.duty_id) ? 'Hide crew' : 'Crew'}
                       </button>
                       {c.flight && (
-                        <button type="button" className="btn ghost" onClick={() => dispatch(selectFlight(c.flight.flight_id))}>
+                        <button type="button" className="btn" onClick={() => dispatch(selectFlight(c.flight.flight_id))}>
                           Open
                         </button>
                       )}

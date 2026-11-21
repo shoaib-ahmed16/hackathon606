@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, HTTPException, Query
 
 from .db import fetch, live_scenario_id, view
@@ -85,6 +87,37 @@ def aircraft(registration: str, scenario_id: int | None = None):
 def standby(duty_id: int, position: str, station: str, from_leg: int = 1, scenario_id: int | None = None):
     """Q4: alternate crew who keep legality and roster (positioning, LVP, rest, conflicts included)."""
     return fetch("SELECT * FROM standby_candidates(%s,%s,%s,%s,%s)", (scn(scenario_id), duty_id, position.upper(), station.upper(), from_leg))
+
+
+@r.get("/crew/fdp-preview")
+def fdp_preview(duty_id: int, report_utc: datetime, scenario_id: int | None = None):
+    """What moving the report time would do, before the crew signs in: the sign-in bracket it falls in and the maximum FDP that bracket gives.
+    Once the crew has signed in the bracket is locked: only the number of sectors can still change the limit."""
+    s = scn(scenario_id)
+    cur = fetch(
+        """SELECT fc.position_code, fc.sign_in_utc, fc.legs_counted, fc.max_fdp_min, fc.band_tz, fc.rule_set_id, fc.legal_end_utc,
+                  r.local_start_from, r.local_start_to
+             FROM fdp_calculation fc LEFT JOIN fdp_rule r ON r.rule_id = fc.rule_id
+            WHERE fc.scenario_id = %s AND fc.duty_id = %s AND fc.crew_id IS NOT NULL AND fc.is_current
+            ORDER BY fc.margin_min NULLS LAST LIMIT 1""", (s, duty_id))
+    if not cur:
+        return {"available": False, "reason": "No crew legality is calculated for this duty yet"}
+    c = cur[0]
+    now = fetch("SELECT scenario_now(%s) AS t", (s,))[0]["t"]
+    out = {"available": True, "position": c["position_code"], "legs": c["legs_counted"], "signed_in": c["sign_in_utc"] <= now,
+           "current": {"report_utc": c["sign_in_utc"], "bracket_from": c["local_start_from"], "bracket_to": c["local_start_to"],
+                       "max_fdp_min": c["max_fdp_min"], "legal_end_utc": c["legal_end_utc"]}}
+    if out["signed_in"]:
+        out["locked"] = True
+        return out  # no preview: the bracket was fixed at sign-in
+    row = fetch("SELECT * FROM lookup_fdp_rule(%s,%s,(%s::timestamptz AT TIME ZONE %s)::time,%s)",
+                (c["rule_set_id"], c["position_code"], report_utc, c["band_tz"], c["legs_counted"]))
+    n = row[0] if row and row[0].get("rule_id") else None
+    out["locked"] = False
+    out["preview"] = None if not n else {"report_utc": report_utc, "bracket_from": n["local_start_from"], "bracket_to": n["local_start_to"],
+                                         "max_fdp_min": n["max_fdp_min"],
+                                         "legal_end_utc": report_utc + timedelta(minutes=n["max_fdp_min"])}
+    return out
 
 
 @r.get("/crew/replacement-options")

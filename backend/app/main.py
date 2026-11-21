@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import logging
 
-from . import audit, auth, config, migrate, routes_ask, routes_audit, routes_auth, routes_collab, routes_console, routes_feed, routes_explorer, routes_integrations, routes_read, routes_rules, routes_write, stream, worker
+from . import audit, auth, config, migrate, routes_ask, routes_audit, routes_auth, routes_collab, routes_console, routes_feed, routes_explorer, routes_alternates, routes_integrations, routes_read, routes_rules, routes_write, stream, worker
 from .deps import current_user
 from .db import fetch, pool
 
@@ -59,6 +59,7 @@ app.include_router(routes_ask.r, dependencies=[Depends(current_user)])
 app.include_router(routes_integrations.r)  # integrations page (actor())
 app.include_router(routes_rules.r)  # custom rules (actor())
 app.include_router(routes_collab.r)  # KPIs, approvals, subscriptions, data requests (actor())
+app.include_router(routes_alternates.r)  # alternates manager (OCC/ADMIN)
 app.include_router(routes_explorer.r)  # data explorer (OCC/ADMIN only, read-only)
 app.include_router(routes_feed.r)  # simulated live feed push (resolves the user through actor())
 app.include_router(routes_write.r)  # actions resolve the user through actor()

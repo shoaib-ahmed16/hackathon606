@@ -13,7 +13,7 @@ const BOARD_LENSES = ['occ', 'dispatch'];
 
 function Kpi({ k, v, l, s, tone, on, onClick, children }) {
   return (
-    <button className={`kpi ${onClick ? '' : 'static'}`} data-kpi={k} aria-pressed={Boolean(on)} onClick={onClick} title={onClick ? 'Filter the board' : undefined}>
+    <button className={`kpi ${onClick ? '' : 'static'}`} data-kpi={k} aria-pressed={Boolean(on)} aria-label={`${l}: ${typeof v === 'string' || typeof v === 'number' ? v : typeof children === 'string' ? children : ''}${s ? `, ${s}` : ''}${onClick ? '. Filter the board' : ''}`} onClick={onClick} title={onClick ? 'Filter the board' : undefined}>
       <span className={`v ${tone ? `c-${tone}` : ''}`}>{children ?? v}</span>
       <span className="l">{l}</span>
       <span className="s">{s}</span>

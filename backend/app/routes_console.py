@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from .db import fetch, live_scenario_id, tx, view
+from .plain import humanize
 from .deps import actor
 from .routes_write import agent_user_id
 
@@ -40,13 +41,29 @@ def deadlines(case_id: int, scenario_id: int | None = None):
     for f in view("v_flight_watch", {"scenario_id": s, "case_id": case_id}, limit=2000):
         d = None
         status, fid = f["status"], f["flight_id"]
-        if f["diverted_to"] and f["latest_legal_offblocks_utc"] and f["diversion_status"] not in ("DEPARTED", "CLOSED", "CANCELLED"):
-            why = [
-                f"Crew legal end {z(f['legal_end_utc'])} ({local(f['legal_end_utc'])} SHJ)" if f["legal_end_utc"] else "Crew legal end not available",
-                f"Latest legal off-blocks from {f['departure_from_iata'] or f['diverted_to']}: {z(f['latest_legal_offblocks_utc'])} (legal end minus return block time)",
-                f"Operational target {z(f['operational_target_utc'])} (includes the operational buffer)",
-            ]
-            d = {"deadline_utc": f["latest_legal_offblocks_utc"], "kind": "departure", "reason": f"Latest legal departure from {f['diverted_to']}", "why": why}
+        if f["diverted_to"] and f["diversion_status"] not in ("DEPARTED", "CLOSED", "CANCELLED"):
+            alt, hub = f["diverted_to"], f["planned_arr_iata"] or f["arr_iata"]
+            lat, disc = f["latest_legal_offblocks_utc"], f["latest_with_discretion_utc"]
+            in_air = status in ("DIVERTING", "AIRBORNE")
+            landing = f["eta_utc"] if in_air else f.get("ata_utc")
+            # a latest-legal-departure that is EARLIER than the landing is not a deadline anyone can meet: say what is true instead
+            words = None
+            if lat and landing and lat < landing:
+                words = f"Crew cannot fly {alt}→{hub} legally." + (f" Options: commander discretion until {z(disc)}, or replace the crew." if disc and disc > landing else " Option: replace the crew.")
+            if in_air:
+                d = {"deadline_utc": None, "kind": "diverting", "reason": f"Diverting to {alt}, landing about {z(landing)}",
+                     "why": [f"The aircraft is flying to {alt}: landing about {z(landing)} ({local(landing)} SHJ)",
+                             words or (f"Latest legal departure from {alt}: {z(lat)}" if lat else "Crew legality for the return is not available yet")]}
+            elif words:
+                d = {"deadline_utc": None, "kind": "crew", "reason": f"Crew cannot fly {alt}→{hub} legally",
+                     "why": [words, f"Crew legal end {z(f['legal_end_utc'])} ({local(f['legal_end_utc'])} SHJ)" if f["legal_end_utc"] else "Crew legal end not available"]}
+            elif lat:
+                why = [
+                    f"Crew legal end {z(f['legal_end_utc'])} ({local(f['legal_end_utc'])} SHJ)" if f["legal_end_utc"] else "Crew legal end not available",
+                    f"Latest legal off-blocks from {f['departure_from_iata'] or alt}: {z(lat)} (legal end minus return block time)",
+                    f"Operational target {z(f['operational_target_utc'])} (includes the operational buffer)",
+                ]
+                d = {"deadline_utc": lat, "kind": "departure", "reason": f"Latest legal departure from {alt}", "why": why}
         elif status in ("AIRBORNE", "HOLDING", "DIVERTING"):
             inp = fetch("SELECT * FROM flight_decision_inputs(%s,%s)", (s, fid))
             inp = inp[0] if inp else {}
@@ -80,9 +97,11 @@ def flight_detail(flight_id: int, case_id: int, scenario_id: int | None = None):
     if not fl:
         raise HTTPException(404, "Flight not in this case")
     f = fl[0]
+    # an open (PROPOSED) recommendation always wins over an executed (ACCEPTED) one, so the card never shows the reasoning of a decision that is done
     rec = fetch(
         """SELECT rec_id, rec_type, confidence, rationale, assumptions, uncertainty, generated_by, generated_at, required_approver_role, status
-             FROM recommendation WHERE scenario_id = %s AND flight_id = %s AND status IN ('PROPOSED','ACCEPTED') ORDER BY generated_at DESC LIMIT 1""",
+             FROM recommendation WHERE scenario_id = %s AND flight_id = %s AND status IN ('PROPOSED','ACCEPTED')
+            ORDER BY (status = 'PROPOSED') DESC, generated_at DESC LIMIT 1""",
         (s, flight_id),
     )
     crew = fetch(
@@ -165,7 +184,7 @@ def briefing(case_id: int, scenario_id: int | None = None, since: datetime | Non
         """SELECT count(*) FILTER (WHERE generated_at > %s::timestamptz) AS n FROM recommendation WHERE scenario_id = %s""",
         (since or datetime(1970, 1, 1, tzinfo=timezone.utc), s),
     )[0]["n"]
-    return {"now_utc": now, "since": since, "new_recommendations": recs, "items": list(reversed(rows))}
+    return {"now_utc": now, "since": since, "new_recommendations": recs, "items": list(reversed(humanize(rows)))}
 
 
 # ------------------------------------------------------------------ what-if

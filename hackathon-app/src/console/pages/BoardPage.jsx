@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppDispatch } from '@/app/hooks';
 import { passesAll, priorityOf, rulesFor, filterLabel } from '@/features/ops/boardFilters';
 import { selectFlight } from '@/features/ops/opsSlice';
@@ -8,6 +8,7 @@ import { useConsole } from '../ConsoleContext';
 import { useMinuteNow } from '@/hooks/useNow';
 import { MIN } from '@/features/ops/time';
 import Briefing from '../board/Briefing';
+import DispatchView from '../lenses/DispatchView';
 import Filters from '../board/Filters';
 import KpiBar from '../board/KpiBar';
 import Row from '../board/Row';
@@ -61,6 +62,16 @@ function Board({ d }) {
       out[k].sort((a, b) => priorityOf(d.ruleMatches, a.flight_id) - priorityOf(d.ruleMatches, b.flight_id) || key(a) - key(b) || (b.severity_score ?? 0) - (a.severity_score ?? 0));
     return out;
   }, [d.flights, d.ruleMatches, chips, ctx, dlBy, nowMin]);
+
+  // open the most urgent flight when the board loads, so the right-hand panel is never an empty "select a flight" box
+  const opened = useRef(null);
+  const topAct = lanes.act[0]?.flight_id;
+  useEffect(() => {
+    if (d.ops.selectedFlightId == null && topAct != null && opened.current !== d.ctx.case_id) {
+      opened.current = d.ctx.case_id;
+      dispatch(selectFlight(topAct));
+    }
+  }, [topAct, d.ops.selectedFlightId, d.ctx.case_id, dispatch]);
 
   const shown = Object.values(lanes).reduce((n, l) => n + l.length, 0);
   return (
@@ -139,7 +150,8 @@ export default function BoardPage() {
   return (
     <div className="main" style={hasPanel ? undefined : { gridTemplateColumns: '1fr' }}>
       <section className="view" aria-live="polite">
-        {(lens === 'occ' || lens === 'dispatch') && <Board d={d} />}
+        {lens === 'occ' && <Board d={d} />}
+        {lens === 'dispatch' && <DispatchView d={d} />}
         {lens === 'crew' && <CrewView d={d} />}
         {lens === 'station' && <StationView d={d} />}
         {lens === 'recovery' && <RecoveryView d={d} />}

@@ -19,7 +19,8 @@ export default function WhatIfSheet({ d, onClose }) {
 
   const go = async () => {
     try {
-      await run({ ...d.ctx, reopen_shift_min: shift }).unwrap();
+      const r = await run({ ...d.ctx, reopen_shift_min: shift }).unwrap();
+      toast.success(`What-if case #${r.case_id} created. It is in the case list as a what-if; use “Open the what-if case” to look at it.`);
     } catch (e) {
       toast.error(getErrorMessage(e));
     }

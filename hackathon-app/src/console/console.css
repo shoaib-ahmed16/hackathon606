@@ -533,3 +533,31 @@ button.alt:hover,.hub-btn:hover{border-color:var(--ai)}
   body.station-lens .sheet{width:100vw;max-width:100vw}
 }
 .kpi .v{overflow:hidden;text-overflow:ellipsis} /* a long value is cut with an ellipsis, never drawn outside its card */
+.hub{cursor:default}
+.hub-edit{border:1px solid var(--line-2);background:transparent;color:var(--muted);border-radius:6px;padding:0 6px;font-size:12px;line-height:18px;cursor:pointer}
+.hub-edit:hover{border-color:var(--ai);color:var(--ai)}
+.badge-count{display:inline-block;min-width:20px;text-align:center}
+.crew-outlook{display:flex;flex-direction:column;gap:6px;margin:4px 0 8px}
+.co-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.co-row > b{min-width:170px}
+.appr-dl{margin:2px 0 6px;font-size:13px}
+.flt-link{border:none;background:none;padding:0;font:inherit;font-weight:700;color:inherit;cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
+.flt-link:hover{color:var(--ai);text-decoration-style:solid}
+.tie{margin-left:6px;font-size:11px;border:1px solid var(--line-2);border-radius:999px;padding:0 6px;color:var(--muted)}
+.tie-note{margin:0 0 8px}
+
+/* first screen: the eight KPI tiles on one compact row, so the flight list starts near the top */
+.kpis{gap:8px;padding:10px 16px 0}
+.kpi{padding:6px 9px}
+.kpi .v{font-size:19px}
+.kpi .l{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .s{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1380px){ .kpis{grid-template-columns:repeat(8,minmax(0,1fr))} }
+@media (max-width:1240px){ .kpis{grid-template-columns:repeat(4,minmax(0,1fr))} }
+/* Tools menu: a small pop-over, so the actions row stays short. The row no longer scrolls, so the pop-over is not clipped. */
+.tools{overflow:visible;position:relative}
+.tools-menu{position:relative;display:inline-flex}
+.tools-pop{position:absolute;top:calc(100% + 4px);left:0;z-index:60;min-width:200px;display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:6px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-md);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.tools-pop .btn{justify-content:flex-start;width:100%}
+@media (max-width:1600px){ .kpis{grid-template-columns:repeat(8,minmax(0,1fr))} }
+@media (max-width:1240px){ .kpis{grid-template-columns:repeat(4,minmax(0,1fr))} }

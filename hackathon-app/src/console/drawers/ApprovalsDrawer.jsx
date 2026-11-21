@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAppDispatch } from '@/app/hooks';
 import { selectFlight } from '@/features/ops/opsSlice';
 import { ms } from '@/features/ops/helpers';
-import { Drawer, RoleChips } from '../ui/ui';
+import { Cd, Drawer, RoleChips } from '../ui/ui';
 import { ApproveSheet, RejectSheet } from '../sheets/DecisionSheets';
 import { decisionWhat, fmtZ, roleLabel } from '../lib';
 
@@ -27,6 +27,13 @@ export default function ApprovalsDrawer({ d, onClose }) {
             <div className="k">
               {x.proposed_by} · {fmtZ(ms(x.decided_at))} · {x.followed_recommendation ? 'matches the engine' : 'differs from the engine'}
             </div>
+            {(() => {
+              // how long is left: an approver must see the urgency, not just the proposal
+              const dl = d.deadlines.find((y) => y.flight_id === x.flight_id);
+              return dl?.deadline_utc
+                ? <div className="appr-dl"><Cd at={ms(dl.deadline_utc)} className="cd" /> <span className="k">{dl.reason}</span></div>
+                : dl ? <div className="appr-dl k">{dl.reason}</div> : null;
+            })()}
             <RoleChips roles={x.required_roles} approved={x.approved_roles} rejected={x.rejected_roles} />
             <div className="ai-buttons">
               {x.can_approve ? (
@@ -43,7 +50,15 @@ export default function ApprovalsDrawer({ d, onClose }) {
         {items.length === 0 && <div className="empty">Proposals appear here as soon as someone records a decision.</div>}
       </Drawer>
       {review && !review.reject && review.f && (
-        <ApproveSheet d={d} f={review.f} decision={review.x} onClose={() => setReview(null)} onReject={() => setReview({ ...review, reject: true })} />
+        <ApproveSheet d={d} f={review.f} decision={review.x} onClose={() => setReview(null)} onReject={() => setReview({ ...review, reject: true })}
+          onFindReplacement={() => { onClose(); dispatch(selectFlight(review.f.flight_id)); }}
+          onDone={(r) => {
+            // fully approved (or executed): leave the queue and land on the flight, with Execute (or the result) in front of you
+            if (r?.status === 'APPROVED' || r?.status === 'EXECUTED') {
+              onClose();
+              dispatch(selectFlight(review.f.flight_id));
+            }
+          }} />
       )}
       {review?.reject && review.f && <RejectSheet d={d} f={review.f} decision={review.x} onClose={() => setReview(null)} />}
     </>
