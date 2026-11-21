@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAppDispatch } from '@/app/hooks';
-import { LogoFull } from '@/components/Logo';
+import { LogoMark } from '@/components/Logo';
 import { APP_NAME } from '@/config/brand';
 import { useSignOut } from '@/features/auth/useSignOut';
 import {
@@ -15,6 +15,7 @@ import { selectCase, setLens, toggleBriefing, toggleSources } from '@/features/o
 import { useOps } from '@/features/ops/useOps';
 import { iso, ms, stampMs } from '@/features/ops/helpers';
 import { toggleMode } from '@/features/ui/uiSlice';
+import { useAppSelector } from '@/app/hooks';
 import { NowProvider, useMinuteNow, useNow, useWall } from '@/hooks/useNow';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 import { ConsoleProvider } from './ConsoleContext';
@@ -63,8 +64,24 @@ function altChip(code, airport) {
   return { cls: '', mark: '✓', text: a.parking_available != null ? `${a.parking_available} stands` : 'Open' };
 }
 
+function ThemeIcon({ dark }) {
+  // dark mode shows a sun (switch to light), light mode shows a moon (switch to dark)
+  return dark ? (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" />
+    </svg>
+  ) : (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z" />
+    </svg>
+  );
+}
+
 function Strip({ d, onSheet, onAirport }) {
   const dispatch = useAppDispatch();
+  const signOut = useSignOut();
+  const dark = useAppSelector((s) => s.ui.mode) === 'dark';
   const now = useMinuteNow(); // the strip only needs the day, so it does not re-render every second
   const { kase, cases, airport, options, ops } = d;
   const hub = airport.find((a) => a.iata === kase?.hub_iata) ?? airport[0];
@@ -84,10 +101,8 @@ function Strip({ d, onSheet, onAirport }) {
   return (
     <header className="strip" aria-label="Situation">
       <div className="brand">
-        <LogoFull height={38} bar />
-        <span className="bn">
-          <small>{hub?.iata ?? kase?.hub_iata ?? 'Hub'} disruption room</small>
-        </span>
+        <LogoMark size={36} />
+        <span className="bn">{APP_NAME}</span>
       </div>
       <div className="scn" data-src="scenario / disruption_case">
         <span className="k">Case</span>
@@ -170,6 +185,14 @@ function Strip({ d, onSheet, onAirport }) {
         <button className="btn" onClick={() => onSheet('ask')} title="Ask a question (Ctrl/Cmd + K)">
           Ask <span className="kbd">⌘K</span>
         </button>
+        <button className="btn icon-btn" onClick={() => dispatch(toggleMode())} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'} title={dark ? 'Light theme' : 'Dark theme'}>
+          <ThemeIcon dark={dark} />
+        </button>
+        <button className="btn icon-btn" onClick={signOut} aria-label="Sign out" title={`Sign out (${d.actor?.display_name ?? ''})`}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H9M16 8l4 4-4 4M20 12H9" />
+          </svg>
+        </button>
       </div>
     </header>
   );
@@ -180,7 +203,6 @@ function Bar({ d, onSheet }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const loc = useLocation();
-  const signOut = useSignOut();
   const now = useNow();
   const { ops, actor } = d;
   const [pushFeed, { isLoading: pushing }] = usePushFeedMutation();
@@ -247,8 +269,6 @@ function Bar({ d, onSheet }) {
         <button className="btn ghost" aria-pressed={ops.showSources} id="srcBtn" onClick={() => dispatch(toggleSources())} title="Show which database object feeds each part">
           Data sources
         </button>
-        <button className="btn ghost" onClick={() => dispatch(toggleMode())}>Theme</button>
-        <button className="btn ghost" onClick={signOut}>Sign out</button>
       </span>
     </div>
   );

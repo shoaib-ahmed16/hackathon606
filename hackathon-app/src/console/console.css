@@ -401,7 +401,7 @@ textarea{width:100%;min-height:70px;background:var(--surface-2);border:1px solid
 }
 
 
-/* =================== FOOH! additions (React port) =================== */
+/* =================== Foooh! additions (React port) =================== */
 .app{height:100dvh}
 .cw-link{color:inherit;text-decoration:none}
 .btn.on-nav,.btn[aria-current="page"]{background:var(--surface-3);color:var(--text)}
@@ -502,3 +502,9 @@ button.alt:hover,.hub-btn:hover{border-color:var(--ai)}
 .tools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
 .tools .btn{white-space:nowrap;flex-shrink:0}
 .scn-row select{max-width:290px}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px}
+/* the strip wraps instead of hiding its right-hand buttons (theme, sign out) when space runs short */
+.strip{flex-wrap:wrap;overflow-x:visible}
+.strip-actions{margin-left:auto}
+.scn-row select{max-width:230px}
+@media (max-width:1700px){ .strip .kbd{display:none} .strip-actions{gap:5px} .strip-actions .btn{padding:6px 10px} .scn-row select{max-width:200px} .clock-z{font-size:17px} }

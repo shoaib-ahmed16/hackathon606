@@ -4,8 +4,8 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { selectIsAuthed, setCredentials } from '@/features/auth/authSlice';
 import { useLoginMutation } from '@/features/auth/authApi';
 import { getErrorMessage } from '@/utils/getErrorMessage';
-import { LogoFull } from '@/components/Logo';
-import { APP_TAGLINE } from '@/config/brand';
+import { LogoMark } from '@/components/Logo';
+import { APP_NAME, APP_TAGLINE } from '@/config/brand';
 
 export default function Login() {
   const dispatch = useAppDispatch();
@@ -39,7 +39,8 @@ export default function Login() {
     <div className="login">
       <form className="login-card" onSubmit={onSubmit} noValidate>
         <div className="login-logo">
-          <LogoFull height={150} />
+          <LogoMark size={72} />
+          <h1>{APP_NAME}</h1>
           <div className="k" style={{ textAlign: 'center' }}>{APP_TAGLINE}</div>
         </div>
         <label className="field-l k" style={{ display: 'block' }}>

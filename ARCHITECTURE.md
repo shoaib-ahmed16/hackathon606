@@ -1,6 +1,6 @@
-# FOOH!: Architecture and Scalability
+# Foooh!: Architecture and Scalability
 
-FOOH! is a disruption control room for airline operations (fog operations and crew duty recovery). This document explains how the solution is built, why, and how far it scales.
+Foooh! is a disruption control room for airline operations (fog operations and crew duty recovery). This document explains how the solution is built, why, and how far it scales.
 Everything here describes code in this repository (`backend/`, `hackathon-app/`, `docker-compose.yml`).
 Limits are stated plainly in section 8.
 

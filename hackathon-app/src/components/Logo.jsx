@@ -1,19 +1,12 @@
 import { Stack, Typography } from '@mui/material';
 import { APP_NAME } from '@/config/brand';
+import { useAppSelector } from '@/app/hooks';
 
-// The mark: the team's logo (wind sweeping past an aircraft; mark only, no lettering). Files: public/logo-512.png (square, rounded),
-// public/logo-full.png (the original artwork, for slides). Keep in sync with public/favicon.png.
+// The mark: wind sweeping fog away. Blue tile in the dark theme, white tile in the light theme (both from the team's logo sheet).
+// Files: public/logo-dark.png, public/logo-light.png (512 px, rounded), public/favicon.png (the blue one works on any browser theme).
 export function LogoMark({ size = 28 }) {
-  return <img src="/logo-512.png" width={size} height={size} alt={`${APP_NAME} logo`} style={{ display: 'block', borderRadius: size * 0.22 }} />;
-}
-
-// The full logo (wind, aircraft, wordmark) on the same navy as the artwork, so it sits cleanly on both themes.
-export function LogoFull({ height = 30, bar = false }) {
-  return (
-    <span style={{ display: 'inline-flex', background: '#0b1a31', borderRadius: Math.round(height * 0.28), overflow: 'hidden' }}>
-      <img src={bar ? '/logo-bar.png' : '/logo-full.png'} alt={`${APP_NAME} logo`} style={{ display: 'block', height, width: 'auto' }} />
-    </span>
-  );
+  const dark = useAppSelector((s) => s.ui.mode) === 'dark';
+  return <img src={dark ? '/logo-dark.png' : '/logo-light.png'} width={size} height={size} alt={`${APP_NAME} logo`} style={{ display: 'block' }} />;
 }
 
 // <Logo /> mark + name   |   <Logo iconOnly /> mark only (collapsed sidebar)

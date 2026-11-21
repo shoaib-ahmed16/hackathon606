@@ -1,36 +1,36 @@
-# FOOH!: brand sheet
+# Foooh!: brand sheet
 
 ## Name
-**FOOH!**. The product name chosen by the team. Short, one word, easy to say on a call or put on a door sign.
+**Foooh!**. The product name chosen by the team. Short, one word, easy to say on a call or put on a door sign.
 Not yet checked for trademark or domain availability. Do that before any public launch.
 
 ## Tagline and one-liners
 - **Tagline:** Disruption control for airline operations.
-- **One line:** FOOH! turns the disruption "firefighter" group chat into one shared decision room, where the AI prepares the facts
+- **One line:** Foooh! turns the disruption "firefighter" group chat into one shared decision room, where the AI prepares the facts
   and options and people stay responsible for every decision.
 - **Three proof points:** every affected flight ordered by how soon a decision is needed; crew legality, fuel and alternates on
   one screen; a full audit trail of who decided what and why.
 
 ## Logo
-The team's logo (`image.png` in the project root): wind swirls sweeping fog away behind a climbing aircraft, with the wordmark "FOOH!" in brushed-silver letters on deep navy. The AI-tool watermark in the original corner was painted out.
-- Files in `hackathon-app/public/`: `logo-full.png` (wide logo with the wordmark, edges faded into the navy; top bar and login), `logo-bar.png` (tighter crop for the top bar), `logo-source.png` (cleaned full square artwork, for slides and posters), `logo-512.png` (mark without the lettering, rounded; app icon), `favicon.png`, `apple-touch-icon.png`.
-- `LogoFull` in `src/components/Logo.jsx` shows the wide logo on the same navy as the artwork. Use the lettering-free mark only at small sizes (tab icon).
-- Keep clear space of at least a quarter of the logo's height. Do not recolour, stretch or add effects.
+Wind sweeping fog away: three wind gusts blowing past an amber flame-shaped drop, a spray of dots trailing off. It is the sound of the name ("Foooh!") drawn.
+The mark has no lettering; the name is set next to it in text.
+- Two versions, as on the team's logo sheet: **blue tile** for the dark theme and **white tile** for the light theme. The app switches between them with the theme (`LogoMark` in `src/components/Logo.jsx`).
+- Files in `hackathon-app/public/`: `logo-dark.png` (blue), `logo-light.png` (white), `favicon.png` and `apple-touch-icon.png` (blue; it reads on any browser theme).
+- Source images: `image copy 4.png` (blue, 2048 px) and the "device sizes" sheet `image.png` (white version, cropped and upscaled, so re-export it at full size if it is ever needed above 128 px).
+- Keep clear space of at least a quarter of the mark's width. Do not recolour, stretch or add effects.
 
 ## Colour
 | Use | Colour |
 |---|---|
-| Logo tile, dark end | `#0c4a6e` |
-| Logo tile, light end / app primary | `#0284c7` |
+| Logo blue tile (gradient) | `#00aeef` to `#0093d0` |
+| Logo amber flame | `#ffc044` |
+| Logo wind, light version | `#00aeef` and `#0a84c6` |
 | Dark-mode primary | `#38bdf8` |
-| Tile gradient mid-tone | `#0369a1` |
-| Logo background navy | `#0b1a31` |
-| Logo silver and ice blue | `#c9d6df` / `#9fd3dc` |
 
 Status colours (green, amber, red) are reserved for operational meaning and are never used for decoration.
 
 ## Where the name lives in the code
 `hackathon-app/src/config/brand.js` (name, tagline, description), `index.html` (tab title and description), `Logo.jsx`,
-`favicon.svg`, the login screen, and the API title in `backend/app/main.py`.
+`favicon.png`, the login screen, and the API title in `backend/app/main.py`.
 Internal identifiers (database name, schema `fogops`, `FOGOPS_DSN`) are deliberately unchanged so existing databases and
 deployments keep working. The demo password `FogOps@2026` is also unchanged because existing demo accounts use it.
