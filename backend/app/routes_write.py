@@ -94,7 +94,8 @@ def recommend(flight_id: int, case_id: int, scenario_id: int | None = None, user
         return conn.execute("SELECT recommend_for_flight(%s,%s,%s) AS rec_id", (s, case_id, flight_id)).fetchall()
 
 
-DIVERSION_FIELDS = {"status", "refuel_status", "handling_status", "waiting_for", "pax_onboard", "landed_alt_utc", "on_blocks_alt_utc", "planned_departure_utc", "actual_departure_utc", "turnaround_min_assumed"}
+CHECKLIST_ROLES = {"flight_plan_filed": ("DISPATCH", "OCC", "ADMIN"), "load_sheet_ready": ("STATION", "OCC", "ADMIN")}  # who may tick each paperwork item
+DIVERSION_FIELDS = {"flight_plan_filed", "load_sheet_ready", "status", "refuel_status", "handling_status", "waiting_for", "pax_onboard", "landed_alt_utc", "on_blocks_alt_utc", "planned_departure_utc", "actual_departure_utc", "turnaround_min_assumed"}
 
 
 @r.patch("/diversions/{diversion_id}")
@@ -103,9 +104,27 @@ def update_diversion(diversion_id: int, body: dict[str, Any], user=Depends(actor
     bad = set(body) - DIVERSION_FIELDS
     if bad or not body:
         raise HTTPException(422, f"Unknown or empty fields: {sorted(bad)}")
-    sets = ", ".join(f"{k} = %s" for k in body)
+    body = dict(body)
+    paperwork = {k: bool(body.pop(k)) for k in list(CHECKLIST_ROLES) if k in body}   # flight plan filed / load sheet ready: tick or untick, who + when kept
     with tx(user) as conn:
-        rows = conn.execute(f"UPDATE diversion SET {sets}, updated_by = %s, updated_at = now() WHERE diversion_id = %s RETURNING *", [*body.values(), int(user), diversion_id]).fetchall()
+        if paperwork:
+            role = conn.execute("SELECT role_code FROM app_user WHERE user_id = %s", (int(user),)).fetchone()["role_code"]
+            for k in paperwork:
+                if role not in CHECKLIST_ROLES[k]:
+                    raise HTTPException(403, f"Only {' or '.join(CHECKLIST_ROLES[k])} can {'file the flight plan' if k == 'flight_plan_filed' else 'mark the load sheet ready'}")
+        parts, vals = [f"{k} = %s" for k in body], list(body.values())
+        for k, on in paperwork.items():
+            col = "flight_plan_filed" if k == "flight_plan_filed" else "load_sheet_ready"
+            parts += [f"{col}_at = {'scenario_stamp(scenario_id)' if on else 'NULL'}", f"{col}_by = %s"]
+            vals.append(int(user) if on else None)
+        rows = conn.execute(f"UPDATE diversion SET {', '.join(parts)}, updated_by = %s, updated_at = now() WHERE diversion_id = %s RETURNING *", [*vals, int(user), diversion_id]).fetchall()
+        if rows and any(paperwork.values()):
+            # an OPEN "ask for the flight plan / load sheet" is answered by ticking the item itself
+            fields = [f for k, f in (("flight_plan_filed", "FLIGHT_PLAN"), ("load_sheet_ready", "LOAD_SHEET")) if paperwork.get(k)]
+            conn.execute(
+                """UPDATE data_request SET status = 'ANSWERED', answer = %s, answered_by = %s, answered_at = now()
+                    WHERE scenario_id = %s AND flight_id = %s AND field = ANY(%s) AND status = 'OPEN'""",
+                (Jsonb({"value": "done", "applied_to": "diversion"}), int(user), rows[0]["scenario_id"], rows[0]["original_flight_id"], fields))
     if not rows:
         raise HTTPException(404, "Unknown diversion")
     return rows
@@ -306,3 +325,38 @@ def delete_case(case_id: int, user=Depends(actor)):
                 with conn.transaction():
                     conn.execute("SELECT recommend_for_flight(%s,%s,%s)", (row["scenario_id"], row["case_id"], row["flight_id"]))
     return {"deleted": case_id}
+
+
+# ---------------------------------------------------------------- report time (move before sign-in, locked after: migration 018)
+class ReportTime(BaseModel):
+    scenario_id: int | None = None
+    duty_id: int
+    report_utc: datetime
+    reason: str
+
+
+@r.post("/crew/report-time")
+def move_report_time(b: ReportTime, user=Depends(actor)):
+    """Move a duty's report time while the crew has not signed in yet. The database refuses it once they have (the bracket is then
+    fixed), refuses a time in the past or more than 12 hours away, and requires a reason. Returns the bracket and limit before and after."""
+    with tx(user) as conn:
+        _require_role(conn, user, ("OCC", "CREW_CONTROL", "ADMIN"))
+        res = conn.execute("SELECT change_report_time(%s,%s,%s,%s) AS r", (b.scenario_id or live_scenario_id(), b.duty_id, b.report_utc, b.reason)).fetchone()
+        return res["r"]
+
+
+# ---------------------------------------------------------------- scenario clock (run / pause / set / advance: migration 019)
+class ClockBody(BaseModel):
+    action: str                       # run | pause | advance | set
+    to_utc: datetime | None = None    # for set
+    minutes: int | None = None        # for advance
+
+
+@r.post("/scenarios/{scenario_id}/clock")
+def scenario_clock(scenario_id: int, b: ClockBody, user=Depends(actor)):
+    """Run, pause, set or advance a scenario's clock, so stamps follow the same time the screen shows. OCC and admin only."""
+    with tx(user) as conn:
+        _require_role(conn, user, ("OCC", "ADMIN"))
+        res = conn.execute("SELECT set_scenario_clock(%s,%s,%s,%s) AS r", (scenario_id, b.action, b.to_utc, b.minutes)).fetchone()
+        return res["r"]
+

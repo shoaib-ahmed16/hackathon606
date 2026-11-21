@@ -84,10 +84,10 @@ def push(body: PushBody | None = None, user=Depends(actor)):
         # The LIVE scenario may run on a stored clock (the snapshot time). Events, fuel and deadlines are all judged against
         # THAT clock, so pushing wall-clock data without moving it makes flights "airborne in the future" and every fuel
         # figure look wrong. Move the clock forward to the push time, together with the data (never backwards).
-        clock = conn.execute("SELECT sim_clock_utc FROM scenario WHERE scenario_id = %s FOR UPDATE", (scn,)).fetchone()
+        clock = conn.execute("SELECT CASE WHEN sim_clock_utc IS NULL THEN NULL ELSE scenario_now(scenario_id) END AS sim_clock_utc FROM scenario WHERE scenario_id = %s FOR UPDATE", (scn,)).fetchone()
         clock_to = None
         if clock and clock["sim_clock_utc"] is not None and clock["sim_clock_utc"] < as_of:
-            conn.execute("UPDATE scenario SET sim_clock_utc = %s WHERE scenario_id = %s", (as_of, scn))
+            conn.execute("UPDATE scenario SET sim_clock_utc = %s, clock_anchor_at = CASE WHEN clock_running THEN now() END WHERE scenario_id = %s", (as_of, scn))
             clock_to = as_of
         rows = conn.execute(
             """SELECT f.flight_id, f.std_utc, f.sta_utc, f.pax_planned, s.pax,

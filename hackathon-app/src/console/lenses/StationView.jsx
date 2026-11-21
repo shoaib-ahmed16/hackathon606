@@ -15,9 +15,13 @@ const BUTTONS = (now) => [
   { k: 'Refuel done', done: (x) => x.refuel_status === 'DONE', body: (x) => ({ refuel_status: x.refuel_status === 'DONE' ? 'PENDING' : 'DONE' }) },
   { k: 'Passengers on board', done: (x) => x.pax_onboard === true, body: (x) => ({ pax_onboard: !x.pax_onboard }) },
   { k: 'Passengers disembarked', done: (x) => x.pax_onboard === false, body: (x) => ({ pax_onboard: x.pax_onboard === false }) },
+  // paperwork for the return leg: Dispatch files the flight plan, the station makes the load sheet ready; "Ready to depart" needs both
+  { k: 'Flight plan filed', who: ['DISPATCH', 'OCC', 'ADMIN'], hint: 'Dispatch files the flight plan', done: (x) => x.flight_plan_filed_at != null, body: (x) => ({ flight_plan_filed: x.flight_plan_filed_at == null }) },
+  { k: 'Load sheet ready', who: ['STATION', 'OCC', 'ADMIN'], hint: 'The station (load control) makes the load sheet ready', done: (x) => x.load_sheet_ready_at != null, body: (x) => ({ load_sheet_ready: x.load_sheet_ready_at == null }) },
   { k: 'Crew arrived', done: (x) => x.waiting_for === 'CREW_REST' || x.waiting_for === 'ARRIVAL_SLOT', body: () => ({ waiting_for: 'ARRIVAL_SLOT' }) },
   {
     k: 'Ready to depart',
+    needs: (x) => (x.flight_plan_filed_at == null || x.load_sheet_ready_at == null) && x.status !== 'READY',
     done: (x) => x.status === 'READY',
     body: (x) => ({ status: x.status === 'READY' ? 'ON_GROUND_ALT' : 'READY', waiting_for: 'ARRIVAL_SLOT' }),
   },
@@ -146,13 +150,16 @@ export default function StationView({ d }) {
             <div className="big-btns">
               {btns.map((b) => {
                 const done = b.done(x);
+                const notMine = b.who && !b.who.includes(d.actor.role_code);
+                const blocked = b.needs?.(x);
                 return (
                   <button
                     key={b.k}
                     type="button"
                     className={`big ${done ? 'done' : ''}`}
                     aria-pressed={done}
-                    disabled={busy === `${x.diversion_id}:${b.k}`}
+                    title={blocked ? 'Needs the flight plan filed and the load sheet ready' : notMine ? b.hint : undefined}
+                    disabled={busy === `${x.diversion_id}:${b.k}` || notMine || blocked}
                     onClick={() => tap(x, b)}
                   >
                     {done ? '✓ ' : ''}

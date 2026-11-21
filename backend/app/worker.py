@@ -93,12 +93,19 @@ def process_pending() -> int:
         done += 1
 
 
+def _tick_running_clocks():
+    for row in fetch("SELECT scenario_id FROM scenario WHERE clock_running AND sim_clock_utc IS NOT NULL"):
+        with tx() as conn:
+            conn.execute("SELECT enqueue_reassessment(%s, 'CLOCK_TICK', 'scenario', %s)", (row["scenario_id"], str(row["scenario_id"])))
+
+
 async def run():
     while True:
         try:
             async with await psycopg.AsyncConnection.connect(config.DSN, autocommit=True) as conn:
                 await conn.execute(f"LISTEN {LISTEN}")
                 last_alert = 0.0
+                last_tick = 0.0
                 while True:
                     await asyncio.to_thread(process_pending)  # also drains anything queued while we were away
                     try:  # entries for switched-off systems become manual tasks
@@ -113,6 +120,12 @@ async def run():
                                 await asyncio.to_thread(rules.evaluate_alerts, agent)
                         except Exception:  # noqa: BLE001 - alerts must never stop the reassessment loop
                             log.exception("alert rule evaluation failed")
+                    if time.monotonic() - last_tick >= 60:  # a RUNNING scenario clock moves on its own: refresh stored margins once a minute
+                        last_tick = time.monotonic()
+                        try:
+                            await asyncio.to_thread(_tick_running_clocks)
+                        except Exception:  # noqa: BLE001
+                            log.exception("clock tick failed")
                     async for _ in conn.notifies(timeout=5):
                         break
         except asyncio.CancelledError:

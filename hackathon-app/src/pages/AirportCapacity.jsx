@@ -30,7 +30,7 @@ export default function AirportCapacity() {
   const clock = rows[0]?.computed_at_utc;
 
   return (
-    <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'minmax(0, 1fr)' }}>
+    <Box className="page" sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'minmax(0, 1fr)', maxWidth: 'none' }}>
       <PageHeader
         title="Airport capacity"
         subtitle="Stands, arrivals per hour and occupancy for the hub and alternates, with the source of every number"

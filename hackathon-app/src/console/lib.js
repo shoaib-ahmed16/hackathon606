@@ -99,11 +99,14 @@ export function whereText(f) {
   // right after a diversion is executed the aircraft is still flying there: it is not "on the ground" until it lands
   if (f.diverted_to && f.status === 'DIVERTING')
     return [`Diverting to ${f.diverted_to}`, `Landing about ${fmtZ(eta)}`];
-  if (f.diverted_to)
+  if (f.diverted_to) {
+    // paperwork for the return leg comes first: no flight plan or load sheet, no departure
+    const paper = f.status === 'ON_BLOCKS' || f.status === 'LANDED' ? (f.flight_plan_filed_at == null ? 'flight plan' : f.load_sheet_ready_at == null ? 'load sheet' : null) : null;
     return [
       `On ground at ${f.diverted_to}`,
-      f.waiting_for ? `Waiting for ${human(f.waiting_for)}` : `Diverted from ${f.planned_arr_iata}`,
+      paper ? `Waiting for ${paper}` : f.waiting_for ? `Waiting for ${human(f.waiting_for)}` : `Diverted from ${f.planned_arr_iata}`,
     ];
+  }
   if (f.status === 'HOLDING')
     return [
       `Holding near ${f.current_dest_iata}`,

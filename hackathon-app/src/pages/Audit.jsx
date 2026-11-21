@@ -31,7 +31,7 @@ const exportCsv = (rows) => {
   const head = 'time_utc,actor,role,kind,summary,outcome,entity_type,entity_id,scenario_id,case_id';
   const lines = rows.map((r) =>
     [
-      r.occurred_at,
+      r.scenario_time_utc ?? r.occurred_at,
       r.actor,
       r.actor_role,
       r.kind,
@@ -175,7 +175,7 @@ function Body() {
             </TableHead>
             <TableBody>
               {rows.map((r) => {
-                const t = ms(r.occurred_at);
+                const t = ms(r.scenario_time_utc ?? r.occurred_at); // scenario time: the same clock as the briefing and the screen
                 const refused = r.kind === 'action' && r.after_data?.ok === false;
                 return [
                   <TableRow

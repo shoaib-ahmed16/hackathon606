@@ -32,6 +32,7 @@ export default function KpiBar({ d, ctx }) {
     return {
       affected: live.length,
       pax: live.reduce((a, f) => a + Number(f.connecting_pax ?? 0), 0),
+      paxRisk: live.reduce((a, f) => a + Number(f.pax_at_risk ?? 0), 0),
       high: c('sev:50'),
       medium: d.flights.filter((f) => (f.severity_score ?? 0) >= 30 && (f.severity_score ?? 0) < 50 && !isRecovered(f)).length,
       pending: c('approval'),
@@ -56,7 +57,8 @@ export default function KpiBar({ d, ctx }) {
   return (
     <div className="kpis" data-src="v_disruption_kpis · v_flight_severity">
       <Kpi k="all" v={count.affected} l="Flights affected" s={`${d.flights.length} watched`} on={on('affected')} onClick={() => apply('affected')} />
-      <Kpi k="pax" v={count.pax.toLocaleString()} l="Pax affected" s="connecting only" onClick={() => toast('Passengers on board are not in the supplied data. Connecting passengers come from the connecting-pax file; on-board counts need aeroMart bookings.')} />
+      <Kpi k="pax" v={count.pax.toLocaleString()} l="Connecting pax" s={`${count.paxRisk.toLocaleString()} at risk`} tone={count.paxRisk > 0 ? 'risk' : undefined}
+        onClick={() => toast(`Connecting passengers on these flights: ${count.pax.toLocaleString()}, each connection counted once (from the connecting-pax file). Only ${count.paxRisk.toLocaleString()} are at risk: their onward flight leaves less than 40 minutes after the projected arrival, or their flight diverted or was cancelled. Passengers on board are not in the supplied data.`)} />
       <Kpi k="sev" v={count.high} tone="exceeded" l="High severity" s={`${count.medium} medium`} on={on('sev:50')} onClick={() => apply('sev:50')} />
       <Kpi k="pending" v={count.pending} tone="risk" l="Decisions pending" s="waiting for approval" on={on('approval')} onClick={() => apply('approval')} />
       <Kpi

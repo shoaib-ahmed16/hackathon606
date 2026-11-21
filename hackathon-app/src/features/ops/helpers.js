@@ -52,6 +52,8 @@ export const simBase = (kase) => (kase?.sim_clock_utc ? Date.parse(kase.sim_cloc
 export const scenarioNowMs = (kase) => {
   const base = simBase(kase);
   if (base == null) return Date.now();
+  // a PAUSED scenario clock stands still in the database, so it stands still on the screen too (same time in both places)
+  if (kase.clock_running === false) return base;
   if (base !== lastBase) {
     lastBase = base;
     T0 = Date.now();

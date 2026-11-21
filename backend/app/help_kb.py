@@ -36,7 +36,7 @@ Each row shows the flight and route, severity and tags, where the aircraft is, a
         "keys": ["kpi", "kpis", "cards", "card", "top cards", "tiles", "flights affected", "pax affected", "decisions pending", "diverted / holding", "needs verification"],
         "text": """The eight cards at the top count flights live, and each one is a filter: click it and the board shows exactly those flights (click again to clear).
 - Flights affected: flights not yet recovered or cancelled.
-- Pax affected: connecting passengers on those flights (on-board counts are not in the supplied data).
+- Connecting pax: connecting passengers on those flights, each connection counted once (on-board counts are not in the supplied data). The smaller figure under it is how many are AT RISK: their onward flight leaves less than 40 minutes after the projected arrival, or their flight diverted or was cancelled.
 - High severity: severity 50 or more (the card also shows how many are medium).
 - Decisions pending: flights with a decision waiting for approval.
 - Next deadline: the most urgent deadline; click to open that flight.

@@ -27,7 +27,7 @@ function Step({ label, at, strong }) {
   );
 }
 
-function Card({ r, hub }) {
+function Card({ r, hub, dv }) {
   const dispatch = useAppDispatch();
   const [all, setAll] = useState(false);
   const crew = CREW[r.crew_outcome] ?? CREW.VERIFY_CREW;
@@ -42,6 +42,8 @@ function Card({ r, hub }) {
           return {r.recovery_flight_no} · {r.registration ?? 'aircraft not known'} · {human(r.diversion_status)}
         </span>
         <Pill tone={crew.tone}>{crew.label}</Pill>
+        <Pill tone={dv?.flight_plan_filed_at ? 'legal' : 'verify'}>{dv?.flight_plan_filed_at ? `Flight plan filed ${z(dv.flight_plan_filed_at)}` : 'No flight plan'}</Pill>
+        <Pill tone={dv?.load_sheet_ready_at ? 'legal' : 'verify'}>{dv?.load_sheet_ready_at ? `Load sheet ready ${z(dv.load_sheet_ready_at)}` : 'No load sheet'}</Pill>
         <button type="button" className="btn ghost" onClick={() => dispatch(selectFlight(r.recovery_flight_id))}>
           Open flight
         </button>
@@ -142,7 +144,7 @@ export default function DiversionRecovery({ d }) {
       {isError && <p className="k">Could not load the diversion recovery plan.</p>}
       {!isLoading && !isError && data.length === 0 && <p className="k">No active diversions in this case.</p>}
       {data.map((r) => (
-        <Card key={r.diversion_id} r={r} hub={hub} />
+        <Card key={r.diversion_id} r={r} hub={hub} dv={d.diversions.find((x) => x.diversion_id === r.diversion_id)} />
       ))}
     </section>
   );

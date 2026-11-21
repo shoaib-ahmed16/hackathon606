@@ -10,6 +10,7 @@ import {
   useCloseCaseMutation,
   useDeleteCaseMutation,
   usePushFeedMutation,
+  useSetScenarioClockMutation,
 } from '@/features/ops/opsApi';
 import { selectCase, setLens, toggleBriefing, toggleSources } from '@/features/ops/opsSlice';
 import { useOps } from '@/features/ops/useOps';
@@ -38,9 +39,20 @@ const LENSES = [
 ];
 
 // Wall-clock + scenario clock in the strip. Its own component so only it ticks every second.
-function Clock({ refreshedAt }) {
+function Clock({ refreshedAt, kase, role }) {
   const now = useNow();
   const wall = useWall();
+  const [setClock, { isLoading }] = useSetScenarioClockMutation();
+  const hasSimClock = Boolean(kase?.sim_clock_utc);
+  const running = hasSimClock && kase.clock_running !== false;
+  const canClock = hasSimClock && ['OCC', 'ADMIN'].includes(role);
+  const act = async (body) => {
+    try {
+      await setClock({ id: kase.scenario_id, ...body }).unwrap();
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  };
   const d = new Date(now);
   const z = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')}Z`;
   const age = refreshedAt ? Math.max(0, Math.floor((wall - refreshedAt) / 1000)) : null;
@@ -50,7 +62,16 @@ function Clock({ refreshedAt }) {
       <span className="clock-d">{date}</span>
       <span className="clock-z">{z}</span>
       <span className="clock-l">
-        {fmtTime(now)} SHJ{age != null ? ` · data ${age} s ago` : ''}
+        {fmtTime(now)} SHJ{hasSimClock ? (running ? ' · running' : ' · paused') : age != null ? ` · data ${age} s ago` : ''}
+        {canClock && (
+          <>
+            {' '}
+            <button type="button" className="clock-btn" disabled={isLoading} onClick={() => act({ action: running ? 'pause' : 'run' })}
+              title={running ? 'Pause the scenario clock: the time stands still, here and in every record' : 'Run the scenario clock: records are stamped with the time you see'}
+              aria-label={running ? 'Pause the scenario clock' : 'Run the scenario clock'}>{running ? '⏸' : '▶'}</button>
+            <button type="button" className="clock-btn" disabled={isLoading} onClick={() => act({ action: 'advance', minutes: 15 })} title="Move the scenario clock forward 15 minutes">+15 min</button>
+          </>
+        )}
       </span>
     </div>
   );
@@ -180,7 +201,7 @@ function Strip({ d, onSheet, onAirport }) {
         </div>
       </div>
       <div className="spacer" />
-      <Clock refreshedAt={d.refreshedAt} />
+      <Clock refreshedAt={d.refreshedAt} kase={kase} role={d.actor?.role_code} />
       <div className="strip-actions">
         <button className="btn" onClick={() => onSheet('approvals')} data-src="decision PROPOSED ⨝ approval_policy" title="Decisions waiting for your approval">
           Approvals <span className="badge-count" style={{ visibility: pending > 0 ? 'visible' : 'hidden' }}>{pending || 0}</span>

@@ -4,7 +4,9 @@ import {
   useAddRecordMutation,
   useGetAlternatesQuery,
   useGetDownstreamQuery,
+  useUpdateDiversionMutation,
   useGetFdpPreviewQuery,
+  useMoveReportTimeMutation,
   useGetConnectionsQuery,
   useGetFuelCardQuery,
   useGetCommentsQuery,
@@ -336,6 +338,9 @@ function ReportTime({ d, f, fdp }) {
   const signIn = ms(fdp.sign_in_utc);
   const now = useMinuteNow();
   const [t, setT] = useState('');
+  const [reason, setReason] = useState('');
+  const [moveTime, { isLoading: moving }] = useMoveReportTimeMutation();
+  const canMove = ['OCC', 'CREW_CONTROL', 'ADMIN'].includes(d.actor.role_code);
   const signed = signIn <= now;
   const iso = (() => {
     if (!t) return null;
@@ -345,6 +350,16 @@ function ReportTime({ d, f, fdp }) {
   })();
   const { data } = useGetFdpPreviewQuery({ duty_id: f.duty_id, report_utc: iso ?? fdp.sign_in_utc, scenario_id: d.ctx.scenario_id }, { skip: signed || !f.duty_id });
   const pv = data?.preview;
+  const apply = async () => {
+    try {
+      const r = await moveTime({ scenario_id: d.ctx.scenario_id, duty_id: f.duty_id, report_utc: iso, reason: reason.trim() }).unwrap();
+      toast.success(`Report time moved to ${fmtZ(ms(r.after.report_utc))}. Limit ${mmhh(r.before.max_fdp_min)} → ${mmhh(r.after.max_fdp_min)}, legal end ${fmtZ(ms(r.after.legal_end_utc))}.`);
+      setT('');
+      setReason('');
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  };
   if (signed)
     return (
       <div className="k" style={{ marginTop: 6 }}>
@@ -360,9 +375,66 @@ function ReportTime({ d, f, fdp }) {
       {pv && (
         <div style={{ marginTop: 4 }}>
           Bracket {hm(fdp.local_start_from)}–{hm(fdp.local_start_to)} → <b>{hm(pv.bracket_from)}–{hm(pv.bracket_to)}</b> · max FDP {mmhh(fdp.max_fdp_min)} → <b>{mmhh(pv.max_fdp_min)}</b> · legal end {fmtZ(ms(fdp.legal_end_utc))} → <b>{fmtZ(ms(pv.legal_end_utc))}</b>
-          <span className="k"> (a preview: nothing is changed)</span>
+          <span className="k"> (a preview until you apply it)</span>
         </div>
       )}
+      {canMove && iso && new Date(iso).getTime() !== signIn && (
+        <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input className="field-in" style={{ flex: '1 1 220px' }} placeholder="Why does the report time move? (required)" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason for moving the report time" />
+          <button type="button" className="btn primary" disabled={moving || !reason.trim()} onClick={apply}>Move report time</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The paperwork for the return leg of a diverted aircraft: flight plan (Dispatch) and load sheet (station). "Ready to depart" needs both.
+function ReturnChecklist({ d, f }) {
+  const dv = d.diversions.find((x) => x.original_flight_id === f.flight_id && !['DEPARTED', 'CLOSED', 'CANCELLED'].includes(x.status));
+  const [patch, { isLoading }] = useUpdateDiversionMutation();
+  const [ask] = useAskForDataMutation();
+  const role = d.actor.role_code;
+  if (!dv || f.status === 'DIVERTING') return null;
+  const items = [
+    { key: 'flight_plan_filed', field: 'FLIGHT_PLAN', label: 'Flight plan filed', at: dv.flight_plan_filed_at, who: ['DISPATCH', 'OCC', 'ADMIN'], owner: 'Dispatch' },
+    { key: 'load_sheet_ready', field: 'LOAD_SHEET', label: 'Load sheet ready', at: dv.load_sheet_ready_at, who: ['STATION', 'OCC', 'ADMIN'], owner: 'the station' },
+  ];
+  const tick = async (it) => {
+    try {
+      await patch({ id: dv.diversion_id, body: { [it.key]: !it.at } }).unwrap();
+      toast.success(`${it.label}: ${it.at ? 'removed' : 'recorded'}`);
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  };
+  const request = async (it) => {
+    try {
+      await ask({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id, field: it.field }).unwrap();
+      toast.success(`Asked ${it.owner} for the ${it.label.toLowerCase().replace(' filed', '').replace(' ready', '')}`);
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  };
+  const ready = dv.status === 'READY';
+  return (
+    <div className="sec" data-src="diversion.flight_plan_filed_at · load_sheet_ready_at">
+      <h3>Return leg checklist {ready ? <Pill tone="legal">Ready to depart</Pill> : <Pill tone="risk">{items.every((i) => i.at) ? 'Paperwork done' : 'Not ready'}</Pill>}</h3>
+      <div className="checklist">
+        {items.map((it) => {
+          const open = d.openRequests.find((r) => r.flight_id === f.flight_id && r.field === it.field && r.status === 'OPEN');
+          return (
+            <div className="ck-row" key={it.key}>
+              <Pill tone={it.at ? 'legal' : 'verify'}>{it.at ? '✓' : '?'}</Pill>
+              <span><b>{it.label}</b> <span className="k">{it.at ? fmtZ(ms(it.at)) : `waiting for ${it.owner}`}{open ? ' · asked' : ''}</span></span>
+              <span className="ck-act">
+                {it.who.includes(role) && <button type="button" className="btn" disabled={isLoading || (ready && it.at)} onClick={() => tick(it)}>{it.at ? 'Undo' : 'Mark done'}</button>}
+                {!it.at && !open && ['OCC', 'ADMIN'].includes(role) && <button type="button" className="btn ghost" onClick={() => request(it)}>Ask {it.owner}</button>}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="k" style={{ marginTop: 6 }}>The station can only mark the aircraft ready to depart when both are done.</p>
     </div>
   );
 }
@@ -627,6 +699,7 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
       )}
 
       <Alternates d={d} f={f} />
+      {f.diverted_to && <ReturnChecklist d={d} f={f} />}
       {!isRecovered(f) && <Downstream d={d} f={f} />}
       {!isRecovered(f) && <Connections d={d} f={f} />}
 

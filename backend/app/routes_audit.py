@@ -33,6 +33,9 @@ def _summary(row):
                 what = {"approve": "Approved a custom rule", "reject": "Rejected a custom rule", "retire": "Retired a custom rule", "preview": "Previewed a custom rule"}.get(path.rsplit("/", 1)[-1], "Created a custom rule")
             elif "/integrations" in path: what = "Updated an integration" if a == "PATCH" else "Closed an integration task"
             elif path.endswith("/tags") or "/tags/" in path: what = "Tagged a flight" if a == "POST" else "Removed a flight tag"
+            elif path.endswith("/capacity") and a == "PUT": what = "Set an assumed airport capacity"
+            elif path.endswith("/report-time"): what = "Moved a crew report time"
+            elif path.endswith("/clock"): what = "Changed the scenario clock"
             elif path.endswith("/withdraw"): what = "Withdrew a proposed decision"
             elif path.endswith("/station-login"): what = "Created a station login"
             elif path.startswith("/api/alternates"): what = "Added or changed an alternate airport"

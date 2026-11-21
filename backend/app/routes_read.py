@@ -27,7 +27,8 @@ def users():
 def cases(scenario_id: int | None = None):
     """All disruption cases (newest first), with their scenario. Optional scenario filter."""
     return fetch(
-        """SELECT c.*, s.name AS scenario_name, s.kind AS scenario_kind, s.sim_clock_utc,
+        """SELECT c.*, s.name AS scenario_name, s.kind AS scenario_kind,
+                  CASE WHEN s.sim_clock_utc IS NULL THEN NULL ELSE scenario_now(c.scenario_id) END AS sim_clock_utc, s.clock_running,
                   -- is the hub of this case closed or under LVP right now (scenario clock)? the app opens on a case where it is
                   EXISTS (SELECT 1 FROM v_airport_status_current a
                            WHERE a.scenario_id = c.scenario_id AND a.iata = c.hub_iata AND (a.op_status <> 'OPEN' OR a.lvp_in_force)) AS hub_restricted
@@ -48,6 +49,13 @@ def flights(scenario_id: int | None = None, case_id: int | None = None, limit: i
         params.append(case_id)
     return fetch(
         f"""SELECT w.*, sv.severity_score, sv.connecting_pax, fcl.max_fdp_min, fcl.projected_end_utc,
+                   -- connecting passengers whose onward flight is really threatened (less than the minimum connection time, flight diverted or cancelled)
+                   (SELECT dv.flight_plan_filed_at FROM diversion dv WHERE dv.scenario_id = w.scenario_id AND dv.original_flight_id = w.flight_id
+                       AND dv.status NOT IN ('DEPARTED','CLOSED','CANCELLED') ORDER BY dv.diversion_id DESC LIMIT 1) AS flight_plan_filed_at,
+                   (SELECT dv.load_sheet_ready_at FROM diversion dv WHERE dv.scenario_id = w.scenario_id AND dv.original_flight_id = w.flight_id
+                       AND dv.status NOT IN ('DEPARTED','CLOSED','CANCELLED') ORDER BY dv.diversion_id DESC LIMIT 1) AS load_sheet_ready_at,
+                   COALESCE((SELECT sum(r.pax_count) FROM v_connection_risk r WHERE r.scenario_id = w.scenario_id AND r.inbound_flight_id = w.flight_id
+                                AND r.connection_status <> 'OK'), 0)::int AS pax_at_risk,
                    COALESCE((SELECT array_agg(ft.tag ORDER BY ft.tag) FROM flight_tag ft WHERE ft.scenario_id = w.scenario_id AND ft.flight_id = w.flight_id), '{{}}'::text[]) AS tags
               FROM v_flight_watch w
               LEFT JOIN v_flight_severity sv ON sv.case_id = w.case_id AND sv.flight_id = w.flight_id AND sv.scenario_id = w.scenario_id

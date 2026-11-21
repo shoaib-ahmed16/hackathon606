@@ -561,3 +561,8 @@ button.alt:hover,.hub-btn:hover{border-color:var(--ai)}
 .tools-pop .btn{justify-content:flex-start;width:100%}
 @media (max-width:1600px){ .kpis{grid-template-columns:repeat(8,minmax(0,1fr))} }
 @media (max-width:1240px){ .kpis{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.clock-btn{border:1px solid var(--line-2);background:transparent;color:var(--muted);border-radius:6px;padding:0 6px;font:inherit;font-size:11px;line-height:17px;cursor:pointer;margin-left:2px}
+.clock-btn:hover:not(:disabled){border-color:var(--ai);color:var(--ai)}
+.checklist{display:flex;flex-direction:column;gap:8px}
+.ck-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ck-act{margin-left:auto;display:flex;gap:6px}

@@ -243,7 +243,7 @@ def read_all_notifications(user=Depends(actor)):
 
 
 # ---------------------------------------------------------------- "?" data requests
-FIELDS = {"FUEL_ENDURANCE", "ALTERNATE_STATUS", "ALTERNATE_STANDS", "CREW_SIGN_IN", "CREW_QUALIFICATION", "ETA", "OTHER"}
+FIELDS = {"FUEL_ENDURANCE", "ALTERNATE_STATUS", "ALTERNATE_STANDS", "CREW_SIGN_IN", "CREW_QUALIFICATION", "ETA", "FLIGHT_PLAN", "LOAD_SHEET", "OTHER"}
 DEFAULT_QUESTION = {
     "FUEL_ENDURANCE": "Fuel endurance (minutes of holding left) is not available. Please report it.",
     "ALTERNATE_STATUS": "Alternate status is not confirmed (open or closed). Please confirm.",
@@ -251,9 +251,11 @@ DEFAULT_QUESTION = {
     "CREW_SIGN_IN": "Crew sign-in time is missing. Please confirm.",
     "CREW_QUALIFICATION": "Crew qualification (LVP) is unconfirmed. Please confirm.",
     "ETA": "Updated ETA is not available. Please confirm.",
+    "FLIGHT_PLAN": "The flight plan for the return leg is not filed yet. Please file it and confirm.",
+    "LOAD_SHEET": "The load sheet for the return leg is not ready yet. Please prepare it and confirm.",
 }
 DEFAULT_ROLE = {"FUEL_ENDURANCE": "DISPATCH", "ALTERNATE_STATUS": "STATION", "ALTERNATE_STANDS": "STATION",
-                "CREW_SIGN_IN": "CREW_CONTROL", "CREW_QUALIFICATION": "CREW_CONTROL"}
+                "CREW_SIGN_IN": "CREW_CONTROL", "CREW_QUALIFICATION": "CREW_CONTROL", "FLIGHT_PLAN": "DISPATCH", "LOAD_SHEET": "STATION"}
 
 
 class NewRequest(BaseModel):
@@ -346,6 +348,16 @@ def answer_request(request_id: int, b: Answer, user=Depends(actor)):
                 (scn_id, q["iata"], op, v.get("stands"), op == "OPEN", op == "OPEN", op == "OPEN", now, b.quality, int(user), b.note or f"data request {request_id}"),
             )
             applied = "airport_status_event"
+        elif q["field"] in ("FLIGHT_PLAN", "LOAD_SHEET"):
+            # answering the request IS ticking the paperwork item on the diversion, with who and when
+            col = "flight_plan_filed" if q["field"] == "FLIGHT_PLAN" else "load_sheet_ready"
+            n = conn.execute(
+                f"""UPDATE diversion SET {col}_at = scenario_stamp(scenario_id), {col}_by = %s, updated_by = %s, updated_at = now()
+                       WHERE scenario_id = %s AND original_flight_id = %s AND status NOT IN ('DEPARTED','CLOSED','CANCELLED')""",
+                (int(user), int(user), scn_id, flight_id)).rowcount
+            if not n:
+                raise HTTPException(409, "This flight has no open diversion to attach it to")
+            applied = "diversion"
         conn.execute(
             "UPDATE data_request SET status = 'ANSWERED', answer = %s, answered_by = %s, answered_at = now() WHERE request_id = %s",
             (Jsonb({"value": b.value, "quality": b.quality, "note": b.note, "applied_to": applied}), int(user), request_id),
