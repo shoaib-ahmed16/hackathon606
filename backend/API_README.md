@@ -80,6 +80,7 @@ low effort, server-side refusal fallback on. The key never leaves the server. Wi
 - **No personal data.** Crew appear as position and crew number. Questions asking for names, phone, e-mail, address, passport etc. are refused, and every answer (predefined or AI) passes a scrubber that masks crew names, e-mail addresses and phone numbers.
 - **One domain.** Free text that is not about this disruption is refused without calling the model. The model prompt repeats this and returns JSON (`answer`, `flights`, `out_of_scope`); flight cards are built only for flight numbers that exist in the case.
 - **Prompt injection.** Attempts to change the rules, reveal the prompt or ask for keys/passwords are refused. The question is passed to the model as untrusted text.
+- **Explains the console.** "How does the Recovery tab work?", "What does severity mean?" and similar are answered from a built-in guide (`app/help_kb.py`, 31 topics: screens, tabs and terms) with no model call and no data read, plus a button that opens the screen. A question that names a flight or tail is treated as a data question instead. Keep the guide in step with the product when a rule changes.
 - **Audit.** Every question and every refusal (`ASK_REFUSED`, with the reason) is recorded.
 - **Response shape:** `{ mode, answer, source, items: [{ flight_id, flight_no, route, status, chips[], actions[] }], actions[] }`; `mode` is `predefined | ai | refused | fallback | error`.
 

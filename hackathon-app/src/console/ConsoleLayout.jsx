@@ -9,6 +9,7 @@ import {
   useAddRecordMutation,
   useCloseCaseMutation,
   useDeleteCaseMutation,
+  usePushFeedMutation,
 } from '@/features/ops/opsApi';
 import { selectCase, setLens, toggleBriefing, toggleSources } from '@/features/ops/opsSlice';
 import { useOps } from '@/features/ops/useOps';
@@ -20,7 +21,7 @@ import { ConsoleProvider } from './ConsoleContext';
 import ApprovalsDrawer from './drawers/ApprovalsDrawer';
 import NotesDrawer from './drawers/NotesDrawer';
 import AirportSheet from './sheets/AirportSheet';
-import AskSheet from './sheets/AskSheet';
+import AskChat from './drawers/AskChat';
 import NewCaseSheet from './sheets/NewCaseSheet';
 import ReportSheet from './sheets/ReportSheet';
 import WhatIfSheet from './sheets/WhatIfSheet';
@@ -183,6 +184,19 @@ function Bar({ d, onSheet }) {
   const signOut = useSignOut();
   const now = useNow();
   const { ops, actor } = d;
+  const [pushFeed, { isLoading: pushing }] = usePushFeedMutation();
+  const onPush = async () => {
+    try {
+      const r = await pushFeed().unwrap();
+      toast.success(
+        r.events_applied || r.crew_duties_active || r.crew_duties_completed
+          ? `Feed pushed: ${r.flights_updated} flights, ${r.events_applied} events, ${r.crew_duties_active} duties started, ${r.crew_duties_completed} completed, ${r.fuel_estimates} fuel updates${r.clock_moved_to ? ', clock moved to now' : ''}`
+          : 'Feed pushed: already up to date',
+      );
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  };
   const dated = d.deadlines.filter((x) => x.deadline_utc).sort((a, b) => ms(a.deadline_utc) - ms(b.deadline_utc));
   const next = dated.find((x) => ms(x.deadline_utc) >= now) ?? dated[dated.length - 1];
   const nextAt = next ? ms(next.deadline_utc) : null;
@@ -224,6 +238,9 @@ function Bar({ d, onSheet }) {
         <NavLink to="/audit" className={nav}>Audit</NavLink>
         <NavLink to="/data-quality" className={nav}>Data quality</NavLink>
         <button className="btn ghost" onClick={() => onSheet('whatif')}>What if…</button>
+        <button className="btn ghost" disabled={pushing} onClick={onPush} title="Advance the live case with simulated movements, passengers, crew duty status and fuel (safe to press again)">
+          {pushing ? 'Pushing…' : 'Push live data'}
+        </button>
         <button className="btn ghost" onClick={() => onSheet('report')}>Report</button>
         <button className="btn ghost" aria-pressed={ops.showSources} id="srcBtn" onClick={() => dispatch(toggleSources())} title="Show which database object feeds each part">
           Data sources
@@ -315,6 +332,7 @@ function CaseSheet({ d, onClose }) {
 export default function ConsoleLayout() {
   const d = useOps();
   const [sheet, setSheet] = useState(null);
+  const [chat, setChat] = useState('closed'); // the assistant is a docked chat: closed | open | min
   const [airportIata, setAirportIata] = useState(null);
   const { ops } = d;
 
@@ -326,7 +344,7 @@ export default function ConsoleLayout() {
     const onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setSheet('ask');
+        setChat((c) => (c === 'open' ? 'min' : 'open'));
       }
     };
     window.addEventListener('keydown', onKey);
@@ -358,7 +376,7 @@ export default function ConsoleLayout() {
             <div className="replay-banner">
               {d.kase?.scenario_kind} scenario. Nothing here affects live operations.
             </div>
-            <Strip d={d} onSheet={setSheet} onAirport={setAirportIata} />
+            <Strip d={d} onSheet={(v) => (v === 'ask' ? setChat((c) => (c === 'open' ? 'min' : 'open')) : setSheet(v))} onAirport={setAirportIata} />
           </div>
           <Bar d={d} onSheet={setSheet} />
           {d.noCase ? (
@@ -377,7 +395,7 @@ export default function ConsoleLayout() {
         </div>
         {sheet === 'approvals' && <ApprovalsDrawer d={d} onClose={close} />}
         {sheet === 'notes' && <NotesDrawer d={d} onClose={close} />}
-        {sheet === 'ask' && <AskSheet d={d} onClose={close} onOpenView={setSheet} />}
+        <AskChat key={d.ctx.case_id} d={d} state={chat} setState={setChat} onOpenView={(v) => { setChat('min'); setSheet(v); }} />
         {sheet === 'whatif' && <WhatIfSheet d={d} onClose={close} />}
         {sheet === 'report' && <ReportSheet d={d} onClose={close} />}
         {sheet === 'newcase' && <NewCaseSheet d={d} onClose={close} />}

@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from contextvars import ContextVar
 
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
@@ -14,10 +15,17 @@ pool = ConnectionPool(
 )
 
 
+# Set while the Ask assistant runs: every transaction opened through tx()/fetch()/view() is then READ ONLY,
+# enforced by Postgres itself ("cannot execute INSERT in a read-only transaction"), not just by the code we wrote.
+READ_ONLY = ContextVar("read_only", default=False)
+
+
 @contextmanager
 def tx(actor=None):
     """One transaction. Writes pass `actor` so audit triggers + role guardrails know who acted."""
     with pool.connection() as conn:
+        if READ_ONLY.get():
+            conn.execute("SET TRANSACTION READ ONLY")
         if actor is not None:
             conn.execute("SELECT fogops.set_actor(%s)", (actor,))
         yield conn
