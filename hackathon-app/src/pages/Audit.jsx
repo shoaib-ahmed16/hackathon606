@@ -72,7 +72,6 @@ function Body() {
       include_system: system,
       limit: 500,
     },
-    { pollingInterval: 10000 },
   );
   const people = useMemo(
     () => [

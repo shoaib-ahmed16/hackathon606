@@ -133,7 +133,7 @@ function Card({ r, hub, dv }) {
 }
 
 export default function DiversionRecovery({ d }) {
-  const { data = [], isLoading, isError } = useGetDiversionRecoveryQuery(d.ctx, { skip: !d.ctx?.case_id, pollingInterval: 10000 });
+  const { data = [], isLoading, isError } = useGetDiversionRecoveryQuery(d.ctx, { skip: !d.ctx?.case_id });
   const hub = d.kase?.hub_iata ?? 'Hub';
   return (
     <section className="divrec" data-src="diversion_recovery_plan()">

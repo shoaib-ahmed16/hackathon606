@@ -72,8 +72,8 @@ export default function FlightAssessment({ airports, scenarioId }) {
     data: a,
     error,
     isFetching,
-  } = useGetCapacityAssessQuery({ iata, ...q }, { pollingInterval: 10000 });
-  const { data: cmp = [] } = useGetCapacityCompareQuery(q, { pollingInterval: 10000 });
+  } = useGetCapacityAssessQuery({ iata, ...q });
+  const { data: cmp = [] } = useGetCapacityCompareQuery(q);
   const hourly = a?.hourly ?? [];
   const proposed = a?.proposed_flights ?? 0;
   const st = a?.stands;

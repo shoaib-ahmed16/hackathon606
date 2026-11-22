@@ -24,9 +24,7 @@ export default function AirportCapacity() {
     data: rows = [],
     isLoading,
     error,
-  } = useGetAirportCapacityQuery(scenarioParams(scenarioId), {
-    pollingInterval: 10000,
-  });
+  } = useGetAirportCapacityQuery(scenarioParams(scenarioId));
   const clock = rows[0]?.computed_at_utc;
 
   return (

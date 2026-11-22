@@ -569,7 +569,7 @@ function PanelBody({ d, f, onClose, sheet, setSheet, why, setWhy }) {
   const minuteNow = useMinuteNow();
   const detail = useGetFlightDetailQuery({ flightId: f.flight_id, ...d.ctx }).data;
   const links = useGetFlightLinksQuery({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id }).data ?? [];
-  const timeline = useGetFlightTimelineQuery({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id, limit: 60 }, { pollingInterval: 15000 }).data ?? [];
+  const timeline = useGetFlightTimelineQuery({ flightId: f.flight_id, scenario_id: d.ctx.scenario_id, limit: 60 }).data ?? [];
   const [sub, { isLoading: subbing }] = useSubscribeMutation();
   const [unsub] = useUnsubscribeMutation();
   const [untag] = useRemoveTagMutation();

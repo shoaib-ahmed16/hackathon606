@@ -48,7 +48,7 @@ function Body() {
   const [gen, { isLoading, data: report }] = useGenerateReportMutation();
   const timeline = useGetTimelineQuery(
     { case_id: d.ctx.case_id },
-    { skip: !d.ctx.case_id, pollingInterval: 15000 },
+    { skip: !d.ctx.case_id },
   );
   const decisions = d.decisions;
   const make = async () => {

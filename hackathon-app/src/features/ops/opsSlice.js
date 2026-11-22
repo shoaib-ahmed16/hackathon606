@@ -39,6 +39,8 @@ const opsSlice = createSlice({
     panel: null, // 'ask' | 'approvals' | 'whatif' | null
     showSources: Boolean(saved.showSources),
     lastSeenAt: saved.lastSeenAt ?? null, // for the 'since you last looked' briefing
+    ready: false, // the console's first data has loaded: the fog loader lifts when this is true
+    refreshedAt: Date.now(), // the last time the screens were refreshed (timer, button, an action or a live event): re-arms the one auto-refresh timer
   },
   reducers: {
     selectCase: (s, { payload }) => {
@@ -63,10 +65,12 @@ const opsSlice = createSlice({
       persist(s);
     },
     selectFlight: (s, { payload }) => void (s.selectedFlightId = payload),
+    refreshed: (s, { payload }) => void (s.refreshedAt = payload ?? Date.now()),
+    setReady: (s, { payload }) => void (s.ready = payload),
   },
 });
 
-export const { selectCase, selectFlight, setLens, openPanel, closePanel, toggleSources, toggleBriefing, markSeen } =
+export const { selectCase, selectFlight, setLens, openPanel, closePanel, toggleSources, toggleBriefing, markSeen, refreshed, setReady } =
   opsSlice.actions;
 export const selectOps = (s) => s.ops;
 export default opsSlice.reducer;

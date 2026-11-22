@@ -13,7 +13,7 @@ import {
   usePushFeedMutation,
   useSetScenarioClockMutation,
 } from '@/features/ops/opsApi';
-import { markSeen, selectCase, setLens, toggleSources } from '@/features/ops/opsSlice';
+import { markSeen, selectCase, setLens, setReady, toggleSources } from '@/features/ops/opsSlice';
 import { useOps } from '@/features/ops/useOps';
 import { iso, ms, stampMs } from '@/features/ops/helpers';
 import { toggleMode } from '@/features/ui/uiSlice';
@@ -47,7 +47,7 @@ function WhatsNew({ d }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const since = d.ops.lastSeenAt;
-  const { data } = useGetBriefingQuery({ ...d.ctx, since: since ?? undefined }, { skip: !d.ctx.case_id, pollingInterval: 15000 });
+  const { data } = useGetBriefingQuery({ ...d.ctx, since: since ?? undefined }, { skip: !d.ctx.case_id });
   const items = [...(data?.items ?? [])].reverse();   // newest first
   const n = items.length;
   useEffect(() => {
@@ -256,6 +256,10 @@ function Strip({ d, onSheet, onAirport }) {
       <div className="spacer" />
       <Clock refreshedAt={d.refreshedAt} kase={kase} role={d.actor?.role_code} />
       <div className="strip-actions">
+        <button type="button" className="btn icon-btn refresh-btn" onClick={d.refreshNow} disabled={d.fetching} aria-label="Refresh now"
+          title={`Refresh now. Updated ${d.refreshedAt ? new Date(d.refreshedAt).toLocaleTimeString() : 'just now'}; refreshes by itself every ${d.everySec} s, and right after any action.`}>
+          <svg className={d.fetching ? 'spin' : ''} width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v6h-6" /></svg>
+        </button>
         <button className="btn" onClick={() => onSheet('approvals')} data-src="decision PROPOSED ⨝ approval_policy" title="Decisions waiting for your approval">
           Approvals <span className="badge-count" style={{ visibility: pending > 0 ? 'visible' : 'hidden' }}>{pending || 0}</span>
         </button>
@@ -484,6 +488,11 @@ export default function ConsoleLayout() {
   const [chat, setChat] = useState('closed'); // the assistant is a docked chat: closed | open | min
   const [airportIata, setAirportIata] = useState(null);
   const { ops } = d;
+  const dispatch = useAppDispatch();
+  // tell the fog loader the first data is in (also when the load failed: the error page must not stay hidden)
+  useEffect(() => {
+    if (!d.isLoading) dispatch(setReady(true));
+  }, [d.isLoading, dispatch]);
 
   // the Station view is the one screen meant for a phone or tablet: below 768 px it drops the desk-sized chrome (see console.css)
   useEffect(() => {
@@ -504,14 +513,8 @@ export default function ConsoleLayout() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  if (d.isLoading)
-    return (
-      <div className="app">
-        <div className="skeleton" />
-        <div className="skeleton" />
-        <div className="skeleton" />
-      </div>
-    );
+  // while the first data loads the fog loader covers the screen (no skeleton blocks)
+  if (d.isLoading) return <div className="app" />;
   if (d.error)
     return (
       <div className="page">

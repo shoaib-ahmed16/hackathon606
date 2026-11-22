@@ -1,0 +1,38 @@
+/* the fog loader: colours come from the theme tokens (light and dark); it replaces the old skeleton blocks */
+:root{--fog-c:rgba(255,255,255,.96)}
+[data-theme="dark"]{--fog-c:rgba(150,170,196,.62)}
+.fog{position:fixed;inset:0;z-index:400;background:var(--bg);overflow:hidden;transition:background-color 1.5s ease .35s}
+.fog.clearing{background-color:transparent;pointer-events:none}
+.fog-c{position:absolute;display:block;width:70vmax;height:46vmax;border-radius:50%;background:radial-gradient(closest-side,var(--fog-c) 0%,transparent 72%);filter:blur(26px);opacity:.95;will-change:transform,opacity}
+/* covering: the fog breathes slowly while the data loads */
+.fog.cover .c1{left:-18vmax;top:-6vmax;animation:fogIdleA 7s ease-in-out infinite alternate}
+.fog.cover .c2{right:-20vmax;top:-2vmax;animation:fogIdleB 8s ease-in-out infinite alternate}
+.fog.cover .c3{left:8vmax;bottom:-14vmax;animation:fogIdleB 9s ease-in-out infinite alternate}
+.fog.cover .c4{right:6vmax;top:-22vmax;animation:fogIdleA 8.5s ease-in-out infinite alternate}
+.fog.cover .c5{left:-8vmax;top:26vh;animation:fogIdleB 7.5s ease-in-out infinite alternate}
+.fog.cover .c6{right:-10vmax;bottom:-4vmax;animation:fogIdleA 9.5s ease-in-out infinite alternate}
+/* clearing: the clouds drift apart and thin out */
+.fog.clearing .c1{left:-18vmax;top:-6vmax;animation:fogL 1.6s .05s cubic-bezier(.45,.05,.25,1) forwards}
+.fog.clearing .c2{right:-20vmax;top:-2vmax;animation:fogR 1.65s .1s cubic-bezier(.45,.05,.25,1) forwards}
+.fog.clearing .c3{left:8vmax;bottom:-14vmax;animation:fogDown 1.6s .15s cubic-bezier(.45,.05,.25,1) forwards}
+.fog.clearing .c4{right:6vmax;top:-22vmax;animation:fogUp 1.6s .1s cubic-bezier(.45,.05,.25,1) forwards}
+.fog.clearing .c5{left:-8vmax;top:26vh;animation:fogL 1.7s .2s cubic-bezier(.45,.05,.25,1) forwards}
+.fog.clearing .c6{right:-10vmax;bottom:-4vmax;animation:fogR 1.7s .25s cubic-bezier(.45,.05,.25,1) forwards}
+.fog-brand{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text);transition:opacity .7s ease,transform .7s ease}
+.fog.clearing .fog-brand{opacity:0;transform:translateY(-8px)}
+.fog-brand img{border-radius:16px;box-shadow:0 10px 30px -12px rgba(0,0,0,.4)}
+.fog-brand b{font:700 28px/1 var(--font-head,var(--font));letter-spacing:.01em}
+.fog-brand span{color:var(--muted);font-size:13px;letter-spacing:.04em;min-height:1em}
+@keyframes fogIdleA{to{transform:translate(2.5vmax,1.2vmax) scale(1.06)}}
+@keyframes fogIdleB{to{transform:translate(-2.5vmax,-1.2vmax) scale(1.05)}}
+@keyframes fogL{to{transform:translateX(-70vmax) scale(1.25);opacity:0}}
+@keyframes fogR{to{transform:translateX(70vmax) scale(1.25);opacity:0}}
+@keyframes fogUp{to{transform:translateY(-55vmax) scale(1.2);opacity:0}}
+@keyframes fogDown{to{transform:translateY(55vmax) scale(1.2);opacity:0}}
+/* reduced motion: no drifting; the logo shows, then a short fade */
+@media (prefers-reduced-motion:reduce){
+  .fog-c{display:none}
+  .fog,.fog.clearing{transition:opacity .3s ease}
+  .fog.clearing{opacity:0}
+  .fog-brand{transition:none}
+}

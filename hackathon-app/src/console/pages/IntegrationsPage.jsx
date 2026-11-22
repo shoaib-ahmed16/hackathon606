@@ -60,7 +60,7 @@ function SystemRow({ s, canEdit }) {
 
 export default function IntegrationsPage() {
   const d = useConsole();
-  const { data, isLoading, error } = useGetIntegrationsQuery(undefined, { pollingInterval: 15000 });
+  const { data, isLoading, error } = useGetIntegrationsQuery(undefined);
   const [markEntered, { isLoading: marking }] = useMarkEnteredMutation();
   const canEdit = ['OCC', 'ADMIN'].includes(d.actor?.role_code);
   const systems = data?.systems ?? [];

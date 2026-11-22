@@ -683,3 +683,11 @@ a.brand-link:focus-visible{outline:none;box-shadow:0 0 0 2px color-mix(in srgb,v
 .meter .track{height:7px;border-radius:4px;background:color-mix(in srgb,var(--text) 15%,var(--surface));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--text) 10%,transparent)}
 .meter .fill{border-radius:4px;min-width:6px}
 .meter.verify .track{background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--text) 15%,var(--surface)) 0 4px,transparent 4px 8px)}
+
+/* refresh button */
+.refresh-btn svg{transition:transform .3s}
+.refresh-btn:hover:not(:disabled) svg{transform:rotate(60deg)}
+.refresh-btn:disabled{opacity:1;cursor:progress}
+.spin{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none;opacity:.55}}

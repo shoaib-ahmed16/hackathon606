@@ -32,7 +32,7 @@ export default function Briefing({ d }) {
   const dispatch = useAppDispatch();
   const now = useNow();
   const since = d.ops.lastSeenAt;
-  const { data } = useGetBriefingQuery({ ...d.ctx, since: since ?? undefined }, { skip: !d.ctx.case_id, pollingInterval: 15000 });
+  const { data } = useGetBriefingQuery({ ...d.ctx, since: since ?? undefined }, { skip: !d.ctx.case_id });
   const items = data?.items ?? [];
   const [all, setAll] = useState(false);
   // newest first matters: the first screen shows the latest two lines, the rest is one click away

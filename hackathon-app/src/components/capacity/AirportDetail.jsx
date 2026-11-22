@@ -90,7 +90,7 @@ export default function AirportDetail({ iata, scenarioId, canEdit, onEdit, onClo
     error,
   } = useGetAirportCapacityDetailQuery(
     { iata, window_h: 24, ...scenarioParams(scenarioId) },
-    { skip: !iata, pollingInterval: 10000 },
+    { skip: !iata },
   );
   const hourly = d?.assessment?.hourly ?? [];
   const byHour = d?.history_profile?.by_hour_utc ?? [];
