@@ -691,3 +691,22 @@ a.brand-link:focus-visible{outline:none;box-shadow:0 0 0 2px color-mix(in srgb,v
 .spin{animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none;opacity:.55}}
+
+/* case clock: labelled, with an explanation */
+.clock{position:relative}
+.clock-top{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.clock-tag{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.clock-i{width:16px;height:16px;border-radius:50%;border:none;background:var(--surface-3);color:var(--muted);font:700 10px/1 var(--font);cursor:pointer;display:grid;place-items:center;padding:0}
+.clock-i:hover,.clock-i[aria-expanded="true"]{background:var(--ai-bg);color:var(--ai)}
+.clock-i:focus-visible{outline:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--ai) 60%,transparent)}
+.clock-utc{opacity:.75}
+.clock-state{margin-left:6px;padding:0 7px;border-radius:999px;background:var(--surface-3);color:var(--muted);font-size:11px;line-height:17px}
+.clock-state.on{background:var(--legal-bg);color:var(--legal)}
+.clock-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:80;width:min(360px,92vw);text-align:left;white-space:normal;background:var(--surface);border-radius:16px;padding:14px 16px;
+  box-shadow:0 18px 50px -14px rgba(0,0,0,.6),inset 0 0 0 1px color-mix(in srgb,var(--line) 70%,transparent);font-size:12.5px;line-height:1.45;color:var(--text)}
+.clock-pop > b:first-child{font-size:14px;display:block;margin-bottom:6px}
+.clock-pop dl{margin:0;display:grid;gap:2px}
+.clock-pop dt{font-weight:600;margin-top:8px;display:flex;justify-content:space-between;gap:8px}
+.clock-pop dd{margin:0;color:var(--muted)}
+.clock-pop .mono{font-family:var(--font-mono,ui-monospace,monospace);font-weight:500;color:var(--ai)}
+.clock-pop .k{margin:10px 0 0;display:block}

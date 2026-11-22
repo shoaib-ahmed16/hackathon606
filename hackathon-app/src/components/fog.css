@@ -22,7 +22,9 @@
 .fog.clearing .fog-brand{opacity:0;transform:translateY(-8px)}
 .fog-brand img{border-radius:16px;box-shadow:0 10px 30px -12px rgba(0,0,0,.4)}
 .fog-brand b{font:700 28px/1 var(--font-head,var(--font));letter-spacing:.01em}
-.fog-brand span{color:var(--muted);font-size:13px;letter-spacing:.04em;min-height:1em}
+.fog-bar{width:min(260px,62vw);height:5px;border-radius:99px;background:color-mix(in srgb,var(--text) 14%,transparent);overflow:hidden;margin-top:8px}
+.fog-bar i{display:block;height:100%;border-radius:inherit;background:var(--ai);transition:width .25s ease-out}
+.fog-pct{color:var(--muted);font-size:12px;letter-spacing:.04em;font-variant-numeric:tabular-nums}
 @keyframes fogIdleA{to{transform:translate(2.5vmax,1.2vmax) scale(1.06)}}
 @keyframes fogIdleB{to{transform:translate(-2.5vmax,-1.2vmax) scale(1.05)}}
 @keyframes fogL{to{transform:translateX(-70vmax) scale(1.25);opacity:0}}
@@ -35,4 +37,5 @@
   .fog,.fog.clearing{transition:opacity .3s ease}
   .fog.clearing{opacity:0}
   .fog-brand{transition:none}
+  .fog-bar i{transition:none}
 }

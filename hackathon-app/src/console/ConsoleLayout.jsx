@@ -94,9 +94,19 @@ function Clock({ refreshedAt, kase, role }) {
   const now = useNow();
   const wall = useWall();
   const [setClock, { isLoading }] = useSetScenarioClockMutation();
+  const [info, setInfo] = useState(false);
+  const ref = useRef(null);
   const hasSimClock = Boolean(kase?.sim_clock_utc);
   const running = hasSimClock && kase.clock_running !== false;
   const canClock = hasSimClock && ['OCC', 'ADMIN'].includes(role);
+  useEffect(() => {
+    if (!info) return undefined;
+    const away = (e) => !ref.current?.contains(e.target) && setInfo(false);
+    const esc = (e) => e.key === 'Escape' && setInfo(false);
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+  }, [info]);
   const act = async (body) => {
     try {
       await setClock({ id: kase.scenario_id, ...body }).unwrap();
@@ -104,26 +114,60 @@ function Clock({ refreshedAt, kase, role }) {
       toast.error(getErrorMessage(e));
     }
   };
-  const d = new Date(now);
-  const z = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')}Z`;
+  const hms = (ms) => { const x = new Date(ms); return `${String(x.getUTCHours()).padStart(2, '0')}:${String(x.getUTCMinutes()).padStart(2, '0')}:${String(x.getUTCSeconds()).padStart(2, '0')}`; };
+  const z = `${hms(now)}Z`;
   const age = refreshedAt ? Math.max(0, Math.floor((wall - refreshedAt) / 1000)) : null;
   const date = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(now);
+  const mine = new Date(wall);
+  const myZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   return (
-    <div className="clock" data-src="scenario_now()">
+    <div className="clock" data-src="scenario_now()" ref={ref}>
       <span className="clock-d">{date}</span>
-      <span className="clock-z">{z}</span>
+      <span className="clock-top">
+        <span className="clock-tag">Case time</span>
+        <span className="clock-z" title="UTC (Z): the time this case runs on">{z}</span>
+        <button type="button" className="clock-i" aria-label="What do these times mean?" aria-expanded={info} onClick={() => setInfo((v) => !v)}>i</button>
+      </span>
       <span className="clock-l">
-        {fmtTime(now)} SHJ{hasSimClock ? (running ? ' · running' : ' · paused') : age != null ? ` · data ${age} s ago` : ''}
+        {fmtTime(now)} SHJ <span className="clock-utc">(UTC+4)</span>
+        {hasSimClock ? <span className={`clock-state ${running ? 'on' : ''}`}>{running ? 'running' : 'paused'}</span> : age != null ? ` · data ${age} s ago` : ''}
         {canClock && (
           <>
             {' '}
             <button type="button" className="clock-btn" disabled={isLoading} onClick={() => act({ action: running ? 'pause' : 'run' })}
-              title={running ? 'Pause the scenario clock: the time stands still, here and in every record' : 'Run the scenario clock: records are stamped with the time you see'}
-              aria-label={running ? 'Pause the scenario clock' : 'Run the scenario clock'}>{running ? '⏸' : '▶'}</button>
-            <button type="button" className="clock-btn" disabled={isLoading} onClick={() => act({ action: 'advance', minutes: 15 })} title="Move the scenario clock forward 15 minutes">+15 min</button>
+              title={running ? 'Pause the case clock: the time stands still, here and in every record' : 'Run the case clock in real time: records are stamped with the time you see'}
+              aria-label={running ? 'Pause the case clock' : 'Run the case clock'}>{running ? '⏸' : '▶'}</button>
+            <button type="button" className="clock-btn" disabled={isLoading} onClick={() => act({ action: 'advance', minutes: 15 })} title="Move the case clock forward 15 minutes">+15 min</button>
           </>
         )}
       </span>
+      {info && (
+        <div className="clock-pop" role="dialog" aria-label="What the times mean">
+          <b>Which time is which?</b>
+          <dl>
+            <dt>Case time <span className="mono">{z}</span></dt>
+            <dd>The time this case runs on. Every deadline, countdown and record (decisions, status entries, audit) uses it. <b>Z means UTC</b>, the aviation standard.</dd>
+            <dt>Sharjah <span className="mono">{fmtTime(now)} SHJ</span></dt>
+            <dd>The same moment in Sharjah local time: case time + 4 h (UTC+4, no daylight saving). Crew duty brackets use this one.</dd>
+            <dt>Your computer <span className="mono">{mine.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></dt>
+            <dd>Real time in {myZone}. It is only used for "data refreshed N s ago". It is not the case time.</dd>
+            {kase?.opened_at && (
+              <>
+                <dt>Case opened <span className="mono">{new Date(kase.opened_at).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></dt>
+                <dd>When this case record was created, shown in your computer's time zone. It is not the case time.</dd>
+              </>
+            )}
+          </dl>
+          <p className="k">
+            {hasSimClock
+              ? running
+                ? 'The case clock is running in real time from the time it was started.'
+                : 'The case clock is paused. Demo and replay data is a recorded snapshot, so the clock stands still at the snapshot time (live demo 20 Nov 16:45Z, fog replay 21 Nov 02:45Z).'
+              : 'This case follows real time.'}
+            {canClock ? ' OCC and admin can run it, pause it or step it 15 minutes.' : ''}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
