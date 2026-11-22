@@ -688,9 +688,9 @@ a.brand-link:focus-visible{outline:none;box-shadow:0 0 0 2px color-mix(in srgb,v
 .refresh-btn svg{transition:transform .3s}
 .refresh-btn:hover:not(:disabled) svg{transform:rotate(60deg)}
 .refresh-btn:disabled{opacity:1;cursor:progress}
-.spin{animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.spin{animation:none;opacity:.55}}
+.rf-spin{animation:rfspin .8s linear infinite}
+@keyframes rfspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.rf-spin{animation:none;opacity:.55}}
 
 /* case clock: labelled, with an explanation */
 .clock{position:relative}
@@ -710,3 +710,12 @@ a.brand-link:focus-visible{outline:none;box-shadow:0 0 0 2px color-mix(in srgb,v
 .clock-pop dd{margin:0;color:var(--muted)}
 .clock-pop .mono{font-family:var(--font-mono,ui-monospace,monospace);font-weight:500;color:var(--ai)}
 .clock-pop .k{margin:10px 0 0;display:block}
+
+/* loading placeholders: shaped like the content, never an empty screen */
+.skel-wrap{padding:14px 16px;display:grid;gap:12px;width:100%}
+.skel-tiles{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.skel-rows{display:grid;gap:10px}
+.skel{display:block;height:64px;border-radius:12px;background:linear-gradient(90deg,var(--surface-2),var(--surface-3),var(--surface-2));background-size:200% 100%;animation:sk 1.2s infinite}
+.skel.row{height:92px}
+@media (max-width:900px){.skel-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}

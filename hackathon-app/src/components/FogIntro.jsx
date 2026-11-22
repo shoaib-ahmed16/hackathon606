@@ -18,6 +18,7 @@ export default function FogIntro() {
   const [pct, setPct] = useState(6);   // progress: eases towards 92% while loading, 100% when the data is in
 
   useEffect(() => {
+    import('@/console/pages/BoardPage').catch(() => {});   // start fetching the main page's code now, alongside the data
     dispatch(setReady(false));   // a new load or sign-in: wait for fresh data
     const a = setTimeout(() => setMinDone(true), 1100);
     const b = setTimeout(() => setPhase((p) => (p === 'cover' ? 'clearing' : p)), 8000);

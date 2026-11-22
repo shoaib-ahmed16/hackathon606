@@ -14,7 +14,7 @@ import time
 
 import psycopg
 
-from . import config, routes_integrations, rules
+from . import cache, config, routes_integrations, rules
 from .db import fetch, live_scenario_id, tx
 
 log = logging.getLogger("fogops.worker")
@@ -181,6 +181,7 @@ def process_pending() -> int:
                 _reassess(conn, job)
                 conn.execute("UPDATE reassessment_queue SET status = 'DONE', done_at = now() WHERE job_id = %s", (job["job_id"],))
                 conn.execute("SELECT pg_notify('fogops_updated', %s)", (json.dumps({"job_id": job["job_id"], "scenario_id": job["scenario_id"]}),))
+            cache.clear()   # the re-check is committed: the next read must see it
         except Exception as e:  # noqa: BLE001 - record and carry on with the next job
             log.exception("reassessment job %s failed", job["job_id"])
             with tx(agent) as conn:

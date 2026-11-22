@@ -91,8 +91,9 @@ class AuditMiddleware:
         await self.app(scope, replay, send_wrap)
         if status["code"] < 400:   # any saved change (a decision, a diversion, a status entry...) must show on the capacity screen at once
             try:
-                from . import routes_capacity
+                from . import cache, routes_capacity
                 routes_capacity._CACHE.clear()
+                cache.clear()
             except Exception:  # noqa: BLE001
                 pass
 

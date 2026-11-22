@@ -6,11 +6,12 @@ from psycopg_pool import ConnectionPool
 
 from . import config
 
+# jit=off in the connection options: the heavy read models run slower with JIT (migration 030 also sets it for the database)
 pool = ConnectionPool(
     config.DSN,
     min_size=1,
     max_size=10,
-    kwargs={"row_factory": dict_row, "options": f"-c search_path={config.SEARCH_PATH}"},
+    kwargs={"row_factory": dict_row, "options": f"-c search_path={config.SEARCH_PATH} -c jit=off"},
     open=False,
 )
 

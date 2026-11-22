@@ -7,7 +7,7 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from . import config
+from . import cache, config
 from .deps import current_user
 
 r = APIRouter(prefix="/api", tags=["live"])
@@ -45,6 +45,7 @@ async def stream(ticket: str):
                 got = False
                 async for n in notifies:
                     got = True
+                    cache.clear()   # something changed in the database: drop the shared read cache before telling the browser
                     name = {'fogops_updated': 'updated', 'fogops_notify': 'notify'}.get(n.channel, 'reassess')
                     yield f"event: {name}\ndata: {json.dumps({'payload': n.payload})}\n\n"
                 if not got:

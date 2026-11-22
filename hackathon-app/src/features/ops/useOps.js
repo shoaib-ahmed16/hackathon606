@@ -13,7 +13,6 @@ import {
   useGetDecisionLogQuery,
   useGetExceptionsQuery,
   useGetFlightsQuery,
-  useGetKpisQuery,
   useGetRulesQuery,
   useGetDataRequestsQuery,
   useGetRuleMatchesQuery,
@@ -27,6 +26,7 @@ import { selectCase, selectOps } from './opsSlice';
 import { refreshAll } from './refresh';
 
 const EMPTY_LIST = [];
+const arr = (x) => (Array.isArray(x) ? x : EMPTY_LIST);   // a reply that is null or not a list shows as empty, never as a crash
 const EMPTY_RULES = { rules: [], flights: {}, errors: [] };
 const POLL_FALLBACK = 10000; // the one auto-refresh timer while the live stream is down
 const POLL_LIVE = 60000;     // a slow safety net while the live stream is connected (it pushes every change)
@@ -64,7 +64,6 @@ export function useOps() {
   const plan = useGetRecoveryPlanQuery(ctx, opt);
   const decisions = useGetDecisionLogQuery(ctx, opt);
   const exceptions = useGetExceptionsQuery({ scenario_id: ops.scenarioId }, opt);
-  const kpis = useGetKpisQuery({ case_id: ops.caseId }, opt);
   const rules = useGetRulesQuery({ scenario_id: ops.scenarioId }, { skip: !ops.scenarioId });   // changes only when someone saves a rule, which refreshes it
   const ruleMatches = useGetRuleMatchesQuery(ctx, opt);
   const requests = useGetDataRequestsQuery({ scenario_id: ops.scenarioId, status: 'OPEN' }, { skip: !ops.scenarioId });
@@ -156,6 +155,8 @@ export function useOps() {
   // A failed poll must not wipe a screen that already has data: the last good data stays on show and a thin banner says the link is down.
   // Only a failure with nothing to show (first load) becomes the full-page error.
   const failed = [cases, flights, crew].filter((r) => r.isError);
+  const rm = ruleMatches.data;
+  const ruleMatchesSafe = useMemo(() => (rm && typeof rm === 'object' ? { rules: arr(rm.rules), flights: rm.flights && typeof rm.flights === 'object' ? rm.flights : {}, errors: arr(rm.errors) } : EMPTY_RULES), [rm]);
   const firstError = failed.find((r) => r.data === undefined);
   const reconnecting = failed.length > 0 && !firstError;
 
@@ -165,28 +166,27 @@ export function useOps() {
     kase,
     actor,
     cases: openCases,
-    alternates: alternates.data ?? EMPTY_LIST,
-    flights: flights.data ?? [],
-    crew: crew.data ?? [],
-    airport: airport.data ?? [],
-    plan: plan.data ?? [],
-    decisions: decisions.data ?? [],
-    exceptions: exceptions.data ?? [],
-    deadlines: deadlines.data?.items ?? [],
-    options: options.data ?? [],
+    alternates: arr(alternates.data),
+    flights: arr(flights.data),
+    crew: arr(crew.data),
+    airport: arr(airport.data),
+    plan: arr(plan.data),
+    decisions: arr(decisions.data),
+    exceptions: arr(exceptions.data),
+    deadlines: arr(deadlines.data?.items),
+    options: arr(options.data),
     refreshedAt: flights.fulfilledTimeStamp,
     fetching: flights.isFetching || cases.isFetching || crew.isFetching,
     refreshNow,
     everySec: every / 1000,
-    fuel: fuel.data ?? [],
-    diversions: diversions.data ?? [],
-    kpis: kpis.data,
-    rules: rules.data ?? [],
-    ruleMatches: ruleMatches.data ?? EMPTY_RULES,
-    approvals: approvals.data ?? [],
+    fuel: arr(fuel.data),
+    diversions: arr(diversions.data),
+    rules: arr(rules.data),
+    ruleMatches: ruleMatchesSafe,
+    approvals: arr(approvals.data),
     subscribed,
     teams,
-    openRequests: requests.data ?? EMPTY_LIST,
+    openRequests: arr(requests.data),
     notifications: notifications.data ?? { unread: 0, items: [] },
     isLoading:
       cases.isLoading ||

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAppDispatch } from '@/app/hooks';
@@ -25,6 +25,8 @@ import ApprovalsDrawer from './drawers/ApprovalsDrawer';
 import NotesDrawer from './drawers/NotesDrawer';
 import AirportSheet from './sheets/AirportSheet';
 import AskChat from './drawers/AskChat';
+import SectionSkeleton from '@/components/SectionSkeleton';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import NewCaseSheet from './sheets/NewCaseSheet';
 import ReportSheet from './sheets/ReportSheet';
 import WhatIfSheet from './sheets/WhatIfSheet';
@@ -174,8 +176,8 @@ function Clock({ refreshedAt, kase, role }) {
 
 function altChip(code, airport) {
   const a = airport.find((x) => x.iata === code);
-  if (!a) return { cls: 'verify', mark: '?', text: 'verify' };
-  if (a.op_status !== 'OPEN') return { cls: 'blocked', mark: '✕', text: a.op_status.toLowerCase() };
+  if (!a || !a.op_status) return { cls: 'verify', mark: '?', text: 'verify' };
+  if (a.op_status !== 'OPEN') return { cls: 'blocked', mark: '✕', text: String(a.op_status).toLowerCase() };
   if (a.fuel_ok === false) return { cls: 'blocked', mark: '✕', text: 'No fuel' };
   // free stands = what the station reported minus diverted aircraft still on the ground there (the stand is given back when they leave)
   const free = a.stands_free ?? a.parking_available;
@@ -244,7 +246,7 @@ function Strip({ d, onSheet, onAirport }) {
           >
             {cases.map((c) => (
               <option key={c.case_id} value={c.case_id}>
-                #{c.case_id} {c.title} ({c.scenario_kind.toLowerCase()})
+                #{c.case_id} {c.title} ({String(c.scenario_kind ?? '').toLowerCase()})
               </option>
             ))}
           </select>
@@ -302,7 +304,7 @@ function Strip({ d, onSheet, onAirport }) {
       <div className="strip-actions">
         <button type="button" className="btn icon-btn refresh-btn" onClick={d.refreshNow} disabled={d.fetching} aria-label="Refresh now"
           title={`Refresh now. Updated ${d.refreshedAt ? new Date(d.refreshedAt).toLocaleTimeString() : 'just now'}; refreshes by itself every ${d.everySec} s, and right after any action.`}>
-          <svg className={d.fetching ? 'spin' : ''} width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v6h-6" /></svg>
+          <svg className={d.fetching ? 'rf-spin' : ''} width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v6h-6" /></svg>
         </button>
         <button className="btn" onClick={() => onSheet('approvals')} data-src="decision PROPOSED ⨝ approval_policy" title="Decisions waiting for your approval">
           Approvals <span className="badge-count" style={{ visibility: pending > 0 ? 'visible' : 'hidden' }}>{pending || 0}</span>
@@ -593,7 +595,11 @@ export default function ConsoleLayout() {
               </section>
             </div>
           ) : (
-            <Outlet />
+            <ErrorBoundary label="page">
+              <Suspense fallback={<SectionSkeleton />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           )}
         </div>
         {sheet === 'approvals' && <ApprovalsDrawer d={d} onClose={close} />}

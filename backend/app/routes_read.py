@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
 
+from . import cache
 from .db import fetch, live_scenario_id, view
 
 r = APIRouter(prefix="/api", tags=["read models"])
@@ -43,10 +44,16 @@ def flights(scenario_id: int | None = None, case_id: int | None = None, limit: i
     """Single flight watch: status, ETA, fog exposure, captain, duty margin, recommendation, decision, owner, severity, tags."""
     # The case filter is added only when given and as a plain equality: with "(%s IS NULL OR case_id = %s)" Postgres cannot push
     # it down into the heavy v_flight_watch view and evaluates EVERY case of the scenario (23 s for a 94-flight case).
-    where, params = "w.scenario_id = %s", [scn(scenario_id)]
+    sid = scn(scenario_id)
+    where, params = "w.scenario_id = %s", [sid]
     if case_id is not None:
         where += " AND w.case_id = %s"
         params.append(case_id)
+    params = [sid, *params]   # the passengers sub-select comes first in the SQL text
+    return cache.cached(("flights", sid, case_id, int(limit)), 3.0, lambda: _flights_rows(where, params, limit))
+
+
+def _flights_rows(where, params, limit):
     return fetch(
         f"""SELECT w.*, sv.severity_score, sv.connecting_pax, fcl.max_fdp_min, fcl.projected_end_utc,
                    -- connecting passengers whose onward flight is really threatened (less than the minimum connection time, flight diverted or cancelled)
@@ -54,12 +61,14 @@ def flights(scenario_id: int | None = None, case_id: int | None = None, limit: i
                        AND dv.status NOT IN ('DEPARTED','CLOSED','CANCELLED') ORDER BY dv.diversion_id DESC LIMIT 1) AS flight_plan_filed_at,
                    (SELECT dv.load_sheet_ready_at FROM diversion dv WHERE dv.scenario_id = w.scenario_id AND dv.original_flight_id = w.flight_id
                        AND dv.status NOT IN ('DEPARTED','CLOSED','CANCELLED') ORDER BY dv.diversion_id DESC LIMIT 1) AS load_sheet_ready_at,
-                   COALESCE((SELECT sum(r.pax_count) FROM v_connection_risk r WHERE r.scenario_id = w.scenario_id AND r.inbound_flight_id = w.flight_id
-                                AND r.connection_status <> 'OK'), 0)::int AS pax_at_risk,
+                   COALESCE(pr.pax_at_risk, 0)::int AS pax_at_risk,
                    COALESCE((SELECT array_agg(ft.tag ORDER BY ft.tag) FROM flight_tag ft WHERE ft.scenario_id = w.scenario_id AND ft.flight_id = w.flight_id), '{{}}'::text[]) AS tags
               FROM v_flight_watch w
               LEFT JOIN v_flight_severity sv ON sv.case_id = w.case_id AND sv.flight_id = w.flight_id AND sv.scenario_id = w.scenario_id
               LEFT JOIN v_flight_crew_legality fcl ON fcl.scenario_id = w.scenario_id AND fcl.flight_id = w.flight_id
+              -- connecting passengers at risk, summed ONCE per inbound flight (one pass over the connections, not one lookup per flight)
+              LEFT JOIN (SELECT inbound_flight_id, sum(pax_count) AS pax_at_risk FROM v_connection_risk WHERE scenario_id = %s AND connection_status <> 'OK'
+                          GROUP BY inbound_flight_id) pr ON pr.inbound_flight_id = w.flight_id
              WHERE {where}
              ORDER BY coalesce(w.eta_utc, w.sta_utc) LIMIT {int(limit)}""",
         params,

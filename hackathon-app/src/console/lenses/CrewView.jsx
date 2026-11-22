@@ -72,8 +72,8 @@ function RowSectors({ dutyId, scenarioId, fallback }) {
 // the minutes short still show). DISCRETION REQUIRED / EXCEEDED belong to the current leg (N) once a flight is actually diverted.
 const n1Risk = (st) => (st === 'DISCRETION_REQUIRED' || st === 'EXCEEDED' ? 'AT_RISK' : st);
 const withExtra = (base, extra) =>
-  base.map((c) => {
-    const x = extra.find((e) => e.crew_id === c.crew_id);
+  (base ?? []).map((c) => {
+    const x = (extra ?? []).find((e) => e.crew_id === c.crew_id);
     const m = x && x.margin_n1_extra_min != null
       ? { ...c, status_n1: x.status_n1_extra, margin_n1_min: x.margin_n1_extra_min, via: x.alt_iata, x }
       : c;
@@ -85,7 +85,7 @@ function Outlook({ dutyId, scenarioId }) {
   const { showN1 } = useDutyContext(dutyId, scenarioId);
   const { data: base = [] } = useGetLegOutlookQuery({ scenario_id: scenarioId, duty_id: dutyId });
   const { data: extra = [] } = useGetN1ExtraSectorQuery({ scenario_id: scenarioId, duty_id: dutyId }, { skip: !showN1 });
-  const data = showN1 ? withExtra(base, extra) : base;
+  const data = showN1 ? withExtra(base ?? [], extra ?? []) : base ?? [];
   if (!data.length) return null;
   const rank = ['LEGAL', 'AT_RISK', 'DISCRETION_REQUIRED', 'VERIFICATION_REQUIRED', 'EXCEEDED'];
   const worst = (key) => data.reduce((a, c) => (rank.indexOf(c[key]) > rank.indexOf(a) ? c[key] : a), 'LEGAL');
@@ -165,7 +165,7 @@ function CrewDetail({ dutyId, scenarioId, crew }) {
   const { sectors, showN1 } = useDutyContext(dutyId, scenarioId);
   const { data: base = [], isFetching } = useGetLegOutlookQuery({ scenario_id: scenarioId, duty_id: dutyId });
   const { data: extra = [] } = useGetN1ExtraSectorQuery({ scenario_id: scenarioId, duty_id: dutyId }, { skip: !showN1 });
-  const data = showN1 ? withExtra(base, extra) : base;
+  const data = showN1 ? withExtra(base ?? [], extra ?? []) : base ?? [];
   const sev = (c) => Math.max(SEV.indexOf(c.status_n), showN1 ? SEV.indexOf(c.status_n1) : 0);
   const { data: nl = [] } = useGetNextDutyLegalQuery({ scenario_id: scenarioId, duty_id: dutyId });
   const next = (id) => nl.find((x) => x.crew_id === id);

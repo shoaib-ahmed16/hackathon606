@@ -11,8 +11,6 @@ cp .env.example .env
 npm run dev        # http://localhost:3000
 ```
 
-Demo login (dummyjson.com backend): **emilys / emilyspass**. Sign up works but is only simulated by that backend.
-
 ## Commands
 
 |                             |                                           |
@@ -20,7 +18,7 @@ Demo login (dummyjson.com backend): **emilys / emilyspass**. Sign up works but i
 | `npm run dev`               | dev server                                |
 | `npm run check`             | lint + build (run before every push)      |
 | `npm run format`            | Prettier                                  |
-| `docker compose up --build` | production image on http://localhost:8080 |
+| `docker compose up --build` | production image on http://130.61.182.207:8080/ |
 
 ## What's included
 
