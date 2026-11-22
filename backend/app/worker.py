@@ -14,7 +14,7 @@ import time
 
 import psycopg
 
-from . import cache, config, routes_integrations, rules
+from . import cache, config, routes_integrations, rules, weather_feed
 from .db import fetch, live_scenario_id, tx
 
 log = logging.getLogger("fogops.worker")
@@ -204,6 +204,7 @@ async def run():
                 last_tick = 0.0
                 last_fuel = 0.0
                 last_recalc = 0.0
+                last_weather = 0.0
                 while True:
                     await asyncio.to_thread(process_pending)  # also drains anything queued while we were away
                     try:  # entries for switched-off systems become manual tasks
@@ -236,6 +237,9 @@ async def run():
                             await asyncio.to_thread(_recalc_fuel_recommendations)
                         except Exception:  # noqa: BLE001 - must never stop the reassessment loop
                             log.exception("fuel recalculation failed")
+                    if config.WEATHER_FEED_ENABLED and time.monotonic() - last_weather >= config.WEATHER_EVERY_SEC:  # open weather data, never an airport status
+                        last_weather = time.monotonic()
+                        await asyncio.to_thread(weather_feed.pull_once)  # never raises
                     async for _ in conn.notifies(timeout=5):
                         break
         except asyncio.CancelledError:

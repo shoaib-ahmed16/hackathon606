@@ -15,7 +15,7 @@ def scn(scenario_id: int | None) -> int | None:
 
 @r.get("/scenarios")
 def scenarios():
-    return fetch("SELECT scenario_id, name, kind, parent_scenario_id, sim_clock_utc, description, is_active FROM scenario ORDER BY scenario_id")
+    return fetch("SELECT scenario_id, name, kind, parent_scenario_id, sim_clock_utc, description, is_active, use_external_weather FROM scenario ORDER BY scenario_id")
 
 
 @r.get("/users")
