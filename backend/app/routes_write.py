@@ -223,7 +223,14 @@ def create_case(b: NewCase, user=Depends(actor)):
         if not src:
             raise HTTPException(404, "Unknown scenario")
         if b.simulate_fog and src["kind"] == "LIVE":
+            live_scn = scn_id
             scn_id = conn.execute("SELECT clone_scenario(%s, %s, 'WHATIF') AS id", (scn_id, f"WHATIF {b.title.strip() or hub} {datetime.utcnow():%d%b %H:%M:%S}")).fetchone()["id"]
+            # clone_scenario does not copy fuel on board: without it every alternate shows FUEL_ENDURANCE_UNKNOWN and is never executable
+            # (same copy the what-if endpoint makes). Quality labels pass through unchanged.
+            conn.execute("""INSERT INTO flight_fuel_estimate (scenario_id, flight_id, as_of_utc, fuel_on_board_kg, min_diversion_fuel_kg, burn_rate_hold_kg_per_hr,
+                                      est_holding_endurance_min, quality, basis, entered_by)
+                            SELECT %s, flight_id, as_of_utc, fuel_on_board_kg, min_diversion_fuel_kg, burn_rate_hold_kg_per_hr, est_holding_endurance_min, quality, basis, entered_by
+                              FROM flight_fuel_estimate WHERE scenario_id = %s""", (scn_id, live_scn))
         case = conn.execute(
             "INSERT INTO disruption_case (scenario_id, title, hub_iata, cause, phase, opened_by) VALUES (%s,%s,%s,%s,'MONITORING',%s) RETURNING *",
             (scn_id, b.title.strip(), hub, b.cause, int(user)),
@@ -359,4 +366,17 @@ def scenario_clock(scenario_id: int, b: ClockBody, user=Depends(actor)):
         _require_role(conn, user, ("OCC", "ADMIN"))
         res = conn.execute("SELECT set_scenario_clock(%s,%s,%s,%s) AS r", (scenario_id, b.action, b.to_utc, b.minutes)).fetchone()
         return res["r"]
+
+
+class WeatherModeBody(BaseModel):
+    use_external_weather: bool        # true = the engine may use the stored real weather (METAR) for this scenario; false = only what is entered
+
+
+@r.post("/scenarios/{scenario_id}/weather")
+def scenario_weather(scenario_id: int, b: WeatherModeBody, user=Depends(actor)):
+    """Switch whether real weather (METAR history / live feed) may be used for this scenario (migrations 026-028). Off = the fog model runs on the
+    visibility and times of your own status entries and a real METAR cannot block or fill in an alternate. A person's entries win either way. OCC and admin only."""
+    with tx(user) as conn:
+        _require_role(conn, user, ("OCC", "ADMIN"))
+        return conn.execute("SELECT set_scenario_weather(%s,%s) AS r", (scenario_id, b.use_external_weather)).fetchone()["r"]
 

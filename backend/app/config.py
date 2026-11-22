@@ -16,6 +16,9 @@ TOKEN_TTL_SEC = int(os.environ.get("TOKEN_TTL_HOURS", "12")) * 3600
 DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD", "FogOps@2026")
 
 WORKER_ENABLED = os.environ.get("WORKER_ENABLED", "true").lower() == "true"
+# live METAR/TAF from aviationweather.gov (public, no key); off by default. It only stores observations and queues reassessments, never changes an airport status.
+WEATHER_FEED_ENABLED = os.environ.get("WEATHER_FEED_ENABLED", "false").lower() == "true"
+WEATHER_EVERY_SEC = int(os.environ.get("WEATHER_EVERY_SEC", "600"))
 
 # --- Ask (Claude). Leave the key unset and only the predefined questions work.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
