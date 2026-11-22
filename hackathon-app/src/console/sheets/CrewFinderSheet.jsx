@@ -12,6 +12,7 @@ import '../lenses/lenses.css';
 const tone = (ok) => (ok == null ? 'verify' : ok ? 'legal' : 'exceeded');
 const POS = { CANDIDATE_BASE_IS_DESTINATION: 'based at destination', DESTINATION_IS_HUB: 'at hub', ROAD_FROM_HUB: 'road from hub' };
 const posText = (c, dest) => (c.positioning_min == null ? `positioning to ${dest} not configured` : `${c.positioning_min} min positioning (${POS[c.positioning_basis] ?? c.positioning_basis})`);
+const SRC = { SIGNED_IN: 'signed in that day', STANDBY: 'standby', NO_SIGN_IN: 'no sign-in that day (counted as standby)' };
 const T = (iso) => (iso ? fmtZL(ms(iso)) : '-');
 
 // Who can replace a crew member of this flight's duty without breaking legality or the roster.
@@ -111,7 +112,7 @@ export default function CrewFinderSheet({ d, f, onClose }) {
           </p>
         )}
         {isFetching && <p className="k" aria-live="polite">Checking rest, roster conflicts, LVP, positioning to {destination} and the extra sector…</p>}
-        {data.map((c) => {
+        {data.slice(0, 50).map((c) => {
           const ok = c.verdict === 'CANDIDATE';
           return (
             <div key={c.crew_id} className={`cand ${ok ? '' : 'bad'} ${picked === c.crew_id ? 'picked' : ''}`}>
@@ -124,6 +125,9 @@ export default function CrewFinderSheet({ d, f, onClose }) {
                   <Pill tone={c.lvp_qualified ? 'legal' : 'exceeded'}>{c.lvp_qualified ? 'LVP ✓' : 'Not LVP'}</Pill>{' '}
                   <Pill tone={tone(c.ok_n)}>N={c.legs_n}: {c.margin_n_min == null ? 'verify' : `${fmtDur(c.margin_n_min)} margin`}</Pill>{' '}
                   <Pill tone={tone(c.ok_n1)}>N+1={c.legs_n1}: {c.margin_n1_min == null ? 'verify' : `${fmtDur(c.margin_n1_min)} margin`}</Pill>
+                </div>
+                <div className="k" style={{ marginTop: 2 }}>
+                  <b>Legality {fmtDur(c.legality_min)}</b> (flight needs {fmtDur(c.need_min)}) · {SRC[c.pool_source] ?? c.pool_source}
                 </div>
                 <div className="k" style={{ marginTop: 2 }}>
                   Week: {fmtDur(c.week_duty_min)} duty, {fmtDur(c.week_flying_min)} flying (pool avg {fmtDur(c.pool_avg_duty_min)} duty)
@@ -153,6 +157,7 @@ export default function CrewFinderSheet({ d, f, onClose }) {
           N = remaining legs of this duty, N+1 = one more sector (its own flying time is not included). Weekly workload is the roster in the
           last 7 days (the loaded roster may cover less); it ranks crew and is not a legal limit.
         </p>
+        {data.length > 50 && <p className="k">Showing the best 50 of {data.length}, most legality hours first.</p>}
         {!isFetching && data.length === 0 && <p className="k">No standby candidates for this position.</p>}
         <label className="field-l" htmlFor="cf-note">Note for the approvers (optional)</label>
         <textarea id="cf-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. crew will time out before an arrival slot" />

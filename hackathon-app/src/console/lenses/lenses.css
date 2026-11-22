@@ -83,3 +83,15 @@
 .dv-table tbody tr{cursor:pointer}
 .dv-table tbody tr:hover,.dv-table tbody tr.on{background:var(--surface-2)}
 .dv-table tbody tr:last-child td{border-bottom:none}
+
+/* Crew Control: duty sectors block inside the expanded crew list */
+.cd-sectors{margin:6px 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+.cd-srow{display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(170px,1fr) minmax(170px,1fr) 80px 100px;gap:12px;align-items:center;padding:4px 0}
+
+/* Crew Control row: sector list in the first column */
+.crew-view .rw-row{grid-template-columns:270px 120px minmax(220px,1fr) 190px 140px}
+.row-sectors{display:flex;flex-direction:column;gap:4px}
+.rs-line{display:block}
+
+/* no diversion: the N+1 column is not shown at all */
+.cd-row.no-n1{grid-template-columns:minmax(150px,1fr) minmax(190px,1fr) minmax(210px,1fr)}

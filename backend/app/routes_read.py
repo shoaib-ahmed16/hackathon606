@@ -141,6 +141,30 @@ def leg_outlook(duty_id: int, scenario_id: int | None = None):
     return fetch("SELECT * FROM crew_leg_outlook(%s,%s)", (scn(scenario_id), duty_id))
 
 
+@r.get("/crew/duty-sectors")
+def duty_sectors(duty_id: int, scenario_id: int | None = None):
+    """Sectors of a duty with their own hours (block, ground) and whether a diversion is in play. Display only."""
+    return fetch("SELECT * FROM crew_duty_sectors(%s,%s)", (scn(scenario_id), duty_id))
+
+
+@r.get("/crew/open-duties")
+def open_duties(scenario_id: int | None = None, limit: int = Query(2000, le=5000)):
+    """Every crew member whose duty is not over yet (PLANNED/ACTIVE), on any case. Includes VERIFICATION_REQUIRED crew."""
+    return fetch(
+        f"""SELECT v.*, cd.status AS duty_status FROM v_crew_legality_ranking v
+              JOIN crew_duty cd ON cd.duty_id = v.duty_id AND cd.status IN ('PLANNED','ACTIVE')
+             WHERE v.scenario_id = %s
+             ORDER BY v.legal_end_utc NULLS LAST, v.crew_id LIMIT {int(limit)}""",
+        (scn(scenario_id),),
+    )
+
+
+@r.get("/crew/n1-extra-sector")
+def n1_extra_sector(duty_id: int, scenario_id: int | None = None):
+    """N+1 per crew including the extra sector: return from the best-ranked alternate to the hub (engine times, P90 basis labelled)."""
+    return fetch("SELECT * FROM crew_n1_extra_sector(%s,%s)", (scn(scenario_id), duty_id))
+
+
 @r.get("/crew/next-duty-legal")
 def next_duty_legal(duty_id: int, scenario_id: int | None = None):
     """Per crew on a duty: duty end + minimum rest = from when they are legal for their next flight (rest is labelled ASSUMED)."""
